@@ -1,0 +1,59 @@
+[gd_scene format=2]
+
+[node name="Open2DH" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Open2GHMainUINode" type="Control" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Panel" type="Panel" parent="Open2GHMainUINode"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel"]
+margin_right = 40.0
+margin_bottom = 40.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer"]
+margin_right = 40.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer"]
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer"]
+margin_top = 4.0
+margin_right = 40.0
+margin_bottom = 4.0
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer"]
+margin_right = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer"]
+
+[node name="VSplitContainer" type="VSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VBoxContainer"]
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer"]
+margin_left = 12.0
+margin_right = 40.0
+
+[node name="ColorRect" type="ColorRect" parent="."]
+margin_right = 1026.0
+margin_bottom = 616.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+color = Color( 0.121569, 0.12549, 0.211765, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
