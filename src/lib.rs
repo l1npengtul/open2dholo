@@ -1,5 +1,5 @@
 use gdnative::prelude::*;
-
+use uvc::Device;
 // Function that registers all exposed classes to Godot
 fn init(handle: InitHandle) {
 }
