@@ -1,5 +1,4 @@
 use gdnative::prelude::*;
-use uvc::Device;
 
 mod main;
 fn init(handle: InitHandle) {
