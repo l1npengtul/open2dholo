@@ -1,4 +1,6 @@
-[gd_scene format=2]
+[gd_scene load_steps=2 format=2]
+
+[sub_resource type="World" id=1]
 
 [node name="Open2DH" type="Control"]
 anchor_right = 1.0
@@ -81,6 +83,9 @@ margin_bottom = 36.0
 stretch = true
 
 [node name="Viewport" type="Viewport" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer"]
+size = Vector2( 600, 600 )
+size_override_stretch = true
+world = SubResource( 1 )
 handle_input_locally = false
 render_target_update_mode = 3
 
@@ -91,6 +96,7 @@ stretch = true
 
 [node name="Viewport" type="Viewport" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer2"]
 size = Vector2( 0, 24 )
+size_override_stretch = true
 handle_input_locally = false
 render_target_update_mode = 3
 
@@ -98,6 +104,20 @@ render_target_update_mode = 3
 margin_left = 12.0
 margin_right = 12.0
 margin_bottom = 36.0
+
+[node name="ViewportContainer" type="ViewportContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer"]
+
+[node name="Viewport" type="Viewport" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer/ViewportContainer"]
+handle_input_locally = false
+render_target_update_mode = 3
+
+[node name="ViewportContainer2" type="ViewportContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer"]
+margin_top = 12.0
+margin_bottom = 36.0
+
+[node name="Viewport" type="Viewport" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer/ViewportContainer2"]
+handle_input_locally = false
+render_target_update_mode = 3
 
 [node name="TabContainer" type="TabContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer"]
 margin_left = 24.0

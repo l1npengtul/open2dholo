@@ -1,4 +1,7 @@
-use gdnative::prelude::*;
+use gdnative::{
+    prelude::*,
+    NativeClass, nativescript, methods, api::*
+};
 
 #[derive(NativeClass)]
 #[inherit(Control)]
