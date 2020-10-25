@@ -1,12 +1,12 @@
 [gd_scene load_steps=4 format=2]
 
-[ext_resource path="res://test_wrld.tscn" type="PackedScene" id=1]
+[ext_resource path="res://Model.tscn" type="PackedScene" id=1]
 
 [sub_resource type="ViewportTexture" id=1]
-viewport_path = NodePath("Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer/Viewport")
+viewport_path = NodePath("Viewport")
 
 [sub_resource type="ViewportTexture" id=2]
-viewport_path = NodePath("Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer2/Viewport")
+viewport_path = NodePath("Viewport")
 
 [node name="Open2DH" type="Control"]
 anchor_right = 1.0
@@ -16,8 +16,8 @@ __meta__ = {
 }
 
 [node name="ColorRect" type="ColorRect" parent="."]
-margin_right = 1026.0
-margin_bottom = 616.0
+margin_right = 1251.0
+margin_bottom = 754.0
 grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
@@ -35,132 +35,339 @@ __meta__ = {
 }
 
 [node name="Panel" type="Panel" parent="Open2GHMainUINode"]
-margin_right = 1056.0
-margin_bottom = 613.0
+margin_left = -1.68188
+margin_right = 1098.32
+margin_bottom = 684.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel"]
-margin_right = 40.0
-margin_bottom = 40.0
+margin_left = 16.0
+margin_top = 17.0
+margin_right = 1016.0
+margin_bottom = 582.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer"]
-margin_right = 432.0
-margin_bottom = 14.0
+margin_right = 1000.0
+margin_bottom = 20.0
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer"]
-margin_right = 112.0
-margin_bottom = 14.0
+margin_right = 148.0
+margin_bottom = 20.0
 
-[node name="File" type="Label" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
-margin_right = 23.0
-margin_bottom = 14.0
+[node name="File" type="MenuButton" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
+margin_right = 35.0
+margin_bottom = 20.0
+size_flags_horizontal = 12
+size_flags_vertical = 12
 text = "File"
 
-[node name="Settings" type="Label" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
-margin_left = 27.0
-margin_right = 78.0
-margin_bottom = 14.0
+[node name="PopupMenu2" type="PopupMenu" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File"]
+margin_right = 20.0
+margin_bottom = 20.0
+popup_exclusive = true
+allow_search = true
+
+[node name="Settings" type="MenuButton" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
+margin_left = 39.0
+margin_right = 102.0
+margin_bottom = 20.0
+size_flags_horizontal = 12
+size_flags_vertical = 12
 text = "Settings"
 
-[node name="Help" type="Label" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
-margin_left = 82.0
-margin_right = 112.0
-margin_bottom = 14.0
+[node name="PopupMenu2" type="PopupMenu" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Settings"]
+margin_right = 20.0
+margin_bottom = 20.0
+popup_exclusive = true
+allow_search = true
+
+[node name="Help" type="MenuButton" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
+margin_left = 106.0
+margin_right = 148.0
+margin_bottom = 20.0
+size_flags_horizontal = 12
+size_flags_vertical = 12
 text = "Help"
 
+[node name="PopupMenu2" type="PopupMenu" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help"]
+margin_right = 20.0
+margin_bottom = 20.0
+popup_exclusive = true
+allow_search = true
+
 [node name="HSplitContainer" type="HSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer"]
-margin_top = 18.0
-margin_right = 432.0
-margin_bottom = 430.0
-grow_horizontal = 2
+margin_top = 24.0
+margin_right = 1000.0
+margin_bottom = 565.0
 grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+split_offset = 60
 
-[node name="HSplitContainer" type="HSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer"]
-margin_right = 412.0
-margin_bottom = 412.0
+[node name="VSplitContainer" type="VSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer"]
+margin_right = 668.0
+margin_bottom = 541.0
+split_offset = 24
 
-[node name="VSplitContainer2" type="VSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer"]
-margin_right = 200.0
-margin_bottom = 412.0
-rect_min_size = Vector2( 100, 100 )
+[node name="HSplitContainer2" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer"]
+margin_right = 668.0
+margin_bottom = 352.0
+size_flags_horizontal = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2"]
+margin_right = 300.0
+margin_bottom = 352.0
+size_flags_vertical = 3
+alignment = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer"]
+margin_right = 300.0
+margin_bottom = 24.0
+size_flags_horizontal = 3
+
+[node name="Input" type="Label" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer/HBoxContainer"]
+margin_top = 5.0
+margin_right = 119.0
+margin_bottom = 19.0
+size_flags_horizontal = 3
+text = "Input"
+
+[node name="CheckBox" type="CheckBox" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer/HBoxContainer"]
+margin_left = 123.0
+margin_right = 199.0
+margin_bottom = 24.0
+text = "Disable"
+
+[node name="CheckBox2" type="CheckBox" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer/HBoxContainer"]
+margin_left = 203.0
+margin_right = 300.0
+margin_bottom = 24.0
+text = "CV Overlay"
+
+[node name="TextureRect" type="TextureRect" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer"]
+margin_top = 28.0
+margin_right = 300.0
+margin_bottom = 352.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+texture = SubResource( 1 )
+stretch_mode = 4
+
+[node name="Control" type="Control" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2"]
+margin_left = 304.0
+margin_right = 364.0
+margin_bottom = 352.0
+size_flags_horizontal = 3
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2"]
+margin_left = 368.0
+margin_right = 668.0
+margin_bottom = 352.0
+size_flags_vertical = 3
+alignment = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer2"]
+margin_right = 179.0
+margin_bottom = 24.0
+size_flags_horizontal = 0
+size_flags_vertical = 0
+
+[node name="Label" type="Label" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer2/HBoxContainer"]
+margin_top = 5.0
+margin_right = 99.0
+margin_bottom = 19.0
+size_flags_horizontal = 3
+text = "Output Preview"
+
+[node name="CheckBox" type="CheckBox" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer2/HBoxContainer"]
+margin_left = 103.0
+margin_right = 179.0
+margin_bottom = 24.0
+text = "Disable"
+
+[node name="TextureRect2" type="TextureRect" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2/VBoxContainer2"]
+margin_top = 28.0
+margin_right = 300.0
+margin_bottom = 352.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+texture = SubResource( 2 )
+stretch_mode = 4
+
+[node name="PanelContainer" type="PanelContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer"]
+margin_top = 364.0
+margin_right = 668.0
+margin_bottom = 541.0
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 661.0
+margin_bottom = 170.0
+split_offset = 200
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer"]
+margin_right = 433.0
+margin_bottom = 163.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer"]
+margin_right = 433.0
+margin_bottom = 24.0
+
+[node name="Label" type="Label" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer"]
+margin_top = 5.0
+margin_right = 305.0
+margin_bottom = 19.0
+size_flags_horizontal = 3
+text = "Terminal Output"
+
+[node name="Button" type="Button" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer"]
+margin_left = 309.0
+margin_right = 353.0
+margin_bottom = 24.0
+hint_tooltip = "Clear the current log output"
+text = "Clear"
+
+[node name="CheckBox" type="CheckBox" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer"]
+margin_left = 357.0
+margin_right = 433.0
+margin_bottom = 24.0
+text = "Disable"
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer"]
+margin_top = 28.0
+margin_right = 433.0
+margin_bottom = 135.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="ViewportContainer" type="ViewportContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2"]
-margin_right = 200.0
-margin_bottom = 200.0
-rect_min_size = Vector2( 200, 200 )
-size_flags_horizontal = 0
-size_flags_vertical = 0
-stretch = true
+[node name="HBoxContainer2" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer"]
+margin_top = 139.0
+margin_right = 433.0
+margin_bottom = 163.0
 
-[node name="Viewport" type="Viewport" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer"]
-size = Vector2( 200, 200 )
-size_override_stretch = true
-handle_input_locally = false
-render_target_update_mode = 3
+[node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer2"]
+margin_right = 386.0
+margin_bottom = 24.0
+size_flags_horizontal = 3
 
-[node name="Spatial" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer/Viewport" instance=ExtResource( 1 )]
+[node name="Send" type="Button" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer2"]
+margin_left = 390.0
+margin_right = 433.0
+margin_bottom = 24.0
+text = "Send"
 
-[node name="ViewportContainer2" type="ViewportContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2"]
-margin_top = 212.0
-margin_right = 200.0
-margin_bottom = 412.0
-rect_min_size = Vector2( 200, 200 )
-size_flags_horizontal = 0
-size_flags_vertical = 2
-stretch = true
+[node name="VBoxContainer2" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer"]
+margin_left = 445.0
+margin_right = 654.0
+margin_bottom = 163.0
 
-[node name="Viewport" type="Viewport" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer2"]
-size = Vector2( 200, 200 )
-size_override_stretch = true
-handle_input_locally = false
-render_target_update_mode = 3
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2"]
+margin_right = 209.0
+margin_bottom = 24.0
 
-[node name="Spatial" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer2/ViewportContainer2/Viewport" instance=ExtResource( 1 )]
+[node name="Label" type="Label" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2/HBoxContainer"]
+margin_top = 5.0
+margin_right = 81.0
+margin_bottom = 19.0
+size_flags_horizontal = 2
+text = "Performance"
 
-[node name="VSplitContainer" type="VSplitContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer"]
-margin_left = 212.0
-margin_right = 412.0
-margin_bottom = 412.0
+[node name="CheckBox" type="CheckBox" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2/HBoxContainer"]
+margin_left = 133.0
+margin_right = 209.0
+margin_bottom = 24.0
+text = "Disable"
 
-[node name="TextureRect" type="TextureRect" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer"]
-margin_right = 200.0
-margin_bottom = 200.0
-size_flags_horizontal = 0
-size_flags_vertical = 0
-texture = SubResource( 1 )
+[node name="RichTextLabel" type="RichTextLabel" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2"]
+margin_top = 28.0
+margin_right = 209.0
+margin_bottom = 139.0
+size_flags_horizontal = 9
+size_flags_vertical = 3
 
-[node name="TextureRect2" type="TextureRect" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/HSplitContainer/VSplitContainer"]
-margin_top = 212.0
-margin_right = 200.0
-margin_bottom = 412.0
-size_flags_horizontal = 0
-size_flags_vertical = 0
-texture = SubResource( 2 )
+[node name="Button" type="Button" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2"]
+margin_left = 119.0
+margin_top = 143.0
+margin_right = 209.0
+margin_bottom = 163.0
+size_flags_horizontal = 8
+size_flags_vertical = 8
+text = "Log to File..."
 
 [node name="TabContainer" type="TabContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer"]
-margin_left = 424.0
-margin_right = 432.0
-margin_bottom = 412.0
+margin_left = 680.0
+margin_right = 1000.0
+margin_bottom = 541.0
 tab_align = 0
 
-[node name="Model" type="Control" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+[node name="Model" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
 margin_top = 32.0
 margin_right = -4.0
 margin_bottom = -4.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
-[node name="Camera" type="Control" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+[node name="Grid" type="GridContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model"]
+margin_right = 312.0
+margin_bottom = 501.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid"]
+margin_right = 296.0
+margin_bottom = 485.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid/VBoxContainer"]
+margin_right = 296.0
+margin_bottom = 24.0
+placeholder_text = "Filter Properties..."
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid/VBoxContainer"]
+margin_top = 28.0
+margin_right = 296.0
+margin_bottom = 485.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid"]
+margin_left = 300.0
+margin_right = 312.0
+margin_bottom = 485.0
+size_flags_horizontal = 8
+size_flags_vertical = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HScrollBar" type="HScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid"]
+margin_top = 489.0
+margin_right = 296.0
+margin_bottom = 501.0
+
+[node name="Output" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
 visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -169,8 +376,39 @@ margin_top = 32.0
 margin_right = -4.0
 margin_bottom = -4.0
 
-[node name="Output" type="Control" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
-visible = false
+[node name="GridContainer" type="GridContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output"]
+margin_right = 312.0
+margin_bottom = 505.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
+margin_right = 296.0
+margin_bottom = 489.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer"]
+margin_right = 296.0
+margin_bottom = 24.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer"]
+margin_top = 28.0
+margin_right = 296.0
+margin_bottom = 28.0
+
+[node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
+margin_left = 300.0
+margin_right = 312.0
+margin_bottom = 489.0
+
+[node name="HScrollBar" type="HScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
+margin_top = 493.0
+margin_right = 296.0
+margin_bottom = 505.0
+
+[node name="Input" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -178,5 +416,36 @@ margin_top = 32.0
 margin_right = -4.0
 margin_bottom = -4.0
 
-[node name="Spatial" type="Spatial" parent="."]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.55906 )
+[node name="GridContainer" type="GridContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input"]
+margin_right = 312.0
+margin_bottom = 505.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
+margin_right = 296.0
+margin_bottom = 489.0
+
+[node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_right = 296.0
+margin_bottom = 24.0
+
+[node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
+margin_left = 300.0
+margin_right = 312.0
+margin_bottom = 489.0
+size_flags_vertical = 3
+
+[node name="HScrollBar" type="HScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
+margin_top = 493.0
+margin_right = 296.0
+margin_bottom = 505.0
+size_flags_horizontal = 3
+
+[node name="Viewport" parent="." instance=ExtResource( 1 )]
+size = Vector2( 300, 300 )
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2( 512, 300 )
+current = true
