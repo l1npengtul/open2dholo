@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=2]
+[gd_scene load_steps=5 format=2]
 
 [ext_resource path="res://Model.tscn" type="PackedScene" id=1]
+[ext_resource path="res://src/GDScript/scene_tree_edit.gd" type="Script" id=2]
 
 [sub_resource type="ViewportTexture" id=1]
 viewport_path = NodePath("Viewport")
@@ -316,8 +317,7 @@ margin_right = 1000.0
 margin_bottom = 541.0
 tab_align = 0
 
-[node name="Model" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
-visible = false
+[node name="Scene" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -327,45 +327,44 @@ margin_bottom = -4.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="Grid" type="GridContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model"]
+[node name="Grid" type="GridContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene"]
 margin_right = 312.0
-margin_bottom = 501.0
+margin_bottom = 505.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 columns = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
 margin_right = 296.0
-margin_bottom = 485.0
+margin_bottom = 489.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid/VBoxContainer"]
+[node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid/VBoxContainer"]
 margin_right = 296.0
 margin_bottom = 24.0
 placeholder_text = "Filter Properties..."
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid/VBoxContainer"]
+[node name="Tree" type="Tree" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid/VBoxContainer"]
 margin_top = 28.0
 margin_right = 296.0
-margin_bottom = 485.0
-size_flags_horizontal = 3
-size_flags_vertical = 3
+margin_bottom = 29.0
+script = ExtResource( 2 )
 
-[node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid"]
+[node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
 margin_left = 300.0
 margin_right = 312.0
-margin_bottom = 485.0
+margin_bottom = 489.0
 size_flags_horizontal = 8
 size_flags_vertical = 3
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="HScrollBar" type="HScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Model/Grid"]
-margin_top = 489.0
+[node name="HScrollBar" type="HScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
+margin_top = 493.0
 margin_right = 296.0
-margin_bottom = 501.0
+margin_bottom = 505.0
 
 [node name="Output" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
 visible = false
@@ -409,6 +408,7 @@ margin_right = 296.0
 margin_bottom = 505.0
 
 [node name="Input" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
