@@ -1,8 +1,11 @@
 use gdnative::prelude::*;
+pub mod open2dhctrl;
+pub mod model_tree_edit;
 
-mod main;
-fn init(handle: InitHandle) {
+fn init(handle: InitHandle){
+    handle.add_class::<self::open2dhctrl::Main>();
+    handle.add_class::<self::model_tree_edit::ModelTreeEditor>()
 }
 
-// Macro that creates the entry-points of the dynamic library.
 godot_init!(init);
+// Macro that creates the entry-points of the dynamic library.

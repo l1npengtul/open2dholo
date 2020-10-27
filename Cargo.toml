@@ -7,8 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gdnative = "0.9.0"
-opencv = "0.46.1"
+gdnative = "0.9.1"
 
 [dependencies.uvc] # TODO: Change back to main branch when updated
 git = "https://github.com/l1npengtul/libuvc-rs.git"
