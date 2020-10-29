@@ -7,12 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gdnative = "0.9.1"
 
 [dependencies.uvc] # TODO: Change back to main branch when updated
 git = "https://github.com/l1npengtul/libuvc-rs.git"
 features = ["vendor"]
 
+[dependencies.gdnative]
+version = "0.9.1"
+features = ["bindings"]
 
 [lib]
 crate-type = ["cdylib"]

@@ -1,8 +1,7 @@
 use gdnative::{
     prelude::*,
-    NativeClass, nativescript, methods, api::*
+    NativeClass, api::*
 };
-
 #[derive(NativeClass)]
 #[inherit(Tree)]
 pub struct ModelTreeEditor;
@@ -14,6 +13,10 @@ impl ModelTreeEditor {
     }
     #[export]
     fn _ready(&self, _owner: &Tree) {
+        match (_owner.create_item()) {
+            
+        };
+        _owner.set_hide_root(true);
     }
 }
 
