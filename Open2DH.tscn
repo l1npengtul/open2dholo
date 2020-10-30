@@ -1,6 +1,4 @@
-[gd_scene load_steps=4 format=2]
-
-[ext_resource path="res://src/GDScript/scene_tree_edit.gd" type="Script" id=2]
+[gd_scene load_steps=3 format=2]
 
 [sub_resource type="ViewportTexture" id=1]
 viewport_path = NodePath("Viewport")
@@ -11,13 +9,15 @@ viewport_path = NodePath("Viewport")
 [node name="Open2DH" type="Control"]
 anchor_right = 1.0
 anchor_bottom = 1.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
 [node name="ColorRect" type="ColorRect" parent="."]
-margin_right = 1251.0
-margin_bottom = 754.0
+margin_right = 1105.0
+margin_bottom = 686.0
 grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
@@ -30,6 +30,8 @@ __meta__ = {
 [node name="Open2GHMainUINode" type="Control" parent="."]
 margin_right = 40.0
 margin_bottom = 40.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -66,8 +68,8 @@ margin_bottom = 20.0
 [node name="File" type="MenuButton" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
 margin_right = 35.0
 margin_bottom = 20.0
-size_flags_horizontal = 12
-size_flags_vertical = 12
+size_flags_horizontal = 13
+size_flags_vertical = 13
 text = "File"
 
 [node name="PopupMenu2" type="PopupMenu" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File"]
@@ -80,8 +82,8 @@ allow_search = true
 margin_left = 39.0
 margin_right = 102.0
 margin_bottom = 20.0
-size_flags_horizontal = 12
-size_flags_vertical = 12
+size_flags_horizontal = 13
+size_flags_vertical = 13
 text = "Settings"
 
 [node name="PopupMenu2" type="PopupMenu" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Settings"]
@@ -94,8 +96,8 @@ allow_search = true
 margin_left = 106.0
 margin_right = 148.0
 margin_bottom = 20.0
-size_flags_horizontal = 12
-size_flags_vertical = 12
+size_flags_horizontal = 13
+size_flags_vertical = 13
 text = "Help"
 
 [node name="PopupMenu2" type="PopupMenu" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help"]
@@ -342,7 +344,6 @@ placeholder_text = "Filter Properties..."
 margin_top = 28.0
 margin_right = 502.0
 margin_bottom = 29.0
-script = ExtResource( 2 )
 
 [node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
 margin_left = 506.0
@@ -435,7 +436,3 @@ margin_top = 493.0
 margin_right = 296.0
 margin_bottom = 505.0
 size_flags_horizontal = 3
-
-[node name="Camera2D" type="Camera2D" parent="."]
-position = Vector2( 512, 300 )
-current = true

@@ -17,6 +17,7 @@ impl ModelTreeEditor {
             
         };
         _owner.set_hide_root(true);
+    
     }
 }
 
