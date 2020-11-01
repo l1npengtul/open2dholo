@@ -1,6 +1,6 @@
 use gdnative::{
     prelude::*,
-    NativeClass, nativescript, methods, api::*
+    NativeClass, methods
 };
 
 #[derive(NativeClass)]

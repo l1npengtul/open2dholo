@@ -343,7 +343,9 @@ placeholder_text = "Filter Properties..."
 [node name="Tree" type="Tree" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid/VBoxContainer"]
 margin_top = 28.0
 margin_right = 502.0
-margin_bottom = 29.0
+margin_bottom = 489.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
 [node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
 margin_left = 506.0
