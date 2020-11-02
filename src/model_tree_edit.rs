@@ -19,6 +19,8 @@ impl ModelTreeEditor {
     }
     #[export]
     fn _ready(&self, owner: &Tree) {
+        godot_print!("hello, world.");
+
         let root_item : &TreeItem = unsafe{ &*owner.create_item(owner.assume_shared(), 0).unwrap().assume_safe()};
 
         // TODO: Less .unwrap() more error handle
