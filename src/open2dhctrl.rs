@@ -1,7 +1,7 @@
 use gdnative::{
     prelude::*,
     NativeClass, methods,
-    api::{Panel, VBoxContainer}
+    api::{Panel, VBoxContainer, Control}
 };
 use std::convert::TryInto;
 
@@ -26,14 +26,16 @@ impl Main {
     }
 
     #[export]
-    fn _ready(&self, owner: &Control) {
-        let root_viewport  = unsafe {*owner.get_parent().unwrap().assume_safe()};
-        root_viewport.connect(GodotString::from_str("on_resize"), owner, GodotString::from_str("on_screen_resize"), VariantArray::new_shared(), 0);
-
+    fn _ready(&self, owner: TRef<Control>) {
+        let root_viewport : &Viewport  = unsafe {&*owner.get_viewport().unwrap().assume_safe()};
+        root_viewport.connect("on_resize", owner, "on_screen_resize", VariantArray::new_shared(), 0);
+        let vector : Vector2 = root_viewport.size();
+        godot_print!("{}",vector.x);
+        godot_print!("{}",vector.y);
     }
     #[export]
     pub fn on_screen_resize(&self, _owner: &Control){
-
+        godot_print!("resize");
     }
 }
 
