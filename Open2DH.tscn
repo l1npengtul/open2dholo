@@ -1,13 +1,7 @@
-[gd_scene load_steps=5 format=2]
+[gd_scene load_steps=3 format=2]
 
 [ext_resource path="res://src/GDNative/ModelTreeEditor.gdns" type="Script" id=1]
 [ext_resource path="res://src/GDNative/Open2DH.gdns" type="Script" id=2]
-
-[sub_resource type="ViewportTexture" id=1]
-viewport_path = NodePath("Viewport")
-
-[sub_resource type="ViewportTexture" id=2]
-viewport_path = NodePath("Viewport")
 
 [node name="Open2DH" type="Control"]
 anchor_right = 1.0
@@ -169,7 +163,6 @@ margin_right = 215.0
 margin_bottom = 52.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-texture = SubResource( 1 )
 stretch_mode = 4
 
 [node name="Control" type="Control" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/HSplitContainer2"]
@@ -210,7 +203,6 @@ margin_right = 179.0
 margin_bottom = 52.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-texture = SubResource( 2 )
 stretch_mode = 4
 
 [node name="PanelContainer" type="PanelContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer"]
