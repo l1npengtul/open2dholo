@@ -22,17 +22,20 @@ impl Main {
     }
     #[export]
     pub fn on_size_change(&self, owner: &Control){
-        let root_viewport_size  = OS::new()
-        //let colorrect = unsafe {&*owner.get_node("ColorRect").unwrap().assume_safe().cast::<ColorRect>().unwrap()};
-        //let main_ui = unsafe {&*owner.get_node("Open2GHMainUINode").unwrap().assume_safe().cast::<Control>().unwrap()};
-        //let panel = unsafe {&*owner.get_node("Open2GHMainUINode/Panel").unwrap().assume_safe().cast::<Panel>().unwrap()};
+        let root_viewport_size  = OS::godot_singleton().window_size();
+        let colorrect = unsafe {&*owner.get_node("ColorRect").unwrap().assume_safe().cast::<ColorRect>().unwrap()};
+        let main_ui = unsafe {&*owner.get_node("Open2GHMainUINode").unwrap().assume_safe().cast::<Control>().unwrap()};
+        let panel = unsafe {&*owner.get_node("Open2GHMainUINode/Panel").unwrap().assume_safe().cast::<Panel>().unwrap()};
         let vbox = unsafe {&*owner.get_node("Open2GHMainUINode/Panel/VBoxContainer").unwrap().assume_safe().cast::<VBoxContainer>().unwrap()};
 
-        //colorrect.set_size(root_viewport_size, true);
-        //main_ui.set_size(root_viewport_size, true);
-        //panel.set_size(root_viewport_size, true);
-        vbox.set_size(root_viewport_size, true);
-        //owner.set_size(root_viewport_size, true);
+        let vbox_size = Vector2::new(root_viewport_size.x-(vbox.position().x*2.0),root_viewport_size.y-(vbox.position().y*2.0));
+
+        owner.set_size(root_viewport_size, true);
+        colorrect.set_size(root_viewport_size, true);
+        main_ui.set_size(root_viewport_size, true);
+        panel.set_size(root_viewport_size, true);
+        vbox.set_size(vbox_size, true);
+
     }
 
 }
