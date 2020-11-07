@@ -1,12 +1,12 @@
 // TODO: Change to acutal data format
 
-
-pub struct ThreadMessage{
+#[derive(Copy, Clone)]
+pub struct ThreadMessage {
     msg: MessageType,
     content: String,
 }
-impl ThreadMessage{
-    pub fn new(mt: MessageType, cnt: String) -> Self{
+impl ThreadMessage {
+    pub fn new(mt: MessageType, cnt: String) -> Self {
         ThreadMessage {
             msg: mt,
             content: cnt,
@@ -20,7 +20,7 @@ impl ThreadMessage{
     }
 }
 
-pub enum MessageType{
+pub enum MessageType {
     DIE,
     SET,
     CLOSE,

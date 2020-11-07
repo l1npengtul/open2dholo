@@ -1,27 +1,24 @@
+#![deny(clippy::pedantic)]
 use gdnative::prelude::*;
 use uvc;
 
-
-
-pub mod input_processer;
-pub mod model_tree_edit;
-pub mod open2dhctrl;
-pub mod process_packet;
-pub mod thread_packet;
+pub mod error;
+pub mod nodes;
+pub mod processing;
 
 #[macro_use]
 extern crate lazy_static;
 
 lazy_static! {
-    static ref UVC: uvc::Context = {
+    static ref UVC: uvc::Context<'static> = {
         let ctx = uvc::Context::new();
         ctx
     };
 }
 
 fn init(handle: InitHandle) {
-    handle.add_class::<self::open2dhctrl::Main>();
-    handle.add_class::<self::model_tree_edit::ModelTreeEditor>();
+    handle.add_class::<self::nodes::main::open2dhctrl>();
+    handle.add_class::<self::nodes::editor_tabs::model_tree_edit>();
 }
 
 godot_init!(init);

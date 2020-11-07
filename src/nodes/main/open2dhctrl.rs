@@ -4,7 +4,6 @@ use gdnative::{
     prelude::*,
     NativeClass,
 };
-use uvc;
 
 #[derive(NativeClass)]
 #[inherit(Control)]
@@ -12,7 +11,7 @@ pub struct Main;
 
 #[methods]
 impl Main {
-    fn new(owner: &Control) -> Self {
+    fn new(_owner: &Control) -> Self {
         Main
     }
 
