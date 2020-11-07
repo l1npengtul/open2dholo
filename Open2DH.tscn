@@ -228,6 +228,7 @@ margin_bottom = 542.0
 tab_align = 0
 
 [node name="Scene" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -279,7 +280,6 @@ margin_right = 490.0
 margin_bottom = 506.0
 
 [node name="Output" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
-visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -288,36 +288,48 @@ margin_right = -4.0
 margin_bottom = -4.0
 
 [node name="GridContainer" type="GridContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output"]
-margin_right = 312.0
-margin_bottom = 505.0
+margin_right = 506.0
+margin_bottom = 506.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 columns = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
-margin_right = 296.0
-margin_bottom = 489.0
+margin_right = 490.0
+margin_bottom = 490.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer"]
-margin_right = 296.0
+margin_right = 490.0
 margin_bottom = 24.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer"]
 margin_top = 28.0
-margin_right = 296.0
-margin_bottom = 28.0
+margin_right = 490.0
+margin_bottom = 490.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer/VBoxContainer"]
+margin_right = 490.0
+margin_bottom = 20.0
+size_flags_horizontal = 13
+
+[node name="MenuButton" type="MenuButton" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer/VBoxContainer/HBoxContainer"]
+margin_right = 38.0
+margin_bottom = 20.0
+text = "Pick"
 
 [node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
-margin_left = 300.0
-margin_right = 312.0
-margin_bottom = 489.0
+margin_left = 494.0
+margin_right = 506.0
+margin_bottom = 490.0
 
 [node name="HScrollBar" type="HScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
-margin_top = 493.0
-margin_right = 296.0
-margin_bottom = 505.0
+margin_top = 494.0
+margin_right = 490.0
+margin_bottom = 506.0
 
 [node name="Input" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
 visible = false

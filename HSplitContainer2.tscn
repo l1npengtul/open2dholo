@@ -72,22 +72,20 @@ size_flags_vertical = 11
 alignment = 2
 
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer2"]
-margin_left = 56.0
 margin_right = 235.0
 margin_bottom = 24.0
-size_flags_horizontal = 8
-size_flags_vertical = 12
+size_flags_horizontal = 3
 
 [node name="Label" type="Label" parent="VBoxContainer2/HBoxContainer"]
 margin_top = 5.0
-margin_right = 99.0
+margin_right = 155.0
 margin_bottom = 19.0
 size_flags_horizontal = 3
 text = "Output Preview"
 
 [node name="CheckBox" type="CheckBox" parent="VBoxContainer2/HBoxContainer"]
-margin_left = 103.0
-margin_right = 179.0
+margin_left = 159.0
+margin_right = 235.0
 margin_bottom = 24.0
 text = "Disable"
 

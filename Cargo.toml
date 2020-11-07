@@ -5,10 +5,13 @@ authors = ["l1npengtul <l1npengtul@protonmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# with every dependency added we get closer and closer to NPM levels of dependency
 
 [dependencies]
 parking_lot = "0.11.0"
 flume = "0.9.1"
+lazy_static = "1.4.0"
+rayon = "1.5.0"
 
 [dependencies.uvc] # TODO: Change back to main branch when updated
 git = "https://github.com/l1npengtul/libuvc-rs.git"
