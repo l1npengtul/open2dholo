@@ -1,27 +1,9 @@
+use crate::processing::device_description::DeviceDesc;
+
 // TODO: Change to acutal data format
-
-#[derive(Copy, Clone)]
-pub struct ThreadMessage {
-    msg: MessageType,
-    content: String,
-}
-impl ThreadMessage {
-    pub fn new(mt: MessageType, cnt: String) -> Self {
-        ThreadMessage {
-            msg: mt,
-            content: cnt,
-        }
-    }
-    pub fn get_message_type(&self) -> &MessageType {
-        &self.msg
-    }
-    pub fn get_message_content(&self) -> &String {
-        &self.content
-    }
-}
-
+#[derive(Clone)]
 pub enum MessageType {
-    DIE,
-    SET,
-    CLOSE,
+    DIE(u8),
+    SET(DeviceDesc),
+    CLOSE(u8),
 }
