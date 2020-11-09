@@ -9,6 +9,7 @@ pub mod processing;
 #[macro_use]
 extern crate lazy_static;
 
+// Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
     static ref UVC: uvc::Context<'static> = {
         let ctx = uvc::Context::new();
@@ -22,4 +23,3 @@ fn init(handle: InitHandle) {
 }
 
 godot_init!(init);
-// Macro that creates the entry-points of the dynamic library.

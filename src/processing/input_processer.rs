@@ -17,6 +17,8 @@ use std::{
     thread::{Builder, JoinHandle},
 };
 use std::sync::RwLock;
+use gdnative::api::VisualScriptSubCall;
+use std::convert::TryInto;
 
 struct InputProcessing {
     device: DeviceDesc,
@@ -32,15 +34,14 @@ impl InputProcessing {
     ) -> Self {
         let (to_thread_tx, to_thread_rx) = flume::unbounded();
         let (from_thread_tx, from_thread_rx) = flume::unbounded();
+        let description = DeviceDesc::from_description(bind_device);
         let thread = Builder::new()
             .name(format!(
                 "input-processor_{}-{}",
                 bind_device.product_id, num_thread
             ))
-            .spawn(move || input_process_func(to_thread_rx, from_thread_tx))
+            .spawn(move || input_process_func(to_thread_rx, from_thread_tx, description.clone()))
             .unwrap();
-        let description = DeviceDesc::from_description(bind_device);
-        to_thread_tx.send(MessageType::SET(description.clone()));
         InputProcessing {
             device: description,
             sender_p1: to_thread_tx,
@@ -67,38 +68,65 @@ impl Drop for InputProcessing {
     }
 }
 
-pub fn input_process_func(
+/*
+ * Thread Return Codes - VERY
+ * -1 = Thread Communication Error
+ * 0 = Sucessful Exit
+ * 1 = Device not found
+ * 2 = General Error
+ */
+
+fn input_process_func(
     recv: Receiver<MessageType>,
     send: Sender<Processed>,
+    startup_desc: DeviceDesc
 ) -> u8 {
     std::thread::sleep(Duration::from_millis(100));
-    let mut current_device: Option<DeviceDesc> = None;
-    'main: loop {
-        let incoming = match recv.try_recv() {
-            Ok(msg) => {
-                match msg {
-                    MessageType::SET(dev) => {
-                        current_device = Some(dev)
-                    }
-                    MessageType::CLOSE(code) => {
+    let device_serial = match startup_desc.ser {
+        Some(serial) => Some(&serial.to_owned()[..]),
+        None => None
+    };
+    let mut current_device: uvc::Device = match crate::UVC.find_device(startup_desc.vid, startup_desc.pid, device_serial) {
+        Ok(v) => v,
+        Err(why) => {
+            return 1;
+        }
+    };
+    current_device.open().unwrap().get_stream_handle_with_format()
+    0
+}
 
-                    }
-                    MessageType::DIE(exit) => {
-                        return exit;
-                    }
+fn trick_or_channel(message: Result<MessageType, TryRecvError>) -> DeviceOrTrick {
+    return match message {
+        Ok(msg) => {
+            match msg {
+                MessageType::SET(dev) => {
+                    DeviceOrTrick::Device(dev)
+                }
+                MessageType::CLOSE(code) => {
+                    DeviceOrTrick::Exit(code)
+                }
+                MessageType::DIE(exit) => {
+                    DeviceOrTrick::Exit(code)
                 }
             }
-            Err(e) => {
-                match e {
-                    TryRecvError::Disconnected => {
-                        return 0;
-                    }
-                    _ => {
-                        // spooky the error goes into the ether
-                    }
+        }
+        Err(e) => {
+            match e {
+                TryRecvError::Disconnected => {
+                    DeviceOrTrick::Exit(-1)
+                }
+                TryRecvError::Empty => {
+                    DeviceOrTrick::None
                 }
             }
         }
     }
-    0
+}
+
+// Trick or treat with death and webcams. Fun for the whole family!
+enum DeviceOrTrick {
+    Device(DeviceDesc),
+    Exit(u8),
+    None
 }
