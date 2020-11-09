@@ -79,7 +79,8 @@ impl Drop for InputProcessing {
 fn input_process_func(
     recv: Receiver<MessageType>,
     send: Sender<Processed>,
-    startup_desc: DeviceDesc
+    startup_desc: DeviceDesc,
+    startup_format:
 ) -> u8 {
     std::thread::sleep(Duration::from_millis(100));
     let device_serial = match startup_desc.ser {
@@ -88,7 +89,7 @@ fn input_process_func(
     };
     let mut current_device: uvc::Device = match crate::UVC.find_device(startup_desc.vid, startup_desc.pid, device_serial) {
         Ok(v) => v,
-        Err(why) => {
+        Err(_why) => {
             return 1;
         }
     };
