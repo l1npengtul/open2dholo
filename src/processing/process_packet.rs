@@ -7,11 +7,13 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct Processed {
     data: Vec<Vector2>,
-    frame_data: Option<Arc<RwLock<uvc::Frame>>>
+    frame_data: Option<Arc<RwLock<uvc::Frame>>>,
 }
 impl Processed {
     fn new(data: Vec<Vector2>, imgframe: Option<Arc<RwLock<uvc::Frame>>>) -> Self {
-        Processed { data,
-        frame_data: imgframe}
+        Processed {
+            data,
+            frame_data: imgframe,
+        }
     }
 }

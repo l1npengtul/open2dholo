@@ -7,5 +7,5 @@ pub enum InvalidDeviceError {
         vendor: String,
         prod: String,
         ser: String,
-    }
+    },
 }
