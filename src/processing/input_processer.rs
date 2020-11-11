@@ -17,6 +17,7 @@ use std::{
     thread::{Builder, JoinHandle},
     time::Duration,
 };
+use rayon::{ThreadPoolBuilder, ThreadPool, ThreadPoolBuildError};
 
 struct InputProcessing {
     device: DeviceDesc,
@@ -90,7 +91,6 @@ fn input_process_func(
     startup_format: uvc::StreamFormat,
 ) -> u8 {
     std::thread::sleep(Duration::from_millis(100));
-    //let processing_pool = rayon::
     let device_serial = match startup_desc.ser {
         Some(serial) => Some(serial),
         None => None,
@@ -106,6 +106,8 @@ fn input_process_func(
             return 1;
         }
     };
+    let processing_pool = ThreadPoolBuilder::new().num_threads(8).build();
+
     let counter = Arc::new(AtomicUsize::new(0));
     current_device
         .open()
