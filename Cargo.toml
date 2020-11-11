@@ -14,6 +14,7 @@ lazy_static = "1.4.0"
 thiserror = "1.0.22"
 cv-core = "0.15.0"
 dlib-face-recognition = "0.1.7"
+rayon = "1.5.0"
 
 [dependencies.uvc] # TODO: Change back to main branch when updated
 git = "https://github.com/l1npengtul/libuvc-rs.git"

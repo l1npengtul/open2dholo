@@ -7,15 +7,15 @@ use crate::{
     },
 };
 use flume::{Receiver, SendError, Sender, TryRecvError};
-use gdnative::api::VisualScriptSubCall;
-use std::convert::TryInto;
-use std::error::Error;
-use std::sync::atomic::AtomicUsize;
-use std::sync::RwLock;
-use std::time::Duration;
 use std::{
-    sync::Arc,
+    convert::TryInto,
+    error::Error,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize},
+        Arc, RwLock,
+    },
     thread::{Builder, JoinHandle},
+    time::Duration,
 };
 
 struct InputProcessing {
@@ -90,6 +90,7 @@ fn input_process_func(
     startup_format: uvc::StreamFormat,
 ) -> u8 {
     std::thread::sleep(Duration::from_millis(100));
+    //let processing_pool = rayon::
     let device_serial = match startup_desc.ser {
         Some(serial) => Some(serial),
         None => None,
@@ -111,9 +112,7 @@ fn input_process_func(
         .unwrap()
         .get_stream_handle_with_format(current_format)
         .unwrap()
-        .start_stream(|frame, count| {
-
-        }, counter.clone())
+        .start_stream(|frame, count| {}, counter.clone())
         .expect("Could not start stream!");
     0
 }
