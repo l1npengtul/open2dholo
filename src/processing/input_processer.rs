@@ -82,6 +82,7 @@ impl Drop for InputProcessing {
  * 1 = Device not found
  * 2 = General Error
  * 3 = Thread Communication Error
+ * 4 = Threadpool Error
  */
 
 fn input_process_func(
@@ -106,7 +107,15 @@ fn input_process_func(
             return 1;
         }
     };
-    let processing_pool = ThreadPoolBuilder::new().num_threads(8).build();
+    let threads = (1000/current_format.fps) + 1;
+    let processing_pool = match ThreadPoolBuilder::new().num_threads(threads as usize).build() {
+        Ok(v) => {
+            v
+        }
+        Err(_why) => {
+            return 4;
+        }
+    };
 
     let counter = Arc::new(AtomicUsize::new(0));
     current_device

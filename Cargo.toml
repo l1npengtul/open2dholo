@@ -15,6 +15,8 @@ thiserror = "1.0.22"
 cv-core = "0.15.0"
 dlib-face-recognition = "0.1.7"
 rayon = "1.5.0"
+ron = "0.6.2"
+serde = "1.0.117"
 
 [dependencies.uvc] # TODO: Change back to main branch when updated
 git = "https://github.com/l1npengtul/libuvc-rs.git"
@@ -24,9 +26,9 @@ features = ["vendor"]
 version = "0.9.1"
 features = ["bindings"]
 
-[dependencies.opencv]
-version = "0.46.3"
-features = ["buildtime-bindgen", "clang-runtime"]
+#[dependencies.opencv]
+#version = "0.46.3"
+#features = ["buildtime-bindgen", "clang-runtime"]
 
 [lib]
 crate-type = ["cdylib"]
