@@ -13,9 +13,9 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::atomic::{AtomicBool, AtomicUsize};
-use serde::{Deserialize, Serialize};
 use crate::processing::device_description::DeviceDesc;
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 
 #[derive(Deserialize, Serialize)]
 pub struct ProcessingConfig {
@@ -23,4 +23,3 @@ pub struct ProcessingConfig {
     pub(crate) max_threads: AtomicUsize,
     pub(crate) default_device: DeviceDesc,
 }
-

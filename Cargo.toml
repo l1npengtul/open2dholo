@@ -13,7 +13,6 @@ flume = "0.9.1"
 lazy_static = "1.4.0"
 thiserror = "1.0.22"
 cv-core = "0.15.0"
-dlib-face-recognition = "0.1.7"
 rayon = "1.5.0"
 ron = "0.6.2"
 serde = "1.0.117"
@@ -25,6 +24,10 @@ features = ["vendor"]
 [dependencies.gdnative]
 version = "0.9.1"
 features = ["bindings"]
+
+[dependencies.dlib-face-recognition]
+version = "0.1.7"
+features = ["embed-all"]
 
 #[dependencies.opencv]
 #version = "0.46.3"

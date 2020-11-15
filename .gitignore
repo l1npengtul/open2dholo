@@ -9,3 +9,5 @@ open2dh.iml
 .idea/
 .mono/
 addons/
+
+mmod_human_face_detector.dat

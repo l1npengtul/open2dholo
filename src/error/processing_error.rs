@@ -16,7 +16,12 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ThreadSendMessageError {
-    #[error("Error sending message to thread.")]
-    CannotSend,
+pub enum ProcessingError {
+    #[error("Could not get the CNN Facial Detection Model at filepath: {0}!")]
+    CNNModelNotFound(String),
+    #[error("Could not get the Facial Landmark Detector at filepath: {0}!")]
+    LandmarkPredictorNotFound(String),
+    #[error("Expected 68 landmark points, only found {0}!")]
+    AllPointsNotDetected(usize),
 }
+

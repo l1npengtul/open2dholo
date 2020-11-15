@@ -13,6 +13,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::nodes::editor_tabs::util::create_editable_item;
 use gdnative::{
     api::{tree::Tree, tree_item::*},
     prelude::*,
@@ -35,8 +36,6 @@ impl ModelTreeEditor {
     }
     #[export]
     fn _ready(&self, owner: &Tree) {
-        godot_print!("hello, world.");
-
         let root_item: &TreeItem = unsafe {
             &*owner
                 .create_item(owner.assume_shared(), 0)
@@ -84,10 +83,4 @@ impl ModelTreeEditor {
         };
         create_editable_item(model_offset_editor_z.clone(), "Z Offset");
     }
-}
-
-fn create_editable_item(item: &TreeItem, field: &str) {
-    item.set_text(0, field);
-    item.set_text_align(0, TreeItem::ALIGN_LEFT);
-    item.set_editable(1, true);
 }

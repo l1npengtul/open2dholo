@@ -13,9 +13,9 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::os::raw::c_int;
-use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct DeviceDesc {
@@ -43,7 +43,7 @@ impl DeviceDesc {
         DeviceDesc {
             vid: None,
             pid: None,
-            ser: None
+            ser: None,
         }
     }
 }

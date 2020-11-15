@@ -14,19 +14,19 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 #![deny(clippy::pedantic)]
-use gdnative::prelude::*;
-use uvc;
-use parking_lot::RwLock;
-use std::sync::{atomic::AtomicBool, Arc};
 use crate::configuration::user_config::UserConfig;
+use dlib_face_recognition::FaceDetector;
+use gdnative::prelude::*;
+use parking_lot::RwLock;
+use rayon::{ThreadPool, ThreadPoolBuilder};
+use std::sync::{atomic::AtomicBool, Arc};
+use uvc;
 
 pub mod configuration;
 pub mod error;
 pub mod nodes;
 pub mod processing;
-
 
 #[macro_use]
 extern crate lazy_static;
@@ -39,8 +39,13 @@ lazy_static! {
     };
     // REPLACE WITH CONFIGURATION STRUCT
     static ref FACE_DETECTED: AtomicBool = AtomicBool::new(false);
-    static ref USER_CONFIG: RwLock<UserConfig> = {
-
+    //static ref USER_CONFIG: RwLock<UserConfig> = {};
+    static ref PROCESSING_POOL: ThreadPool = {
+        let processing_pool = ThreadPoolBuilder::new()
+        .num_threads(8)
+        .build()
+        .expect("Could not build threadpool!");
+        processing_pool
     };
 }
 

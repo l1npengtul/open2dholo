@@ -13,11 +13,13 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::sync::atomic::{AtomicBool, AtomicUsize};
-use serde::{Deserialize, Serialize};
-use gdnative::prelude::*;
 use crate::configuration::processing_config::ProcessingConfig;
+use crate::error::config_error::ConfigError;
 use crate::processing::device_description::DeviceDesc;
+use ron::de::from_reader;
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::{fs::File, path::Path};
 
 #[derive(Serialize, Deserialize)]
 pub struct UserConfig {
@@ -30,13 +32,41 @@ impl UserConfig {
             processing: ProcessingConfig {
                 use_cnn: AtomicBool::new(false),
                 max_threads: AtomicUsize::new(8),
-                default_device: DeviceDesc::from_default()
-            }
+                default_device: DeviceDesc::from_default(),
+            },
         }
     }
 
-    pub fn new(filepath: String) -> Self {
-
+    pub fn from_cfg() -> Result<Self, Box<dyn std::error::Error>> {
+        let file_path: &Path = Path::new("config/settings.ron");
+        let cfg_file = File::open(file_path);
+        match cfg_file {
+            Ok(file) => match from_reader(file) {
+                Ok(cfg) => Ok(cfg),
+                Err(_why) => Err(Box::new(ConfigError::InvalidConfiguration(String::from(
+                    "config/settings.ron",
+                )))),
+            },
+            Err(_why) => Err(Box::new(ConfigError::FileNotFound(String::from(
+                "config/settings.ron",
+            )))),
+        }
     }
-}
 
+    pub fn from_custom_cfg(file_path: Box<Path>) -> Result<Self, Box<dyn std::error::Error>> {
+        let file_path_str = match file_path.to_path_buf().into_os_string().into_string() {
+            Ok(p) => p,
+            Err(_str) => return Err(Box::new(ConfigError::InvalidPath)),
+        };
+        let cfg_file = File::open(file_path);
+        match cfg_file {
+            Ok(file) => match from_reader(file) {
+                Ok(cfg) => Ok(cfg),
+                Err(_why) => Err(Box::new(ConfigError::InvalidConfiguration(file_path_str))),
+            },
+            Err(_why) => Err(Box::new(ConfigError::FileNotFound(file_path_str))),
+        }
+    }
+
+    //pub fn write_current(&self) -> Result<(), Box<dyn std::error::Error>> {}
+}

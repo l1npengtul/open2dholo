@@ -13,22 +13,32 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use gdnative::core_types::Vector2;
+use dlib_face_recognition::Point;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 
 // TODO: Change to acutal data format
 
 #[derive(Clone)]
 pub struct Processed {
-    data: Vec<Vector2>,
+    landmarks: Vec<Point>,
     frame_data: Option<Arc<RwLock<uvc::Frame>>>,
 }
 impl Processed {
-    fn new(data: Vec<Vector2>, imgframe: Option<Arc<RwLock<uvc::Frame>>>) -> Self {
+    pub fn new(data: Vec<Point>, imgframe: Option<Arc<RwLock<uvc::Frame>>>) -> Self {
         Processed {
-            data,
+            landmarks: data,
             frame_data: imgframe,
         }
     }
+}
+
+// For future reference, the `FaceLandmarks` struct is a Vector<Point>.
+pub enum ProcessedPacket {
+    None,
+    FacialLandmark(Processed),
+    GeneralError(String),
+    MissingFacialPointsError(AtomicUsize),
+    MissingFileError(String),
 }

@@ -15,16 +15,16 @@
 
 //use flume::{Receiver, RecvError, RecvTimeoutError, SendError, Sender, TryRecvError};
 
-use crate::{
-    error::thread_send_message_error::ThreadSendMessageError,
-    processing::{
-        device_description::DeviceDesc, process_packet::Processed, thread_packet::MessageType,
-    },
+use crate::processing::process_packet::ProcessedPacket;
+use crate::processing::{
+    device_description::DeviceDesc, process_packet::Processed, thread_packet::MessageType,
 };
-use flume::{Receiver, SendError, Sender, TryRecvError};
+use dlib_face_recognition::{
+    FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
+};
+use flume::{Receiver, Sender, TryRecvError};
+use rayon::{ThreadPool, ThreadPoolBuildError, ThreadPoolBuilder};
 use std::{
-    convert::TryInto,
-    error::Error,
     sync::{
         atomic::{AtomicBool, AtomicUsize},
         Arc, RwLock,
@@ -32,13 +32,12 @@ use std::{
     thread::{Builder, JoinHandle},
     time::Duration,
 };
-use rayon::{ThreadPoolBuilder, ThreadPool, ThreadPoolBuildError};
 
 struct InputProcessing {
     device: DeviceDesc,
     format: uvc::StreamFormat,
-    sender_p1: Sender<MessageType>,   // To Thread
-    reciever_p2: Receiver<Processed>, // From Thread
+    sender_p1: Sender<MessageType>,         // To Thread
+    reciever_p2: Receiver<ProcessedPacket>, // From Thread
     thread_handle: JoinHandle<u8>,
 }
 
@@ -72,7 +71,7 @@ impl InputProcessing {
         }
     }
     pub fn change_device(&self, device: DeviceDesc) -> Result<(), ()> {
-        match self.sender_p1.send(MessageType::SET(device)) {
+        match self.sender_p1.send(MessageType::Set(device)) {
             Ok(_v) => Ok(()),
             Err(_e) => Err(()),
         }
@@ -102,7 +101,7 @@ impl Drop for InputProcessing {
 
 fn input_process_func(
     recv: Receiver<MessageType>,
-    send: Sender<Processed>,
+    send: Sender<ProcessedPacket>,
     startup_desc: DeviceDesc,
     startup_format: uvc::StreamFormat,
 ) -> u8 {
@@ -122,39 +121,48 @@ fn input_process_func(
             return 1;
         }
     };
-    let threads = (1000/current_format.fps) + 1;
-    let processing_pool = match ThreadPoolBuilder::new().num_threads(threads as usize).build() {
-        Ok(v) => {
-            v
-        }
-        Err(_why) => {
-            return 4;
-        }
-    };
+    //let threads = (1000 / current_format.fps) + 1;
 
+    // The AtomicUsize limits us to around 136.1 years of webcam streaming on a 32-bit systems, or
+    // 584542046090.6 years on a 64-bit systems. When the program produces an unhandled panic causing the
+    // program to exit, the Queen of the UK will still be alive.
     let counter = Arc::new(AtomicUsize::new(0));
+    let cloned_send = send.clone();
     current_device
         .open()
         .unwrap()
         .get_stream_handle_with_format(current_format)
         .unwrap()
-        .start_stream(|frame, count| {}, counter.clone())
+        .start_stream(
+            move |frame, count| {
+                let img_matrix = unsafe {
+                    ImageMatrix::new(
+                        frame.width() as usize,
+                        frame.height() as usize,
+                        frame.to_rgb().unwrap().to_bytes().as_ptr(),
+                    )
+                };
+                crate::PROCESSING_POOL
+                    .install(|| cloned_send.send(find_landmarks(&img_matrix)).unwrap())
+            },
+            counter.clone(),
+        )
         .expect("Could not start stream!");
     0
 }
 
 fn trick_or_channel(message: Result<MessageType, TryRecvError>) -> DeviceOrTrick {
-    return match message {
+    match message {
         Ok(msg) => match msg {
-            MessageType::SET(dev) => DeviceOrTrick::Device(dev),
-            MessageType::CLOSE(code) => DeviceOrTrick::Exit(code),
-            MessageType::DIE(code) => DeviceOrTrick::Exit(code),
+            MessageType::Set(dev) => DeviceOrTrick::Device(dev),
+            MessageType::Close(code) => DeviceOrTrick::Exit(code),
+            MessageType::Die(code) => DeviceOrTrick::Exit(code),
         },
         Err(e) => match e {
             TryRecvError::Disconnected => DeviceOrTrick::Exit(3),
             TryRecvError::Empty => DeviceOrTrick::None,
         },
-    };
+    }
 }
 
 // Trick or treat with death and webcams. Fun for the whole family!
@@ -162,4 +170,33 @@ enum DeviceOrTrick {
     Device(DeviceDesc),
     Exit(u8),
     None,
+}
+
+fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
+    let faces = FaceDetector::new().face_locations(img).to_vec();
+    let faces2 = faces.clone();
+    let mut largest_rectangle = match faces2.get(0) {
+        Some(rt) => rt,
+        None => {
+            return ProcessedPacket::None;
+        }
+    };
+
+    // Get facial landmarks
+    let filename = "mmod_human_face_detector.dat";
+    let landmark_getter = match LandmarkPredictor::new(filename) {
+        Ok(detector) => detector,
+        Err(_why) => {
+            return ProcessedPacket::MissingFileError(String::from(filename));
+        }
+    };
+
+    let landmarks = landmark_getter
+        .face_landmarks(img, largest_rectangle)
+        .to_vec();
+    if landmarks.len() == 68 {
+        ProcessedPacket::FacialLandmark(Processed::new(landmarks, None))
+    } else {
+        ProcessedPacket::MissingFacialPointsError(AtomicUsize::from(landmarks.len()))
+    }
 }

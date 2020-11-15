@@ -16,7 +16,13 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ThreadSendMessageError {
-    #[error("Error sending message to thread.")]
-    CannotSend,
+pub enum ConfigError {
+    #[error("Config file not found at location: {0}!")]
+    FileNotFound(String),
+    #[error("Config file at {0} is invalid!")]
+    InvalidConfiguration(String),
+    #[error("Path is invalid! (Could not be converted)")]
+    InvalidPath,
+    #[error("General Error, Could not load config.")]
+    General,
 }
