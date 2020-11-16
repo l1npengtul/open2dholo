@@ -36,8 +36,10 @@ use std::{
 struct InputProcessing {
     device: DeviceDesc,
     format: uvc::StreamFormat,
-    sender_p1: Sender<MessageType>,         // To Thread
-    reciever_p2: Receiver<ProcessedPacket>, // From Thread
+    sender_p1: Sender<MessageType>,
+    // To Thread
+    reciever_p2: Receiver<ProcessedPacket>,
+    // From Thread
     thread_handle: JoinHandle<u8>,
 }
 
@@ -70,7 +72,7 @@ impl InputProcessing {
             thread_handle: thread,
         }
     }
-    pub fn change_device(&self, device: DeviceDesc) -> Result<(), ()> {
+    pub fn fichange_device(&self, device: DeviceDesc) -> Result<(), ()> {
         match self.sender_p1.send(MessageType::Set(device)) {
             Ok(_v) => Ok(()),
             Err(_e) => Err(()),
