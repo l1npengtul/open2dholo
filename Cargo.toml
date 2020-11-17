@@ -17,8 +17,8 @@ rayon = "1.5.0"
 ron = "0.6.2"
 serde = "1.0.117"
 
-[dependencies.uvc] # TODO: Change back to main branch when updated
-git = "https://github.com/l1npengtul/libuvc-rs.git"
+[dependencies.uvc] # TODO: Change back to cargo crate when updated
+git = "https://github.com/mulimoen/libuvc-rs.git"
 features = ["vendor"]
 
 [dependencies.gdnative]

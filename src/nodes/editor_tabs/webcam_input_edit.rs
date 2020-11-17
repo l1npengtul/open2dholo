@@ -3,7 +3,9 @@ use gdnative::{
     api::{tree::Tree, tree_item::*},
     prelude::*,
     NativeClass,
+    core_types::Rect2,
 };
+use uvc::Device;
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
@@ -40,11 +42,32 @@ impl WebcamInputEditor {
                 .unwrap()
                 .assume_safe()
         };
+        webcam_select_list.set_text(0, "Input Webcam:");
+        webcam_select_list.set_text_align(0, 0);
+        webcam_select_list.set_cell_mode(1, 4);
+        webcam_select_list.set_editable(1, true);
+        webcam_select_list.set_custom_draw(1, owner, "webcam_editor_clicked");
 
         owner.connect("custom_popup_edited", owner, "item_clicked", VariantArray::new_shared(), 0);
     }
-    #[export]
-    fn item_clicked(&self, owner: &Tree) {
 
+    #[export]
+    // The documentation on this is piss poor, so this will probably be wrong. Trial and error the function arguments until it works.
+    fn webcam_editor_clicked(&self, owner: TRef<Tree>, treeitem: Ref<TreeItem>, rect: Rect2) {
+        let uvc_devices = match crate::UVC.devices() {
+            Ok(dev) => {
+                godot_print!("b");
+                dev
+            }
+            Err(why) => {
+                // show error
+                return;
+            }
+        };
+        // Change to directly filling menu
+        let mut devlist: Vec<Device> = Vec::new();
+        for i in uvc_devices.into_iter() {
+            devlist.push(i);
+        }
     }
 }
