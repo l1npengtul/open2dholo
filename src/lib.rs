@@ -52,6 +52,7 @@ lazy_static! {
 fn init(handle: InitHandle) {
     handle.add_class::<self::nodes::main::open2dhctrl::Main>();
     handle.add_class::<self::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
+    handle.add_class::<self::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();
 }
 
 godot_init!(init);
