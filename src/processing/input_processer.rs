@@ -25,7 +25,7 @@ use dlib_face_recognition::{
 use flume::{Receiver, Sender, TryRecvError};
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicUsize},
+        atomic::AtomicUsize,
         Arc,
     },
     thread::{Builder, JoinHandle},

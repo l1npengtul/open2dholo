@@ -1,6 +1,6 @@
 use crate::nodes::editor_tabs::util::create_editable_item;
 use gdnative::{
-    api::{tree::Tree, tree_item::*},
+    api::{tree::Tree, tree_item::{TreeItem}},
     prelude::*,
     NativeClass,
     core_types::Rect2,
@@ -53,27 +53,16 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_item_clicked(&self, owner: &Tree, arrow_clicked: bool) {
+    pub fn on_item_clicked(&self, owner: TRef<Tree>, arrow_clicked: bool) {
         if arrow_clicked {
-            match owner.get_edited().unwrap().get_text(0) {
-                GodotString::from("Input Webcam:") => {
-                    let uvc_devices = match crate::UVC.devices() {
-                        Ok(dev) => {
-                            godot_print!("b");
-                            dev
-                        }
-                        Err(why) => {
-                            // show error
-                            return;
-                        }
-                    };
-                    // Change to directly filling menu
-                    let mut devlist: Vec<Device> = Vec::new();
-                    for i in uvc_devices.into_iter() {
-                        devlist.push(i);
-                    }
+            let clicked_item = unsafe {owner.assume_shared().assume_safe().get_edited().unwrap().assume_safe().get_text(0).to_string()}.to_owned(); // bruh what the fuck
+            match &clicked_item[..] {
+                "Input Webcam:" => {
+                    godot_print!("input webcam")
                 }
-                GodotString(_) => {}
+                _ => {
+                    return;
+                }
             }
         }
     }

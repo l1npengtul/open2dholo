@@ -15,12 +15,10 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #![deny(clippy::pedantic)]
-use crate::configuration::user_config::UserConfig;
-use dlib_face_recognition::FaceDetector;
+#![warn(clippy::all)]
 use gdnative::prelude::*;
-use parking_lot::RwLock;
 use rayon::{ThreadPool, ThreadPoolBuilder};
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::atomic::AtomicBool;
 use uvc;
 
 pub mod configuration;
@@ -50,9 +48,9 @@ lazy_static! {
 }
 
 fn init(handle: InitHandle) {
-    handle.add_class::<self::nodes::main::open2dhctrl::Main>();
-    handle.add_class::<self::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
-    handle.add_class::<self::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();
+    handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
+    handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
+    handle.add_class::<crate::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();
 }
 
 godot_init!(init);
