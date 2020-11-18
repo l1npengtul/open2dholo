@@ -23,11 +23,10 @@ use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };
 use flume::{Receiver, Sender, TryRecvError};
-use rayon::{ThreadPool, ThreadPoolBuildError, ThreadPoolBuilder};
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicUsize},
-        Arc, RwLock,
+        Arc,
     },
     thread::{Builder, JoinHandle},
     time::Duration,
@@ -102,7 +101,7 @@ impl Drop for InputProcessing {
  */
 
 fn input_process_func(
-    recv: Receiver<MessageType>,
+    _recv: Receiver<MessageType>,
     send: Sender<ProcessedPacket>,
     startup_desc: DeviceDesc,
     startup_format: uvc::StreamFormat,
@@ -113,7 +112,7 @@ fn input_process_func(
         None => None,
     };
     let mut current_format = startup_format;
-    let mut current_device: uvc::Device = match crate::UVC.find_device(
+    let current_device: uvc::Device = match crate::UVC.find_device(
         startup_desc.vid,
         startup_desc.pid,
         device_serial.as_deref(),
@@ -136,7 +135,7 @@ fn input_process_func(
         .get_stream_handle_with_format(current_format)
         .unwrap()
         .start_stream(
-            move |frame, count| {
+            move |frame, _count| {
                 let img_matrix = unsafe {
                     ImageMatrix::new(
                         frame.width() as usize,

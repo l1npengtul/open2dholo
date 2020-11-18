@@ -281,7 +281,6 @@ margin_right = 490.0
 margin_bottom = 506.0
 
 [node name="Input" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
-visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -304,6 +303,14 @@ margin_bottom = 490.0
 margin_right = 490.0
 margin_bottom = 24.0
 
+[node name="Tree" type="Tree" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_top = 28.0
+margin_right = 490.0
+margin_bottom = 490.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource( 4 )
+
 [node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
 margin_left = 494.0
 margin_right = 506.0
@@ -317,6 +324,7 @@ margin_bottom = 506.0
 size_flags_horizontal = 3
 
 [node name="Output" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -340,14 +348,6 @@ size_flags_vertical = 3
 [node name="LineEdit" type="LineEdit" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer"]
 margin_right = 490.0
 margin_bottom = 24.0
-
-[node name="Tree" type="Tree" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer"]
-margin_top = 28.0
-margin_right = 490.0
-margin_bottom = 490.0
-size_flags_horizontal = 3
-size_flags_vertical = 3
-script = ExtResource( 4 )
 
 [node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
 margin_left = 494.0
