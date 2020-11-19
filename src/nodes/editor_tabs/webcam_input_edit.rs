@@ -1,17 +1,65 @@
+//     Copyright (C) 2020-2021l1npengtul
+//
+//     This program is free software: you can redistribute it and/or modify
+//     it under the terms of the GNU General Public License as published by
+//     the Free Software Foundation, either version 3 of the License, or
+//     (at your option) any later version.
+//
+//     This program is distributed in the hope that it will be useful,
+//     but WITHOUT ANY WARRANTY; without even the implied warranty of
+//     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//     GNU General Public License for more details.
+//
+//     You should have received a copy of the GNU General Public License
+//     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 use gdnative::{
     api::{tree::Tree, tree_item::TreeItem, popup_menu::PopupMenu},
     prelude::*,
     NativeClass,
 };
+use std::cell::RefCell;
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
-pub struct WebcamInputEditor;
+pub struct WebcamInputEditor {
+    device_list: RefCell<Vec<uvc::DeviceDescription>>
+}
 
 #[methods]
 impl WebcamInputEditor {
     fn new(_owner: &Tree) -> Self {
-        WebcamInputEditor
+        let device_list = match crate::UVC.devices() {
+            Ok(dev) => {
+                dev
+            }
+            Err(_why) => {
+                panic!("Could not get devices!");
+                //TODO: Show error message when cannot get device list
+            }
+        };
+        let dev_list: RefCell<Vec<uvc::DeviceDescription>> = RefCell::new(Vec::new());
+        
+        for device in device_list {
+            if let Ok(dev_desc) = device.description() {
+                let to_push = uvc::DeviceDescription {
+                    vendor_id: dev_desc.vendor_id.clone(),
+                    product_id: dev_desc.product_id.clone(),
+                    bcd_uvc: dev_desc.bcd_uvc.clone(),
+                    serial_number: dev_desc.serial_number.clone(),
+                    manufacturer: dev_desc.manufacturer.clone(),
+                    product: dev_desc.product.clone(),
+                }; // DeviceDesc has no clone, so we are making our own clone because we are strong indiependent rustaceans who dont need no impl Clone for x
+                dev_list.borrow_mut().push(to_push);
+                
+                godot_print!("{}", dev_desc.vendor_id);
+                
+            }
+        }
+
+        WebcamInputEditor {
+            device_list: dev_list
+        }
     }
     #[export]
     fn _ready(&self, owner: TRef<Tree>) {
@@ -60,6 +108,10 @@ impl WebcamInputEditor {
 
     #[export]
     pub fn on_item_clicked(&self, owner: TRef<Tree>, arrow_clicked: bool) {
+        let popup = unsafe {owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap()};
+        for item in 0..popup.get_item_count() {
+            popup.remove_item(item);
+        }
         if arrow_clicked {
             let clicked_item = unsafe {
                 owner
@@ -68,26 +120,51 @@ impl WebcamInputEditor {
                     .get_edited()
                     .unwrap()
                     .assume_safe()
-            }; // bruh what the fuck
+            };
             let clicked_string = clicked_item.get_text(0).to_string().to_owned();
             match &clicked_string[..] {
                 "Input Webcam:" => {
-                    let rect = owner.get_custom_popup_rect();
-                    let size = rect.size.to_vector();
-                    let position = rect.origin.to_vector();
-                    
-                    let devices = crate::UVC.devices().expect("Could not get devices!"); // TODO replace with match
-                    let mut device_list: Vec<uvc::Device> = Vec::new();
-                    let mut counter = 0;
-                    let popup = unsafe {owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap()};
-                    
-                    for device in devices {
-                        popup.add_item(device.device_address().to_owned().to_string(), counter, 1 );
-                        counter += 1;
+                    if popup.is_visible() {
+                        popup.set_visible(false);
                     }
-                    popup.set_position(position, true);
-                    popup.set_size(size, true);
-                    popup.set_visible(true);
+                    else {
+                        let rect = owner.get_custom_popup_rect();
+                        let size = rect.size.to_vector();
+                        let position = rect.origin.to_vector();
+                        
+                        let device_list = match crate::UVC.devices() {
+                            Ok(dev) => {
+                                dev
+                            }
+                            Err(_why) => {
+                                panic!("Could not get devices!");
+                                //TODO: Show error message when cannot get device list
+                            }
+                        };
+                        self.device_list.borrow_mut().clear();
+
+        
+                        for device in device_list {
+                            if let Ok(dev_desc) = device.description() {
+                                self.device_list.borrow_mut().push(dev_desc);
+                            }
+                        }
+
+
+                        let mut cnt = 0;
+                        /*
+                        for device_desc in self.device_list.borrow().iter() {
+                           
+                            let dev_formatted = device_desc.
+                            popup.add_item(label, cnt, 1);
+                            cnt += 1;
+                        
+                        }
+                        */
+                        popup.set_position(position, true);
+                        popup.set_size(size, true);
+                        popup.set_visible(true);
+                    }
                 },
                 _ => {
                     return;
