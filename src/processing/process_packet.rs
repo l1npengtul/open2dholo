@@ -15,8 +15,8 @@
 
 use dlib_face_recognition::Point;
 use parking_lot::RwLock;
-use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 
 // TODO: Change to acutal data format
 

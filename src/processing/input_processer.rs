@@ -24,10 +24,7 @@ use dlib_face_recognition::{
 };
 use flume::{Receiver, Sender, TryRecvError};
 use std::{
-    sync::{
-        atomic::AtomicUsize,
-        Arc,
-    },
+    sync::{atomic::AtomicUsize, Arc},
     thread::{Builder, JoinHandle},
     time::Duration,
 };
@@ -111,7 +108,7 @@ fn input_process_func(
         Some(serial) => Some(serial),
         None => None,
     };
-    let mut current_format = startup_format;
+    let current_format = startup_format;
     let current_device: uvc::Device = match crate::UVC.find_device(
         startup_desc.vid,
         startup_desc.pid,
@@ -176,7 +173,7 @@ enum DeviceOrTrick {
 fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
     let faces = FaceDetector::new().face_locations(img).to_vec();
     let faces2 = faces.clone();
-    let mut largest_rectangle = match faces2.get(0) {
+    let largest_rectangle = match faces2.get(0) {
         Some(rt) => rt,
         None => {
             return ProcessedPacket::None;

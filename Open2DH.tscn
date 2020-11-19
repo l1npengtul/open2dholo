@@ -229,7 +229,6 @@ margin_bottom = 542.0
 tab_align = 0
 
 [node name="Scene" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
-visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -281,6 +280,7 @@ margin_right = 490.0
 margin_bottom = 506.0
 
 [node name="Input" type="VBoxContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+visible = false
 anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
@@ -310,6 +310,10 @@ margin_bottom = 490.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource( 4 )
+
+[node name="PopupMenu" type="PopupMenu" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_right = 20.0
+margin_bottom = 20.0
 
 [node name="VScrollBar" type="VScrollBar" parent="Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
 margin_left = 494.0

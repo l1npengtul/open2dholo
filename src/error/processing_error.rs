@@ -24,4 +24,3 @@ pub enum ProcessingError {
     #[error("Expected 68 landmark points, only found {0}!")]
     AllPointsNotDetected(usize),
 }
-

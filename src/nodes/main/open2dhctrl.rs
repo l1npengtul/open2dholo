@@ -40,13 +40,15 @@ impl Main {
                 .cast::<Viewport>()
                 .unwrap()
         };
-        root_viewport.connect(
+        if let Err(_why) = root_viewport.connect(
             "size_changed",
             owner,
             "on_size_change",
             VariantArray::new_shared(),
             0,
-        );
+        ) {
+            panic!("Failed to initialise UI!");
+        }
     }
     #[export]
     pub fn on_size_change(&self, owner: &Control) {

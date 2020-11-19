@@ -15,5 +15,5 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod model_tree_edit;
-pub mod webcam_input_edit;
 mod util;
+pub mod webcam_input_edit;
