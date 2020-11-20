@@ -1,4 +1,5 @@
-//     Copyright (C) 2020-2021l1npengtul
+//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an anime girl.
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -13,13 +14,6 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::device::DeviceDesc;
-use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 
-#[derive(Deserialize, Serialize)]
-pub struct ProcessingConfig {
-    pub(crate) use_cnn: AtomicBool,
-    pub(crate) max_threads: AtomicUsize,
-    pub(crate) default_device: DeviceDesc,
-}
+pub mod device;
+pub mod packet;

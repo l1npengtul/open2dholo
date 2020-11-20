@@ -47,3 +47,19 @@ impl DeviceDesc {
         }
     }
 }
+
+#[derive(Clone)]
+pub struct DeviceHolder {
+    pub id: String,
+    pub vendor_id: u16,
+    pub product_id: u16,
+    pub description: String,
+}
+impl PartialEq for DeviceHolder {
+    fn eq(&self, other: &Self) -> bool {
+        if self.description == other.description  && self.product_id == other.product_id && self.vendor_id == other.vendor_id && self.id == other.id{
+            return false;
+        }
+        true
+    }
+}

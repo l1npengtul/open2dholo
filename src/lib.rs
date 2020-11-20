@@ -25,6 +25,7 @@ pub mod configuration;
 pub mod error;
 pub mod nodes;
 pub mod processing;
+pub mod util;
 
 #[macro_use]
 extern crate lazy_static;

@@ -15,10 +15,8 @@
 
 //use flume::{Receiver, RecvError, RecvTimeoutError, SendError, Sender, TryRecvError};
 
-use crate::processing::process_packet::ProcessedPacket;
-use crate::processing::{
-    device_description::DeviceDesc, process_packet::Processed, thread_packet::MessageType,
-};
+use crate::util::device::DeviceDesc;
+use crate::util::packet::{MessageType, ProcessedPacket, Processed};
 use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };

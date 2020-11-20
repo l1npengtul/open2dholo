@@ -19,17 +19,20 @@ use gdnative::{
     NativeClass,
 };
 use std::cell::RefCell;
+use usb_enumeration::{enumerate, USBDevice};
+use crate::util::device::{DeviceDesc, DeviceHolder};
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
 pub struct WebcamInputEditor {
-    device_list: RefCell<Vec<uvc::DeviceDescription>>
+    device_list: RefCell<Vec<DeviceHolder>>
 }
 
 #[methods]
 impl WebcamInputEditor {
     fn new(_owner: &Tree) -> Self {
-        let device_list = match crate::UVC.devices() {
+        let dev_list: RefCell<Vec<DeviceHolder>> = RefCell::new(Vec::new());
+        let uvc_device_list = match crate::UVC.devices() {
             Ok(dev) => {
                 dev
             }
@@ -38,22 +41,30 @@ impl WebcamInputEditor {
                 //TODO: Show error message when cannot get device list
             }
         };
-        let dev_list: RefCell<Vec<uvc::DeviceDescription>> = RefCell::new(Vec::new());
-        
-        for device in device_list {
-            if let Ok(dev_desc) = device.description() {
-                let to_push = uvc::DeviceDescription {
-                    vendor_id: dev_desc.vendor_id.clone(),
-                    product_id: dev_desc.product_id.clone(),
-                    bcd_uvc: dev_desc.bcd_uvc.clone(),
-                    serial_number: dev_desc.serial_number.clone(),
-                    manufacturer: dev_desc.manufacturer.clone(),
-                    product: dev_desc.product.clone(),
-                }; // DeviceDesc has no clone, so we are making our own clone because we are strong indiependent rustaceans who dont need no impl Clone for x
-                dev_list.borrow_mut().push(to_push);
-                
-                godot_print!("{}", dev_desc.vendor_id);
-                
+
+        let usb_device_list = enumerate();
+        for uvc_device in uvc_device_list {
+            if let Ok(uvc_desc) = uvc_device.description() {
+                for usb_device in usb_device_list.clone() {
+                    if uvc_desc.product_id == usb_device.product_id && uvc_desc.vendor_id == usb_device.vendor_id {
+                        let mut description: String = String::from(format!("{}:{}", uvc_desc.vendor_id, uvc_desc.product_id));
+                        let mut id: String = String::from("");
+                        if let Some(descript) = usb_device.description {
+                            description = descript;
+                        }
+                        let to_push: DeviceHolder = DeviceHolder {
+                            id: usb_device.id,
+                            vendor_id: uvc_desc.vendor_id,
+                            product_id: uvc_desc.product_id,
+                            description: description,
+                        };
+
+                        if !dev_list.borrow().contains(&to_push) {
+                            godot_print!("{}", to_push.clone().description);
+                            dev_list.borrow_mut().push(to_push);
+                        }
+                    }
+                }
             }
         }
 
@@ -63,7 +74,7 @@ impl WebcamInputEditor {
     }
     #[export]
     fn _ready(&self, owner: TRef<Tree>) {
-        let popup = unsafe {owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap()};
+        let popup = unsafe { owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap() };
         popup.set_visible(false);
         let root_item: &TreeItem = unsafe {
             &*owner
@@ -108,7 +119,7 @@ impl WebcamInputEditor {
 
     #[export]
     pub fn on_item_clicked(&self, owner: TRef<Tree>, arrow_clicked: bool) {
-        let popup = unsafe {owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap()};
+        let popup = unsafe { owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap() };
         for item in 0..popup.get_item_count() {
             popup.remove_item(item);
         }
@@ -126,12 +137,11 @@ impl WebcamInputEditor {
                 "Input Webcam:" => {
                     if popup.is_visible() {
                         popup.set_visible(false);
-                    }
-                    else {
+                    } else {
                         let rect = owner.get_custom_popup_rect();
                         let size = rect.size.to_vector();
                         let position = rect.origin.to_vector();
-                        
+                        /*
                         let device_list = match crate::UVC.devices() {
                             Ok(dev) => {
                                 dev
@@ -152,7 +162,7 @@ impl WebcamInputEditor {
 
 
                         let mut cnt = 0;
-                        /*
+                        
                         for device_desc in self.device_list.borrow().iter() {
                            
                             let dev_formatted = device_desc.
@@ -165,7 +175,7 @@ impl WebcamInputEditor {
                         popup.set_size(size, true);
                         popup.set_visible(true);
                     }
-                },
+                }
                 _ => {
                     return;
                 }
@@ -175,7 +185,10 @@ impl WebcamInputEditor {
 
     #[export]
     pub fn on_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
-        let popup = unsafe {owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap()};
+        let popup = unsafe { owner.get_node("../PopupMenu").unwrap().assume_safe().cast::<PopupMenu>().unwrap() };
         // TODO: Get USB device from thing and open device
     }
+
+    //fn 
 }
+
