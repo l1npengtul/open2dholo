@@ -16,7 +16,7 @@
 //use flume::{Receiver, RecvError, RecvTimeoutError, SendError, Sender, TryRecvError};
 
 use crate::util::device::DeviceDesc;
-use crate::util::packet::{MessageType, ProcessedPacket, Processed};
+use crate::util::packet::{MessageType, Processed, ProcessedPacket};
 use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };
@@ -27,7 +27,7 @@ use std::{
     time::Duration,
 };
 
-struct InputProcessing {
+pub struct InputProcessing {
     device: DeviceDesc,
     format: uvc::StreamFormat,
     sender_p1: Sender<MessageType>,
@@ -120,8 +120,8 @@ fn input_process_func(
     //let threads = (1000 / current_format.fps) + 1;
 
     // The AtomicUsize limits us to around 136.1 years of webcam streaming on a 32-bit systems, or
-    // 584542046090.6 years on a 64-bit systems. When the program produces an unhandled panic causing the
-    // program to exit, the Queen of the UK will still be alive.
+    // 584542046090.6 years on a 64-bit systems. The queen of the UK will still be alive by the time the 
+    // counter overflows and the program crashes.
     let counter = Arc::new(AtomicUsize::new(0));
     let cloned_send = send.clone();
     current_device

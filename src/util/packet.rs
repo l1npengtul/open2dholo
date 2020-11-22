@@ -13,12 +13,11 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::util::device::DeviceDesc;
 use dlib_face_recognition::Point;
 use parking_lot::RwLock;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
-use crate::util::device::DeviceDesc;
-
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
@@ -27,8 +26,6 @@ pub enum MessageType {
     Set(DeviceDesc),
     Close(u8),
 }
-
-
 
 // TODO: Change to acutal data format
 

@@ -49,9 +49,12 @@ impl Main {
         ) {
             panic!("Failed to initialise UI!");
         }
+
+        // set the size at ready to avoid weird UI scaling on first boot
+        self.on_size_change(owner);
     }
     #[export]
-    pub fn on_size_change(&self, owner: &Control) {
+    pub fn on_size_change(&self, owner: TRef<Control>) {
         let root_viewport_size = OS::godot_singleton().window_size();
         let colorrect = unsafe {
             &*owner

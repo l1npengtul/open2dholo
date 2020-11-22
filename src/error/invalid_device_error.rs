@@ -23,4 +23,6 @@ pub enum InvalidDeviceError {
         prod: String,
         ser: String,
     },
+    #[error("Could not find and open the device!")]
+    CannotFindDevice,
 }
