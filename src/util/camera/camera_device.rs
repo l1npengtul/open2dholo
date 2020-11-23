@@ -1,6 +1,8 @@
 use crate::util::camera::webcam::*;
 use v4l::capture::device::Device;
 
+
+// USE set_format for v4l2 device
 pub struct V4LinuxDevice {
     device_type: WebcamType,
     path: String,
