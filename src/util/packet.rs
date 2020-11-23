@@ -13,7 +13,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::device::DeviceDesc;
+use crate::util::camera::device::DeviceDesc;
 use dlib_face_recognition::Point;
 use parking_lot::RwLock;
 use std::sync::atomic::AtomicUsize;

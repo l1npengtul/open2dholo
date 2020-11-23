@@ -13,8 +13,8 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::nodes::editor_tabs::util::create_custom_editable_item;
-use crate::util::device::{DeviceHolder, Resolution};
+use crate::{util::camera::device::Resolution, nodes::editor_tabs::util::create_custom_editable_item};
+use crate::util::camera::device::{DeviceDesc, DeviceHolder};
 use gdnative::{
     api::{popup_menu::PopupMenu, tree::Tree, tree_item::TreeItem},
     prelude::*,
