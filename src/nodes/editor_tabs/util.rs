@@ -1,4 +1,7 @@
-use gdnative::{GodotObject, TRef, api::{Tree, TreeItem}};
+use gdnative::{
+    api::{Tree, TreeItem},
+    GodotObject, TRef,
+};
 
 pub fn create_editable_item(item: &TreeItem, field: &str) {
     item.set_text(0, field);

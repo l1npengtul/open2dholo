@@ -13,13 +13,12 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::device::{DeviceHolder, Resolution};
 use crate::nodes::editor_tabs::util::create_custom_editable_item;
+use crate::util::device::{DeviceHolder, Resolution};
 use gdnative::{
     api::{popup_menu::PopupMenu, tree::Tree, tree_item::TreeItem},
     prelude::*,
     NativeClass,
-    
 };
 use std::cell::RefCell;
 use usb_enumeration::enumerate;
@@ -64,7 +63,6 @@ impl WebcamInputEditor {
         ) {
             panic!("Failed to initialise UI!");
         }
-
 
         let framerate_popup = unsafe {
             owner
@@ -123,7 +121,6 @@ impl WebcamInputEditor {
             panic!("Failed to initialise UI!");
         }
 
-
         let root_item: &TreeItem = unsafe {
             &*owner
                 .create_item(owner.assume_shared(), 0)
@@ -133,7 +130,6 @@ impl WebcamInputEditor {
 
         owner.set_hide_root(true);
         owner.set_columns(2);
-
 
         // get ready for some UI spaghetti
         let webcam_video_input: &TreeItem = unsafe {
@@ -162,7 +158,12 @@ impl WebcamInputEditor {
         }
 
         let button = unsafe {
-            owner.get_node("../StartButton").unwrap().assume_safe().cast::<Button>().unwrap()
+            owner
+                .get_node("../StartButton")
+                .unwrap()
+                .assume_safe()
+                .cast::<Button>()
+                .unwrap()
         };
         if let Err(_why) = button.connect("pressed", owner, "", VariantArray::new_shared(), 0) {
             panic!("Failed to initialise UI");
@@ -216,10 +217,19 @@ impl WebcamInputEditor {
                     }
                 }
                 "Webcam Resolution:" => {
-                    if let Some(camera_device) = self.device_selected.borrow().clone(){
+                    if let Some(camera_device) = self.device_selected.borrow().clone() {
                         let device_serial = camera_device.serial.to_owned();
-                        godot_print!("{},{},{}", camera_device.vendor_id, camera_device.product_id, device_serial.clone().unwrap_or("default".to_string()));
-                        match crate::UVC.find_device(Some(camera_device.vendor_id as i32), Some(camera_device.product_id as i32), device_serial.as_deref()) {
+                        godot_print!(
+                            "{},{},{}",
+                            camera_device.vendor_id,
+                            camera_device.product_id,
+                            device_serial.clone().unwrap_or("default".to_string())
+                        );
+                        match crate::UVC.find_device(
+                            Some(camera_device.vendor_id as i32),
+                            Some(camera_device.product_id as i32),
+                            device_serial.as_deref(),
+                        ) {
                             Ok(dev) => {
                                 let resolution_popup = unsafe {
                                     owner
@@ -238,29 +248,33 @@ impl WebcamInputEditor {
                                     let rect = owner.get_custom_popup_rect();
                                     let size = rect.size.to_vector();
                                     let position = rect.origin.to_vector();
-                                    
+
                                     match dev.open() {
                                         Ok(handler) => {
                                             let mut counter = 0;
-                                        let mut resolutions: Vec<String> = Vec::new();
-                                        for format in handler.supported_formats() {
-                                            for frame in format.supported_formats() {
-                                                let resolution_string = format!("{}x{}", frame.width(), frame.height());
-                                                if !resolutions.contains(&resolution_string) {
-                                                    resolutions.push(resolution_string);
+                                            let mut resolutions: Vec<String> = Vec::new();
+                                            for format in handler.supported_formats() {
+                                                for frame in format.supported_formats() {
+                                                    let resolution_string = format!(
+                                                        "{}x{}",
+                                                        frame.width(),
+                                                        frame.height()
+                                                    );
+                                                    if !resolutions.contains(&resolution_string) {
+                                                        resolutions.push(resolution_string);
+                                                    }
                                                 }
                                             }
-                                        }
-                                        for label in resolutions {
-                                            resolution_popup.add_item(label, counter, 1);
-                                            counter += 1;
-                                        }
+                                            for label in resolutions {
+                                                resolution_popup.add_item(label, counter, 1);
+                                                counter += 1;
+                                            }
                                         }
                                         Err(why) => {
                                             godot_print!("{}", why);
                                         }
                                     }
-                                    
+
                                     resolution_popup.set_size(size, true);
                                     resolution_popup.set_position(position, true);
                                 }
@@ -269,16 +283,10 @@ impl WebcamInputEditor {
                                 godot_print!("{}", why);
                             }
                         }
-                        
-
                     }
                 }
-                "Webcam Frame Rate:" => {
-
-                }
-                "Webcam Video Format:" => {
-
-                }
+                "Webcam Frame Rate:" => {}
+                "Webcam Video Format:" => {}
                 _ => {
                     return;
                 }
@@ -418,7 +426,6 @@ impl WebcamInputEditor {
             }
         }
         dev_list
-        
     }
 
     fn update_device_list(&self) {

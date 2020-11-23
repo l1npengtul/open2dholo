@@ -17,7 +17,7 @@ use crate::error::invalid_device_error;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::os::raw::c_int;
-use usb_enumeration:: USBDevice;
+use usb_enumeration::USBDevice;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct DeviceDesc {
@@ -80,9 +80,9 @@ impl DeviceHolder {
         uvc: &uvc::Device,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         if let Ok(uvc_desc) = uvc.description() {
-            if uvc_desc.vendor_id == usb.vendor_id && uvc_desc.product_id == usb.product_id{
+            if uvc_desc.vendor_id == usb.vendor_id && uvc_desc.product_id == usb.product_id {
                 let mut description: String =
-                String::from(format!("{}:{}", uvc_desc.vendor_id, uvc_desc.product_id));
+                    String::from(format!("{}:{}", uvc_desc.vendor_id, uvc_desc.product_id));
                 let serial = uvc_desc.serial_number.clone();
                 if let Some(descript) = usb.description.clone() {
                     description = String::from(format!("{} {}", description, descript));
@@ -121,3 +121,5 @@ pub struct Resolution {
     x: i64,
     y: i64,
 }
+
+fn pr() {}

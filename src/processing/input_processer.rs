@@ -120,7 +120,7 @@ fn input_process_func(
     //let threads = (1000 / current_format.fps) + 1;
 
     // The AtomicUsize limits us to around 136.1 years of webcam streaming on a 32-bit systems, or
-    // 584542046090.6 years on a 64-bit systems. The queen of the UK will still be alive by the time the 
+    // 584542046090.6 years on a 64-bit systems. The queen of the UK will still be alive by the time the
     // counter overflows and the program crashes.
     let counter = Arc::new(AtomicUsize::new(0));
     let cloned_send = send.clone();
