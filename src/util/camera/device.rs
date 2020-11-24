@@ -15,8 +15,10 @@
 
 use crate::error::invalid_device_error;
 use serde::{Deserialize, Serialize};
+use v4l::framesize::FrameSizeEnum;
 use std::error::Error;
 use std::os::raw::c_int;
+use std::convert::TryFrom;
 use usb_enumeration::USBDevice;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -118,7 +120,27 @@ impl PartialEq for DeviceHolder {
 
 #[derive(Copy, Clone)]
 pub struct Resolution {
-    x: i64,
-    y: i64,
+    pub x: u32,
+    pub y: u32,
 }
 
+impl TryFrom<v4l::framesize::FrameSize> for Resolution {
+    type Error = String;
+
+    fn try_from(value: v4l::framesize::FrameSize) -> Result<Self, Self::Error> {
+        Ok(match value.size {
+            FrameSizeEnum::Stepwise(step) => {
+                Resolution {
+                    x: step.max_width,
+                    y: step.max_height,
+                }
+            }
+            FrameSizeEnum::Discrete(dis) => {
+                Resolution {
+                    x: dis.width,
+                    y: dis.height,
+                }
+            }
+        })
+    }
+}
