@@ -13,8 +13,9 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{util::camera::device::Resolution, nodes::editor_tabs::util::create_custom_editable_item};
+use crate::{nodes::editor_tabs::util::create_custom_editable_item, util::camera::{device::Resolution, camera_device::V4LinuxDevice}};
 use crate::util::camera::device::{DeviceDesc, DeviceHolder};
+use crate::util::camera::webcam::Webcam;
 use gdnative::{
     api::{popup_menu::PopupMenu, tree::Tree, tree_item::TreeItem},
     prelude::*,
@@ -53,6 +54,10 @@ impl WebcamInputEditor {
                 .cast::<PopupMenu>()
                 .unwrap()
         };
+
+        let v4l2camera = V4LinuxDevice::new_path("/dev/video0".to_string()).unwrap();
+        godot_print!("{}", v4l2camera.name());
+
         camera_popup.set_visible(false);
         if let Err(_why) = camera_popup.connect(
             "id_pressed",
