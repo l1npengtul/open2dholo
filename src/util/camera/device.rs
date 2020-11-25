@@ -15,11 +15,11 @@
 
 use crate::error::invalid_device_error;
 use serde::{Deserialize, Serialize};
-use v4l::framesize::FrameSizeEnum;
+use std::convert::TryFrom;
 use std::error::Error;
 use std::os::raw::c_int;
-use std::convert::TryFrom;
 use usb_enumeration::USBDevice;
+use v4l::framesize::FrameSizeEnum;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct DeviceDesc {
@@ -129,18 +129,23 @@ impl TryFrom<v4l::framesize::FrameSize> for Resolution {
 
     fn try_from(value: v4l::framesize::FrameSize) -> Result<Self, Self::Error> {
         Ok(match value.size {
-            FrameSizeEnum::Stepwise(step) => {
-                Resolution {
-                    x: step.max_width,
-                    y: step.max_height,
-                }
-            }
-            FrameSizeEnum::Discrete(dis) => {
-                Resolution {
-                    x: dis.width,
-                    y: dis.height,
-                }
-            }
+            FrameSizeEnum::Stepwise(step) => Resolution {
+                x: step.max_width,
+                y: step.max_height,
+            },
+            FrameSizeEnum::Discrete(dis) => Resolution {
+                x: dis.width,
+                y: dis.height,
+            },
         })
+    }
+}
+
+impl PartialEq for Resolution {
+    fn eq(&self, other: &Self) -> bool {
+        if self.x == other.x && self.y == other.y {
+            return false;
+        }
+        true
     }
 }

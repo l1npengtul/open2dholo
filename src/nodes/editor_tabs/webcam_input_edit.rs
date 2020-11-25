@@ -13,22 +13,26 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{nodes::editor_tabs::util::create_custom_editable_item, util::camera::{device::Resolution, camera_device::V4LinuxDevice}};
 use crate::util::camera::device::{DeviceDesc, DeviceHolder};
 use crate::util::camera::webcam::Webcam;
+use crate::{
+    nodes::editor_tabs::util::create_custom_editable_item,
+    util::camera::{camera_device::V4LinuxDevice, device::Resolution},
+};
 use gdnative::{
     api::{popup_menu::PopupMenu, tree::Tree, tree_item::TreeItem},
     prelude::*,
     NativeClass,
 };
 use std::cell::RefCell;
+use std::collections::HashMap;
 use usb_enumeration::enumerate;
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
 pub struct WebcamInputEditor {
-    device_list: RefCell<Vec<DeviceHolder>>,
-    device_selected: RefCell<Option<DeviceHolder>>,
+    device_list: RefCell<HashMap<String, Box<dyn Webcam>>>,
+    device_selected: RefCell<Option<Box<dyn Webcam>>>,
     format_selected: RefCell<Option<Resolution>>,
     fps_selected: RefCell<Option<i32>>,
 }

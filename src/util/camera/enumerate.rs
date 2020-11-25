@@ -1,5 +1,8 @@
+use crate::util::camera::{
+    camera_device::{UVCameraDevice, V4LinuxDevice},
+    webcam::Webcam,
+};
 use std::collections::HashMap;
-use crate::util::camera::{webcam::Webcam, camera_device::V4LinuxDevice};
 use v4l::device::List;
 
 pub fn enumerate() -> Option<HashMap<String, Box<dyn Webcam>>> {
@@ -14,7 +17,7 @@ pub fn enumerate() -> Option<HashMap<String, Box<dyn Webcam>>> {
                 if !known_devices.contains_key(&v4l_device.name()) {
                     known_devices.insert(v4l_device.name(), v4l_device);
                 }
-            } 
+            }
             Some(known_devices)
         }
         "macos" | "windows" => {
@@ -22,7 +25,12 @@ pub fn enumerate() -> Option<HashMap<String, Box<dyn Webcam>>> {
             match crate::UVC.devices() {
                 Ok(list) => {
                     for uvc_device in list {
-                        
+                        if let Ok(camera_device) = UVCameraDevice::from_device(uvc_device) {
+                            let camera_name = camera_device.name();
+                            if !known_devices.contains_key(&camera_name) {
+                                known_devices.insert(camera_name, Box::new(camera_device));
+                            }
+                        }
                     }
                 }
                 Err(_why) => {
@@ -31,8 +39,6 @@ pub fn enumerate() -> Option<HashMap<String, Box<dyn Webcam>>> {
             }
             Some(known_devices)
         }
-        _ => {
-            None
-        }
-    } 
+        _ => None,
+    };
 }
