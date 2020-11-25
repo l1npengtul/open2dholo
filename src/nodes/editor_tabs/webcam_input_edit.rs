@@ -17,7 +17,7 @@ use crate::util::camera::device::{DeviceDesc, DeviceHolder};
 use crate::util::camera::webcam::Webcam;
 use crate::{
     nodes::editor_tabs::util::create_custom_editable_item,
-    util::camera::{camera_device::V4LinuxDevice, device::Resolution},
+    util::camera::{camera_device::V4LinuxDevice, device::Resolution, enumerate::enumerate_devices},
 };
 use gdnative::{
     api::{popup_menu::PopupMenu, tree::Tree, tree_item::TreeItem},
@@ -40,7 +40,7 @@ pub struct WebcamInputEditor {
 #[methods]
 impl WebcamInputEditor {
     fn new(_owner: &Tree) -> Self {
-        let dev_list = RefCell::new(WebcamInputEditor::get_device_list());
+        let dev_list = RefCell::new(enumerate_devices().unwrap_or(HashMap::new()));
         WebcamInputEditor {
             device_list: dev_list,
             device_selected: RefCell::new(None),
@@ -213,10 +213,10 @@ impl WebcamInputEditor {
 
                         self.update_device_list();
 
-                        let device_list = self.device_list.borrow().clone();
+                        let device_list = self.device_list.borrow();
                         let mut id_cnt = 0;
-                        for device in device_list.into_iter() {
-                            camera_popup.add_item(device.description, id_cnt, -1);
+                        for (device_name, _device) in device_list.into_iter() {
+                            camera_popup.add_item(device_name, id_cnt, -1);
                             id_cnt += 1;
                         }
 
@@ -226,74 +226,47 @@ impl WebcamInputEditor {
                     }
                 }
                 "Webcam Resolution:" => {
-                    if let Some(camera_device) = self.device_selected.borrow().clone() {
-                        let device_serial = camera_device.serial.to_owned();
-                        godot_print!(
-                            "{},{},{}",
-                            camera_device.vendor_id,
-                            camera_device.product_id,
-                            device_serial.clone().unwrap_or("default".to_string())
-                        );
-                        match crate::UVC.find_device(
-                            Some(camera_device.vendor_id as i32),
-                            Some(camera_device.product_id as i32),
-                            device_serial.as_deref(),
-                        ) {
-                            Ok(dev) => {
-                                let resolution_popup = unsafe {
-                                    owner
-                                        .get_node("../ResolutionPopup")
-                                        .unwrap()
-                                        .assume_safe()
-                                        .cast::<PopupMenu>()
-                                        .unwrap()
-                                };
-                                for item in 0..resolution_popup.get_item_count() {
-                                    resolution_popup.remove_item(item);
-                                }
-                                if resolution_popup.is_visible() {
-                                    resolution_popup.set_visible(false);
-                                } else {
-                                    let rect = owner.get_custom_popup_rect();
-                                    let size = rect.size.to_vector();
-                                    let position = rect.origin.to_vector();
-
-                                    match dev.open() {
-                                        Ok(handler) => {
-                                            let mut counter = 0;
-                                            let mut resolutions: Vec<String> = Vec::new();
-                                            for format in handler.supported_formats() {
-                                                for frame in format.supported_formats() {
-                                                    let resolution_string = format!(
-                                                        "{}x{}",
-                                                        frame.width(),
-                                                        frame.height()
-                                                    );
-                                                    if !resolutions.contains(&resolution_string) {
-                                                        resolutions.push(resolution_string);
-                                                    }
-                                                }
-                                            }
-                                            for label in resolutions {
-                                                resolution_popup.add_item(label, counter, 1);
-                                                counter += 1;
-                                            }
-                                        }
-                                        Err(why) => {
-                                            godot_print!("{}", why);
+                    let selected = self.device_selected.borrow().as_deref();
+                    match selected {
+                        Some(camera) => {
+                            let resolution_popup = unsafe {
+                                owner
+                                    .get_node("../ResolutionPopup")
+                                    .unwrap()
+                                    .assume_safe()
+                                    .cast::<PopupMenu>()
+                                    .unwrap()
+                            };
+                            for item in 0..resolution_popup.get_item_count() {
+                                resolution_popup.remove_item(item);
+                            }
+                            if resolution_popup.is_visible() {
+                                resolution_popup.set_visible(false);
+                            } else {
+                                let rect = owner.get_custom_popup_rect();
+                                let size = rect.size.to_vector();
+                                let position = rect.origin.to_vector();
+                                let mut counter = 0;
+                                match camera.get_supported_resolutions() {
+                                    Ok(res_list) => {
+                                        for res in  res_list{
+                                            resolution_popup.add_item(res.to_string(), counter, 1);
+                                            counter += 1;
                                         }
                                     }
-
-                                    resolution_popup.set_size(size, true);
-                                    resolution_popup.set_position(position, true);
+                                    Err(why) => {
+                                        godot_print!("{}", why)
+                                    }
                                 }
-                            }
-                            Err(why) => {
-                                godot_print!("{}", why);
+                                resolution_popup.set_size(size, true);
+                                resolution_popup.set_position(position, true);                                                        
                             }
                         }
+                        None => {
+                            godot_print!("No Camera!");
+                        }
                     }
-                }
+                } 
                 "Webcam Frame Rate:" => {}
                 "Webcam Video Format:" => {}
                 _ => {
@@ -324,17 +297,15 @@ impl WebcamInputEditor {
         let clicked_popup = camera_popup
             .get_item_text(camera_popup.get_item_index(id as i64))
             .to_string();
-        for desc in self.device_list.borrow().clone().into_iter() {
-            if desc.description == clicked_popup {
-                let send_desc = desc.clone();
-                clicked_item.set_text(1, desc.description);
-                *self.device_selected.borrow_mut() = Some(send_desc);
-            }
+        // set selected device
+        if let Some(dev) = self.device_list.borrow().get::<String>(&clicked_popup){
+            let inside_device = dev
+            *self.device_selected.borrow_mut() = Some();
         }
     }
 
     #[export]
-    pub fn on_framerate_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+    pub fn on_framerate_popup_menu_clicked(&mut self, owner: TRef<Tree>, id: i32) {
         let framerate_popup = unsafe {
             owner
                 .get_node("../FrameratePopup")
@@ -358,7 +329,7 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_video_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+    pub fn on_video_popup_menu_clicked(&mut self, owner: TRef<Tree>, id: i32) {
         let video_popup = unsafe {
             owner
                 .get_node("../VideoPopup")
@@ -382,7 +353,7 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_resolution_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+    pub fn on_resolution_popup_menu_clicked(&mut self, owner: TRef<Tree>, id: i32) {
         let resolution_popup = unsafe {
             owner
                 .get_node("../ResolutionPopup")
@@ -406,40 +377,18 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
+    pub fn on_start_button_pressed(&mut self, owner: TRef<Tree>) {
         // emit signal to viewport to update its camera if different
     }
 
-    fn get_device_list() -> Vec<DeviceHolder> {
-        let mut dev_list: Vec<DeviceHolder> = Vec::new();
-        let uvc_device_list = match crate::UVC.devices() {
-            Ok(dev) => dev,
-            Err(_why) => {
-                panic!("Could not get devices!");
-                //TODO: Show error message when cannot get device list
+    fn update_device_list(&mut self) {
+        match enumerate_devices() {
+            Some(new_list) => {
+                self.device_list.set(new_list);
+            }
+            None => {
+                // do nothing
             }
         };
-
-        let usb_device_list = enumerate();
-        for uvc_device in uvc_device_list {
-            for usb_device in usb_device_list.clone() {
-                let dev: DeviceHolder = match DeviceHolder::from_devices(&usb_device, &uvc_device) {
-                    Ok(device) => device,
-                    Err(_why) => {
-                        continue;
-                    }
-                };
-                if !dev_list.contains(&dev) {
-                    dev_list.push(dev);
-                }
-            }
-        }
-        dev_list
-    }
-
-    fn update_device_list(&self) {
-        let mut device_list = WebcamInputEditor::get_device_list().clone();
-        self.device_list.borrow_mut().clear();
-        self.device_list.borrow_mut().append(&mut device_list);
     }
 }

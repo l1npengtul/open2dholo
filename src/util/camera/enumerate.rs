@@ -5,7 +5,7 @@ use crate::util::camera::{
 use std::collections::HashMap;
 use v4l::device::List;
 
-pub fn enumerate() -> Option<HashMap<String, Box<dyn Webcam>>> {
+pub fn enumerate_devices() -> Option<HashMap<String, Box<dyn Webcam>>> {
     return match std::env::consts::OS {
         "linux" => {
             let mut known_devices: HashMap<String, Box<dyn Webcam>> = HashMap::new();

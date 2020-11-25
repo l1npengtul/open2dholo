@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::os::raw::c_int;
+use std::fmt::Display;
 use usb_enumeration::USBDevice;
 use v4l::framesize::FrameSizeEnum;
 
@@ -147,5 +148,11 @@ impl PartialEq for Resolution {
             return false;
         }
         true
+    }
+}
+
+impl Display for Resolution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}x{}", self.x, self.y)
     }
 }
