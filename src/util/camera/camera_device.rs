@@ -4,6 +4,7 @@ use v4l::{
     capture::parameters::Parameters, format::Format, fraction::Fraction, framesize::FrameSizeEnum,
     prelude::*, FourCC,
 };
+use gdnative::prelude::*;
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice {
@@ -76,9 +77,10 @@ impl Webcam for V4LinuxDevice {
                 let mut ret: Vec<Resolution> = Vec::new();
                 for fs in formats {
                     let compat = match fs.size {
-                        FrameSizeEnum::Stepwise(_step) => {
-                            continue;
-                        }
+                        FrameSizeEnum::Stepwise(step) => Resolution {
+                            x: step.min_width,
+                            y: step.min_height,
+                        },
                         FrameSizeEnum::Discrete(dis) => Resolution {
                             x: dis.width,
                             y: dis.height,
@@ -88,11 +90,9 @@ impl Webcam for V4LinuxDevice {
                 }
                 Ok(ret)
             }
-            Err(_why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo(
-                    "Supported Resolutions".to_string(),
-                ),
-            )),
+            Err(why) => {
+                Err(Box::new(crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo{prop: "Supported Resolutions".to_string(), msg: why.to_string()}))
+            }
         };
     }
 
@@ -118,11 +118,8 @@ impl Webcam for V4LinuxDevice {
                 }
                 Ok(ret)
             }
-            Err(_why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo(
-                    "Supported Framerate".to_string(),
-                ),
-            )),
+            Err(why) => Err(Box::new(crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo{prop: "Supported Framerates".to_string(), msg: why.to_string()}))
+
         };
     }
 }
@@ -233,11 +230,8 @@ impl<'a> Webcam for UVCameraDevice<'a> {
                 }
                 Ok(resolutions)
             }
-            Err(_why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo(
-                    "Supported Resolutions".to_string(),
-                ),
-            )),
+            Err(why) => Err(Box::new(crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo{prop: "Supported Resolutions".to_string(), msg: why.to_string()}))
+            
         }
     }
 

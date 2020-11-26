@@ -59,9 +59,6 @@ impl WebcamInputEditor {
                 .unwrap()
         };
 
-        let v4l2camera = V4LinuxDevice::new_path("/dev/video0".to_string()).unwrap();
-        godot_print!("{}", v4l2camera.name());
-
         camera_popup.set_visible(false);
         if let Err(_why) = camera_popup.connect(
             "id_pressed",
@@ -213,9 +210,8 @@ impl WebcamInputEditor {
 
                         self.update_device_list();
 
-                        let device_list = self.device_list.borrow();
                         let mut id_cnt = 0;
-                        for (device_name, _device) in device_list.into_iter() {
+                        for (device_name, _device) in self.device_list.borrow_mut().iter() {
                             camera_popup.add_item(device_name, id_cnt, -1);
                             id_cnt += 1;
                         }
@@ -226,8 +222,7 @@ impl WebcamInputEditor {
                     }
                 }
                 "Webcam Resolution:" => {
-                    let selected = self.device_selected.borrow().as_deref();
-                    match selected {
+                    match self.device_selected.borrow().as_deref() {
                         Some(camera) => {
                             let resolution_popup = unsafe {
                                 owner
@@ -247,6 +242,8 @@ impl WebcamInputEditor {
                                 let size = rect.size.to_vector();
                                 let position = rect.origin.to_vector();
                                 let mut counter = 0;
+                                let v4l2_dev = V4LinuxDevice::new_path("/dev/video0".to_string()).unwrap().inner.format().unwrap();
+                                godot_print!("{}", v4l2_dev.fourcc);
                                 match camera.get_supported_resolutions() {
                                     Ok(res_list) => {
                                         for res in  res_list{
@@ -298,14 +295,20 @@ impl WebcamInputEditor {
             .get_item_text(camera_popup.get_item_index(id as i64))
             .to_string();
         // set selected device
-        if let Some(dev) = self.device_list.borrow().get::<String>(&clicked_popup){
-            let inside_device = dev
-            *self.device_selected.borrow_mut() = Some();
+        match self.device_list.borrow_mut().remove(&clicked_popup) {
+            Some(device) => {
+                *self.device_selected.borrow_mut() = Some(device);
+                clicked_item.set_text(1, clicked_popup);
+            }
+            None => {
+                godot_print!("Error!");
+            }
         }
+        self.update_device_list();
     }
 
     #[export]
-    pub fn on_framerate_popup_menu_clicked(&mut self, owner: TRef<Tree>, id: i32) {
+    pub fn on_framerate_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
         let framerate_popup = unsafe {
             owner
                 .get_node("../FrameratePopup")
@@ -329,7 +332,7 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_video_popup_menu_clicked(&mut self, owner: TRef<Tree>, id: i32) {
+    pub fn on_video_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
         let video_popup = unsafe {
             owner
                 .get_node("../VideoPopup")
@@ -353,7 +356,7 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_resolution_popup_menu_clicked(&mut self, owner: TRef<Tree>, id: i32) {
+    pub fn on_resolution_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
         let resolution_popup = unsafe {
             owner
                 .get_node("../ResolutionPopup")
@@ -377,14 +380,15 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_start_button_pressed(&mut self, owner: TRef<Tree>) {
+    pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
         // emit signal to viewport to update its camera if different
     }
 
-    fn update_device_list(&mut self) {
+    fn update_device_list(&self) {
+        self.device_list.borrow_mut().clear();
         match enumerate_devices() {
             Some(new_list) => {
-                self.device_list.set(new_list);
+                *self.device_list.borrow_mut() = new_list;
             }
             None => {
                 // do nothing
