@@ -1,10 +1,10 @@
 use crate::util::camera::{device::*, webcam::*};
+use gdnative::prelude::*;
 use usb_enumeration::{enumerate, Filters};
 use v4l::{
     capture::parameters::Parameters, format::Format, fraction::Fraction, framesize::FrameSizeEnum,
     prelude::*, FourCC,
 };
-use gdnative::prelude::*;
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice {
@@ -72,6 +72,7 @@ impl Webcam for V4LinuxDevice {
     }
 
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
+        godot_print!("a");
         return match self.inner.enum_framesizes(v4l::FourCC::new(b"YUYV")) {
             Ok(formats) => {
                 let mut ret: Vec<Resolution> = Vec::new();
@@ -90,9 +91,12 @@ impl Webcam for V4LinuxDevice {
                 }
                 Ok(ret)
             }
-            Err(why) => {
-                Err(Box::new(crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo{prop: "Supported Resolutions".to_string(), msg: why.to_string()}))
-            }
+            Err(why) => Err(Box::new(
+                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                    prop: "Supported Resolutions".to_string(),
+                    msg: why.to_string(),
+                },
+            )),
         };
     }
 
@@ -118,8 +122,12 @@ impl Webcam for V4LinuxDevice {
                 }
                 Ok(ret)
             }
-            Err(why) => Err(Box::new(crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo{prop: "Supported Framerates".to_string(), msg: why.to_string()}))
-
+            Err(why) => Err(Box::new(
+                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                    prop: "Supported Framerates".to_string(),
+                    msg: why.to_string(),
+                },
+            )),
         };
     }
 }
@@ -230,8 +238,12 @@ impl<'a> Webcam for UVCameraDevice<'a> {
                 }
                 Ok(resolutions)
             }
-            Err(why) => Err(Box::new(crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo{prop: "Supported Resolutions".to_string(), msg: why.to_string()}))
-            
+            Err(why) => Err(Box::new(
+                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                    prop: "Supported Resolutions".to_string(),
+                    msg: why.to_string(),
+                },
+            )),
         }
     }
 

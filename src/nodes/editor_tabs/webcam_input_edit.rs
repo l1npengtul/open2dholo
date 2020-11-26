@@ -17,7 +17,9 @@ use crate::util::camera::device::{DeviceDesc, DeviceHolder};
 use crate::util::camera::webcam::Webcam;
 use crate::{
     nodes::editor_tabs::util::create_custom_editable_item,
-    util::camera::{camera_device::V4LinuxDevice, device::Resolution, enumerate::enumerate_devices},
+    util::camera::{
+        camera_device::V4LinuxDevice, device::Resolution, enumerate::enumerate_devices,
+    },
 };
 use gdnative::{
     api::{popup_menu::PopupMenu, tree::Tree, tree_item::TreeItem},
@@ -50,6 +52,14 @@ impl WebcamInputEditor {
     }
     #[export]
     fn _ready(&self, owner: TRef<Tree>) {
+        let v4l2_device = V4LinuxDevice::new_path(String::from("/dev/video0")).unwrap().inner.enum_formats().unwrap();
+        for desc in v4l2_device {
+            godot_print!("{:#?}", desc.description);
+            godot_print!("{:#}", desc.fourcc);
+            godot_print!("{:#}", desc.flags);
+        }
+
+
         let camera_popup = unsafe {
             owner
                 .get_node("../CameraPopup")
@@ -221,49 +231,46 @@ impl WebcamInputEditor {
                         camera_popup.set_visible(true);
                     }
                 }
-                "Webcam Resolution:" => {
-                    match self.device_selected.borrow().as_deref() {
-                        Some(camera) => {
-                            let resolution_popup = unsafe {
-                                owner
-                                    .get_node("../ResolutionPopup")
-                                    .unwrap()
-                                    .assume_safe()
-                                    .cast::<PopupMenu>()
-                                    .unwrap()
-                            };
-                            for item in 0..resolution_popup.get_item_count() {
-                                resolution_popup.remove_item(item);
-                            }
-                            if resolution_popup.is_visible() {
-                                resolution_popup.set_visible(false);
-                            } else {
-                                let rect = owner.get_custom_popup_rect();
-                                let size = rect.size.to_vector();
-                                let position = rect.origin.to_vector();
-                                let mut counter = 0;
-                                let v4l2_dev = V4LinuxDevice::new_path("/dev/video0".to_string()).unwrap().inner.format().unwrap();
-                                godot_print!("{}", v4l2_dev.fourcc);
-                                match camera.get_supported_resolutions() {
-                                    Ok(res_list) => {
-                                        for res in  res_list{
-                                            resolution_popup.add_item(res.to_string(), counter, 1);
-                                            counter += 1;
-                                        }
-                                    }
-                                    Err(why) => {
-                                        godot_print!("{}", why)
+                "Webcam Resolution:" => match self.device_selected.borrow().as_deref() {
+                    Some(camera) => {
+                        let resolution_popup = unsafe {
+                            owner
+                                .get_node("../ResolutionPopup")
+                                .unwrap()
+                                .assume_safe()
+                                .cast::<PopupMenu>()
+                                .unwrap()
+                        };
+                        for item in 0..resolution_popup.get_item_count() {
+                            resolution_popup.remove_item(item);
+                        }
+                        if resolution_popup.is_visible() {
+                            resolution_popup.set_visible(false);
+                        } else {
+                            let rect = owner.get_custom_popup_rect();
+                            let size = rect.size.to_vector();
+                            let position = rect.origin.to_vector();
+                            let mut counter = 0;
+                            // IOCTL Error seems to disappear if i use sudo - what the fuck?
+                            match camera.get_supported_resolutions() {
+                                Ok(res_list) => {
+                                    for res in res_list {
+                                        resolution_popup.add_item(res.to_string(), counter, 1);
+                                        counter += 1;
                                     }
                                 }
-                                resolution_popup.set_size(size, true);
-                                resolution_popup.set_position(position, true);                                                        
+                                Err(why) => {
+                                    godot_print!("{}", why)
+                                }
                             }
-                        }
-                        None => {
-                            godot_print!("No Camera!");
+                            resolution_popup.set_size(size, true);
+                            resolution_popup.set_position(position, true);
                         }
                     }
-                } 
+                    None => {
+                        godot_print!("No Camera!");
+                    }
+                },
                 "Webcam Frame Rate:" => {}
                 "Webcam Video Format:" => {}
                 _ => {
