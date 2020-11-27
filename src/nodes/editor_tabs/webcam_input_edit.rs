@@ -52,14 +52,6 @@ impl WebcamInputEditor {
     }
     #[export]
     fn _ready(&self, owner: TRef<Tree>) {
-        let v4l2_device = V4LinuxDevice::new_path(String::from("/dev/video0")).unwrap().inner.enum_formats().unwrap();
-        for desc in v4l2_device {
-            godot_print!("{:#?}", desc.description);
-            godot_print!("{:#}", desc.fourcc);
-            godot_print!("{:#}", desc.flags);
-        }
-
-
         let camera_popup = unsafe {
             owner
                 .get_node("../CameraPopup")
@@ -208,9 +200,7 @@ impl WebcamInputEditor {
                             .cast::<PopupMenu>()
                             .unwrap()
                     };
-                    for item in 0..camera_popup.get_item_count() {
-                        camera_popup.remove_item(item);
-                    }
+                    camera_popup.clear();
                     if camera_popup.is_visible() {
                         camera_popup.set_visible(false);
                     } else {
@@ -241,9 +231,7 @@ impl WebcamInputEditor {
                                 .cast::<PopupMenu>()
                                 .unwrap()
                         };
-                        for item in 0..resolution_popup.get_item_count() {
-                            resolution_popup.remove_item(item);
-                        }
+                        resolution_popup.clear();
                         if resolution_popup.is_visible() {
                             resolution_popup.set_visible(false);
                         } else {
@@ -252,6 +240,7 @@ impl WebcamInputEditor {
                             let position = rect.origin.to_vector();
                             let mut counter = 0;
                             // IOCTL Error seems to disappear if i use sudo - what the fuck?
+                            // /dev/video1 is broken forever
                             match camera.get_supported_resolutions() {
                                 Ok(res_list) => {
                                     for res in res_list {
@@ -265,13 +254,55 @@ impl WebcamInputEditor {
                             }
                             resolution_popup.set_size(size, true);
                             resolution_popup.set_position(position, true);
+                            resolution_popup.set_visible(true);
                         }
                     }
                     None => {
                         godot_print!("No Camera!");
                     }
                 },
-                "Webcam Frame Rate:" => {}
+                "Webcam Frame Rate:" => match self.device_selected.borrow().as_deref() {
+                    Some(camera) => {
+                        let fps_popup = unsafe {
+                            owner
+                                .get_node("../FrameratePopup")
+                                .unwrap()
+                                .assume_safe()
+                                .cast::<PopupMenu>()
+                                .unwrap()
+                        };
+                        fps_popup.clear();
+                        if fps_popup.is_visible() {
+                            fps_popup.set_visible(false);
+                        } else {
+                            let rect = owner.get_custom_popup_rect();
+                            let size = rect.size.to_vector();
+                            let position = rect.origin.to_vector();
+                            let mut counter = 0;
+
+                            if let Some(resolution) = self.format_selected.borrow_mut().to_owned() {
+                                match camera.get_supported_framerate(resolution) {
+                                    Ok(res_list) => {
+                                        for res in res_list {
+                                            fps_popup.add_item(res.to_string(), counter, 1);
+                                            counter += 1;
+                                        }
+                                    }
+                                    Err(why) => {
+                                        godot_print!("{}", why)
+                                    }
+                                }
+                            }
+
+                            fps_popup.set_size(size, true);
+                            fps_popup.set_position(position, true);
+                            fps_popup.set_visible(true);
+                        }
+                    }
+                    None => {
+                        godot_print!("No Camera!");
+                    }
+                }
                 "Webcam Video Format:" => {}
                 _ => {
                     return;
@@ -315,6 +346,39 @@ impl WebcamInputEditor {
     }
 
     #[export]
+    pub fn on_resolution_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+        let resolution_popup = unsafe {
+            owner
+                .get_node("../ResolutionPopup")
+                .unwrap()
+                .assume_safe()
+                .cast::<PopupMenu>()
+                .unwrap()
+        };
+        // TODO: Get USB device from thing and open device
+        let clicked_item = unsafe {
+            owner
+                .assume_shared()
+                .assume_safe()
+                .get_edited()
+                .unwrap()
+                .assume_safe()
+        };
+        let clicked_popup = resolution_popup
+            .get_item_text(resolution_popup.get_item_index(id as i64))
+            .to_string();
+        let resolutin_string_vec: Vec<&str> = clicked_popup.split("x").into_iter().collect();
+        let res = Resolution {
+            x: resolutin_string_vec.get(0).unwrap().parse::<u32>().unwrap(),
+            y: resolutin_string_vec.get(1).unwrap().parse::<u32>().unwrap(),
+        };
+        *self.format_selected.borrow_mut() = Some(res);
+        clicked_item.set_text(1, clicked_popup);
+        
+    }
+
+
+    #[export]
     pub fn on_framerate_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
         let framerate_popup = unsafe {
             owner
@@ -336,6 +400,9 @@ impl WebcamInputEditor {
         let clicked_popup = framerate_popup
             .get_item_text(framerate_popup.get_item_index(id as i64))
             .to_string();
+        let fps_int = clicked_popup.parse::<i32>().unwrap();
+        *self.fps_selected.borrow_mut() = Some(fps_int);
+        clicked_item.set_text(1, clicked_popup);
     }
 
     #[export]
@@ -362,30 +429,7 @@ impl WebcamInputEditor {
             .to_string();
     }
 
-    #[export]
-    pub fn on_resolution_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
-        let resolution_popup = unsafe {
-            owner
-                .get_node("../ResolutionPopup")
-                .unwrap()
-                .assume_safe()
-                .cast::<PopupMenu>()
-                .unwrap()
-        };
-        // TODO: Get USB device from thing and open device
-        let clicked_item = unsafe {
-            owner
-                .assume_shared()
-                .assume_safe()
-                .get_edited()
-                .unwrap()
-                .assume_safe()
-        };
-        let clicked_popup = resolution_popup
-            .get_item_text(resolution_popup.get_item_index(id as i64))
-            .to_string();
-    }
-
+    
     #[export]
     pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
         // emit signal to viewport to update its camera if different

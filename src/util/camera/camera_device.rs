@@ -50,13 +50,7 @@ impl Webcam for V4LinuxDevice {
             Ok(capability) => capability.card,
             Err(_why) => "".to_string(),
         };
-        if device_name == "".to_string() {
-            let name = String::from(format!("{}", self.device_path));
-            name
-        } else {
-            let name = String::from(format!("{} ({})", self.device_path, device_name));
-            name
-        }
+        device_name
     }
 
     fn set_resolution(&mut self, res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
@@ -72,8 +66,7 @@ impl Webcam for V4LinuxDevice {
     }
 
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
-        godot_print!("a");
-        return match self.inner.enum_framesizes(v4l::FourCC::new(b"YUYV")) {
+        match self.inner.enum_framesizes(v4l::FourCC::new(b"YUYV")) {
             Ok(formats) => {
                 let mut ret: Vec<Resolution> = Vec::new();
                 for fs in formats {
@@ -89,9 +82,9 @@ impl Webcam for V4LinuxDevice {
                     };
                     ret.push(compat);
                 }
-                Ok(ret)
+                return Ok(ret);
             }
-            Err(why) => Err(Box::new(
+            Err(why) => return Err(Box::new(
                 crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
                     prop: "Supported Resolutions".to_string(),
                     msg: why.to_string(),
@@ -110,14 +103,17 @@ impl Webcam for V4LinuxDevice {
         {
             Ok(inte) => {
                 let mut ret: Vec<u32> = Vec::new();
+                godot_print!("{}", inte.len());
                 for frame in inte {
                     match frame.interval {
                         v4l::frameinterval::FrameIntervalEnum::Discrete(dis) => {
-                            if dis.numerator % dis.denominator == 0 {
-                                ret.push(dis.numerator);
-                            }
+                            godot_print!("{}", dis.to_string());
+                            ret.push(dis.denominator);
                         }
-                        v4l::frameinterval::FrameIntervalEnum::Stepwise(_) => {}
+                        v4l::frameinterval::FrameIntervalEnum::Stepwise(step) => {
+                            ret.push(step.min.denominator);
+                            ret.push(step.max.denominator);
+                        }
                     }
                 }
                 Ok(ret)

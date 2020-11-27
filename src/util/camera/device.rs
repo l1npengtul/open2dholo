@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::Display;
+use std::cmp::Ord;
 use std::os::raw::c_int;
 use usb_enumeration::USBDevice;
 use v4l::framesize::FrameSizeEnum;
@@ -119,7 +120,7 @@ impl PartialEq for DeviceHolder {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq)]
 pub struct Resolution {
     pub x: u32,
     pub y: u32,
