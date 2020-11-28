@@ -15,7 +15,7 @@
 
 use crate::configuration::processing_config::ProcessingConfig;
 use crate::error::config_error::ConfigError;
-use crate::util::camera::device::DeviceDesc;
+use crate::util::camera::device_utils::DeviceDesc;
 use ron::de::from_reader;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicUsize};

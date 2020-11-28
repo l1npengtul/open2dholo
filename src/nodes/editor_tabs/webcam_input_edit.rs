@@ -13,29 +13,30 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::device::{DeviceDesc, DeviceHolder};
-use crate::util::camera::webcam::Webcam;
+use crate::util::camera::{device_utils::DeviceFormat, webcam::Webcam};
 use crate::{
     nodes::editor_tabs::util::create_custom_editable_item,
-    util::camera::{
-        camera_device::V4LinuxDevice, device::Resolution, enumerate::enumerate_devices,
-    },
+    util::camera::{device_utils::Resolution, enumerate::enumerate_devices},
 };
 use gdnative::{
-    api::{popup_menu::PopupMenu, tree::Tree, tree_item::TreeItem},
+    api::{
+        popup_menu::PopupMenu,
+        tree::Tree,
+        tree_item::{TreeCellMode, TreeItem},
+    },
     prelude::*,
     NativeClass,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
-use usb_enumeration::enumerate;
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
 pub struct WebcamInputEditor {
     device_list: RefCell<HashMap<String, Box<dyn Webcam>>>,
     device_selected: RefCell<Option<Box<dyn Webcam>>>,
-    format_selected: RefCell<Option<Resolution>>,
+    resolution_selected: RefCell<Option<Resolution>>,
+    format_selected: RefCell<Option<DeviceFormat>>,
     fps_selected: RefCell<Option<i32>>,
 }
 
@@ -46,6 +47,7 @@ impl WebcamInputEditor {
         WebcamInputEditor {
             device_list: dev_list,
             device_selected: RefCell::new(None),
+            resolution_selected: RefCell::new(None),
             format_selected: RefCell::new(None),
             fps_selected: RefCell::new(None),
         }
@@ -91,19 +93,19 @@ impl WebcamInputEditor {
             panic!("Failed to initialise UI!");
         }
 
-        let video_popup = unsafe {
+        let format_popup = unsafe {
             owner
-                .get_node("../VideoPopup")
+                .get_node("../FormatPopup")
                 .unwrap()
                 .assume_safe()
                 .cast::<PopupMenu>()
                 .unwrap()
         };
-        video_popup.set_visible(false);
-        if let Err(_why) = video_popup.connect(
+        format_popup.set_visible(false);
+        if let Err(_why) = format_popup.connect(
             "id_pressed",
             owner,
-            "on_video_popup_menu_clicked",
+            "on_format_popup_menu_clicked",
             VariantArray::new_shared(),
             0,
         ) {
@@ -151,9 +153,9 @@ impl WebcamInputEditor {
         webcam_video_input.set_disable_folding(false);
 
         create_custom_editable_item(owner, root_item, "Input Webcam:", 2);
-        create_custom_editable_item(owner, root_item, "Webcam Resolution:", 3);
-        create_custom_editable_item(owner, root_item, "Webcam Frame Rate:", 4);
-        create_custom_editable_item(owner, root_item, "Webcam Video Format:", 5);
+        create_custom_editable_item(owner, root_item, "Webcam Video Format:", 3);
+        create_custom_editable_item(owner, root_item, "Webcam Resolution:", 4);
+        create_custom_editable_item(owner, root_item, "Webcam Frame Rate:", 5);
 
         if let Err(_why) = owner.connect(
             "custom_popup_edited",
@@ -239,8 +241,10 @@ impl WebcamInputEditor {
                             let size = rect.size.to_vector();
                             let position = rect.origin.to_vector();
                             let mut counter = 0;
-                            // IOCTL Error seems to disappear if i use sudo - what the fuck?
-                            // /dev/video1 is broken forever
+
+                            if let Some(fmt) = self.format_selected.borrow_mut().to_owned() {
+                                camera.set_camera_foramt(fmt);
+                            }
                             match camera.get_supported_resolutions() {
                                 Ok(res_list) => {
                                     for res in res_list {
@@ -280,7 +284,12 @@ impl WebcamInputEditor {
                             let position = rect.origin.to_vector();
                             let mut counter = 0;
 
-                            if let Some(resolution) = self.format_selected.borrow_mut().to_owned() {
+                            if let Some(fmt) = self.format_selected.borrow_mut().to_owned() {
+                                camera.set_camera_foramt(fmt);
+                            }
+                            if let Some(resolution) =
+                                self.resolution_selected.borrow_mut().to_owned()
+                            {
                                 match camera.get_supported_framerate(resolution) {
                                     Ok(res_list) => {
                                         for res in res_list {
@@ -302,8 +311,45 @@ impl WebcamInputEditor {
                     None => {
                         godot_print!("No Camera!");
                     }
-                }
-                "Webcam Video Format:" => {}
+                },
+                "Webcam Video Format:" => match self.device_selected.borrow().as_deref() {
+                    Some(device) => {
+                        let format_popup = unsafe {
+                            owner
+                                .get_node("../FormatPopup")
+                                .unwrap()
+                                .assume_safe()
+                                .cast::<PopupMenu>()
+                                .unwrap()
+                        };
+                        format_popup.clear();
+                        if format_popup.is_visible() {
+                            format_popup.set_visible(false);
+                        } else {
+                            if let Ok(resolutions) = device.get_supported_resolutions() {
+                                if let Some(res) = resolutions.get(0) {
+                                    let rect = owner.get_custom_popup_rect();
+                                    let size = rect.size.to_vector();
+                                    let position = rect.origin.to_vector();
+                                    let mut counter = 0;
+                                    if let Ok(dev_fmt) = device.get_supported_formats(res.clone()) {
+                                        for fourcc in dev_fmt {
+                                            format_popup.add_item(fourcc.to_string(), counter, 1);
+                                            counter += 1;
+                                        }
+                                    }
+
+                                    format_popup.set_size(size, true);
+                                    format_popup.set_position(position, true);
+                                    format_popup.set_visible(true);
+                                }
+                            }
+                        }
+                    }
+                    None => {
+                        godot_print!("No Camera!");
+                    }
+                },
                 _ => {
                     return;
                 }
@@ -313,6 +359,7 @@ impl WebcamInputEditor {
 
     #[export]
     pub fn on_camera_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+        self.clear_other_fields(owner, "camera");
         let camera_popup = unsafe {
             owner
                 .get_node("../CameraPopup")
@@ -342,11 +389,12 @@ impl WebcamInputEditor {
                 godot_print!("Error!");
             }
         }
-        self.update_device_list();
     }
 
     #[export]
     pub fn on_resolution_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+        self.clear_other_fields(owner, "res");
+
         let resolution_popup = unsafe {
             owner
                 .get_node("../ResolutionPopup")
@@ -372,11 +420,9 @@ impl WebcamInputEditor {
             x: resolutin_string_vec.get(0).unwrap().parse::<u32>().unwrap(),
             y: resolutin_string_vec.get(1).unwrap().parse::<u32>().unwrap(),
         };
-        *self.format_selected.borrow_mut() = Some(res);
+        *self.resolution_selected.borrow_mut() = Some(res);
         clicked_item.set_text(1, clicked_popup);
-        
     }
-
 
     #[export]
     pub fn on_framerate_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
@@ -406,10 +452,11 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_video_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
-        let video_popup = unsafe {
+    pub fn on_format_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+        self.clear_other_fields(owner, "format");
+        let format_popup = unsafe {
             owner
-                .get_node("../VideoPopup")
+                .get_node("../FormatPopup")
                 .unwrap()
                 .assume_safe()
                 .cast::<PopupMenu>()
@@ -424,17 +471,29 @@ impl WebcamInputEditor {
                 .unwrap()
                 .assume_safe()
         };
-        let clicked_popup = video_popup
-            .get_item_text(video_popup.get_item_index(id as i64))
+        let clicked_popup = format_popup
+            .get_item_text(format_popup.get_item_index(id as i64))
             .to_string();
+        match &clicked_popup.clone().to_ascii_lowercase().to_owned()[..] {
+            "yuyv" => {
+                *self.format_selected.borrow_mut() = Some(DeviceFormat::YUYV);
+                clicked_item.set_text(1, clicked_popup);
+            }
+            "mjpg" | "mjpeg" => {
+                *self.format_selected.borrow_mut() = Some(DeviceFormat::MJPEG);
+                clicked_item.set_text(1, clicked_popup);
+            }
+            _ => {}
+        }
     }
 
-    
     #[export]
     pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
-        // emit signal to viewport to update its camera if different
+        self.update_device_list();
+        
     }
 
+    // updates the device list to look for new devices, etc
     fn update_device_list(&self) {
         self.device_list.borrow_mut().clear();
         match enumerate_devices() {
@@ -445,5 +504,111 @@ impl WebcamInputEditor {
                 // do nothing
             }
         };
+    }
+
+    // Clears fields below it and its associated value
+    // Camera => Update Dev List, Clears FMT, RES, FPS
+    // Format => Clears Res, FPS
+    // Res => Clears FPS
+    // FPS => N/A
+    // Note that `item` refers to the thing to NOT clear
+    fn clear_other_fields(&self, owner: TRef<Tree>, item: &str) {
+        match item {
+            "camera" => {
+                self.update_device_list();
+                *self.device_selected.borrow_mut() = None;
+                *self.format_selected.borrow_mut() = None;
+                *self.resolution_selected.borrow_mut() = None;
+                *self.fps_selected.borrow_mut() = None;
+                let mut child = unsafe {
+                    owner
+                        .get_root()
+                        .unwrap()
+                        .assume_safe()
+                        .get_children()
+                        .unwrap()
+                        .assume_safe()
+                };
+                let mut clearable = false;
+                loop {
+                    // see if the child is a custom tree item
+                    if child.get_text(0).to_string() != "Input Webcam:".to_string()
+                        && child.get_cell_mode(1) == TreeCellMode::CUSTOM
+                        && clearable
+                    {
+                        child.set_text(1, "");
+                    } else if child.get_text(0).to_string() == "Input Webcam:".to_string() {
+                        clearable = true;
+                    }
+                    if let Some(a) = child.get_next() {
+                        child = unsafe { a.assume_safe() };
+                    } else {
+                        break;
+                    }
+                }
+            }
+            "format" => {
+                self.update_device_list();
+                *self.resolution_selected.borrow_mut() = None;
+                *self.fps_selected.borrow_mut() = None;
+                let mut child = unsafe {
+                    owner
+                        .get_root()
+                        .unwrap()
+                        .assume_safe()
+                        .get_children()
+                        .unwrap()
+                        .assume_safe()
+                };
+                let mut clearable = false;
+                loop {
+                    // see if the child is a custom tree item
+                    if child.get_text(0).to_string() != "Webcam Video Format:".to_string()
+                        && child.get_cell_mode(1) == TreeCellMode::CUSTOM
+                        && clearable
+                    {
+                        child.set_text(1, "");
+                    } else if child.get_text(0).to_string() == "Webcam Video Format:".to_string() {
+                        clearable = true;
+                    }
+                    if let Some(a) = child.get_next() {
+                        child = unsafe { a.assume_safe() };
+                    } else {
+                        break;
+                    }
+                }
+            }
+            "res" => {
+                self.update_device_list();
+                *self.fps_selected.borrow_mut() = None;
+                let mut child = unsafe {
+                    owner
+                        .get_root()
+                        .unwrap()
+                        .assume_safe()
+                        .get_children()
+                        .unwrap()
+                        .assume_safe()
+                };
+                let mut clearable = false;
+                loop {
+                    // see if the child is a custom tree item
+                    if child.get_text(0).to_string() != "Webcam Resolution:".to_string()
+                        && child.get_cell_mode(1) == TreeCellMode::CUSTOM
+                        && clearable
+                    {
+                        child.set_text(1, "");
+                    } else if child.get_text(0).to_string() == "Webcam Resolution:".to_string() {
+                        clearable = true;
+                    }
+                    if let Some(a) = child.get_next() {
+                        child = unsafe { a.assume_safe() };
+                    } else {
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }

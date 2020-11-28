@@ -27,4 +27,6 @@ pub enum InvalidDeviceError {
     CannotFindDevice,
     #[error("Could not get device property \"{prop}\": {msg}")]
     CannotGetDeviceInfo { prop: String, msg: String },
+    #[error("Could not open the device stream: {0}")]
+    CannotOpenStream(String),
 }

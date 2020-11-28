@@ -13,15 +13,12 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::invalid_device_error;
+use crate::error::invalid_device_error::InvalidDeviceError;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::error::Error;
-use std::fmt::Display;
-use std::cmp::Ord;
-use std::os::raw::c_int;
+use std::{convert::TryFrom, error::Error, fmt::Display, os::raw::c_int};
 use usb_enumeration::USBDevice;
-use v4l::framesize::FrameSizeEnum;
+use uvc::{DeviceHandle, StreamHandle};
+use v4l::{framesize::FrameSizeEnum, prelude::*};
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct DeviceDesc {
@@ -101,9 +98,7 @@ impl DeviceHolder {
                 return Ok(device);
             }
         }
-        return Err(Box::new(
-            invalid_device_error::InvalidDeviceError::CannotFindDevice,
-        ));
+        return Err(Box::new(InvalidDeviceError::CannotFindDevice));
     }
 }
 
@@ -156,4 +151,27 @@ impl Display for Resolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}x{}", self.x, self.y)
     }
+}
+#[derive(Copy, Clone)]
+pub enum DeviceFormat {
+    YUYV,
+    MJPEG,
+}
+
+impl Display for DeviceFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeviceFormat::YUYV => {
+                write!(f, "YUYV")
+            }
+            DeviceFormat::MJPEG => {
+                write!(f, "MJPG")
+            }
+        }
+    }
+}
+
+pub enum StreamType<'a> {
+    V4L2Stream(MmapStream<'a>),
+    UVCStream(StreamHandle<'a>, DeviceHandle<'a>),
 }
