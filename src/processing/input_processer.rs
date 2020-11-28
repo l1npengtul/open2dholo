@@ -13,8 +13,6 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//use flume::{Receiver, RecvError, RecvTimeoutError, SendError, Sender, TryRecvError};
-
 use crate::util::camera::device_utils::DeviceDesc;
 use crate::util::packet::{MessageType, Processed, ProcessedPacket};
 use dlib_face_recognition::{
