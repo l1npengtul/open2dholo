@@ -13,58 +13,56 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::device_utils::DeviceDesc;
-use crate::util::packet::{MessageType, Processed, ProcessedPacket};
+use crate::{error::processing_error::ProcessingError, util::{camera::{camera_device::{V4LinuxDevice, UVCameraDevice}, device_utils::{DeviceDesc, PossibleDevice}, webcam::Webcam}, packet::{MessageType, Processed, ProcessedPacket}}};
 use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };
 use flume::{Receiver, Sender, TryRecvError};
-use std::{
-    sync::{atomic::AtomicUsize, Arc},
-    thread::{Builder, JoinHandle},
-    time::Duration,
-};
+use std::{sync::{Arc, atomic::AtomicUsize}, thread::{Builder, JoinHandle}, time::Duration};
+use downcast_rs::*;
 
 pub struct InputProcessing {
-    device: DeviceDesc,
-    format: uvc::StreamFormat,
     sender_p1: Sender<MessageType>,
     // To Thread
     reciever_p2: Receiver<ProcessedPacket>,
     // From Thread
-    thread_handle: JoinHandle<u8>,
+    thread_handle: JoinHandle<Result<(), Box<ProcessingError>>>,
 }
 
 impl InputProcessing {
     pub fn new(
         num_thread: usize,
-        bind_device: uvc::DeviceDescription,
-        stream_fmt: uvc::StreamFormat,
-    ) -> Self {
+        device: Box<dyn Webcam + Sync + Send>,
+    ) -> Result<Self, ()> {
         let (to_thread_tx, to_thread_rx) = flume::unbounded();
         let (from_thread_tx, from_thread_rx) = flume::unbounded();
-        let description = DeviceDesc::from_description(bind_device);
-        let description2 = description.clone();
-        let thread = Builder::new()
+        let thread = match Builder::new()
             .name(format!("input-processor_{}", num_thread))
             .spawn(move || {
                 input_process_func(
                     to_thread_rx,
                     from_thread_tx,
-                    description,
-                    stream_fmt.clone(),
+                    device
                 )
-            })
-            .unwrap();
-        InputProcessing {
-            device: description2,
-            format: stream_fmt,
-            sender_p1: to_thread_tx,
-            reciever_p2: from_thread_rx,
-            thread_handle: thread,
-        }
+            }) {
+                Ok(join) => {
+                    join
+                }
+                Err(_why) => {
+                    return Err(());
+                }
+        };
+        Ok(
+            InputProcessing{
+                sender_p1: to_thread_tx,
+                // To Thread
+                reciever_p2: from_thread_rx,
+                // From Thread
+                thread_handle: thread,
+            }
+        )
     }
-    pub fn fichange_device(&self, device: DeviceDesc) -> Result<(), ()> {
+    pub fn fichange_device(&self, device: PossibleDevice) -> Result<(), ()> {
         match self.sender_p1.send(MessageType::Set(device)) {
             Ok(_v) => Ok(()),
             Err(_e) => Err(()),
@@ -83,77 +81,84 @@ impl Drop for InputProcessing {
     }
 }
 
-/*
- * Thread Return Codes - VERY
- *
- * 0 = Sucessful Exit
- * 1 = Device not found
- * 2 = General Error
- * 3 = Thread Communication Error
- * 4 = Threadpool Error
- */
-
 fn input_process_func(
-    _recv: Receiver<MessageType>,
+    recv: Receiver<MessageType>,
     send: Sender<ProcessedPacket>,
-    startup_desc: DeviceDesc,
-    startup_format: uvc::StreamFormat,
-) -> u8 {
+    startup_dev: Box<dyn Webcam>,
+) -> Result<(), Box<ProcessingError>> {
     std::thread::sleep(Duration::from_millis(100));
-    let device_serial = match startup_desc.ser {
-        Some(serial) => Some(serial),
-        None => None,
-    };
-    let current_format = startup_format;
-    let current_device: uvc::Device = match crate::UVC.find_device(
-        startup_desc.vid,
-        startup_desc.pid,
-        device_serial.as_deref(),
-    ) {
-        Ok(v) => v,
-        Err(_why) => {
-            return 1;
+    
+    match startup_dev.get_inner(){
+        PossibleDevice::UVCAM { vendor_id, product_id, serial, res, fps, fmt } => {
+            let mut uvc_device = match crate::UVC.find_device(vendor_id.map_or(None, |f| Some(f as i32)), product_id.map_or(None, |f| Some(f as i32)), serial.as_deref()) {
+                Ok(d) => d,
+                Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+            };
+
+            let mut resolution = res;
+            let mut frame_rate = fps;
+            let mut format = fmt;
+
+            loop {
+                // get messages we may need to respond to
+                if let Ok(message) = recv.try_recv() {
+                    match message {
+                        MessageType::Set(device) => {
+                            if let PossibleDevice::UVCAM{ vendor_id, product_id, serial, res, fps, fmt } = device {
+                                match crate::UVC.find_device(vendor_id.map_or(None, |f| Some(f as i32)), product_id.map_or(None, |f| Some(f as i32)), serial.as_deref()) {
+                                    Ok(d) => {
+                                        uvc_device = d;
+                                        resolution = res;
+                                        frame_rate = fps;
+                                        format = fmt;
+                                    },
+                                    Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+                                }
+                            }
+                        }
+                        _ => return Err(Box::new(ProcessingError::General(format!("Thread Close/End request."))))
+                    }
+
+                    // acutal input stream here
+                    let device_handler = match uvc_device.open() {
+                        Ok(h) => h,
+                        Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device handler: {}", why.to_string()))))
+                    };
+
+                    let mut stream_handler = match device_handler.get_stream_handle_with_format_size_and_fps(format, resolution.x, resolution.y, frame_rate) {
+                        Ok(h) => h,
+                        Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device stream handler: {}", why.to_string()))))
+                    };
+
+                    let cnt = Arc::new(AtomicUsize::new(0));
+
+                    let _device_stream = match stream_handler.start_stream(|_frame, count| {
+                        // aaaa go crazy
+                    }, cnt.clone()) {
+                        Ok(active) => active,
+                        Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device stream: {}", why.to_string()))))
+                    };
+                }
+
+            }
+        }
+        PossibleDevice::V4L2 { location, res, fps, fmt } => {
+
         }
     };
-    //let threads = (1000 / current_format.fps) + 1;
 
-    // The AtomicUsize limits us to around 136.1 years of webcam streaming on a 32-bit systems, or
-    // 584542046090.6 years on a 64-bit systems. The queen of the UK will still be alive by the time the
-    // counter overflows and the program crashes.
-    let counter = Arc::new(AtomicUsize::new(0));
-    let cloned_send = send.clone();
-    current_device
-        .open()
-        .unwrap()
-        .get_stream_handle_with_format(current_format)
-        .unwrap()
-        .start_stream(
-            move |frame, _count| {
-                let img_matrix = unsafe {
-                    ImageMatrix::new(
-                        frame.width() as usize,
-                        frame.height() as usize,
-                        frame.to_rgb().unwrap().to_bytes().as_ptr(),
-                    )
-                };
-                crate::PROCESSING_POOL
-                    .install(|| cloned_send.send(find_landmarks(&img_matrix)).unwrap())
-            },
-            counter.clone(),
-        )
-        .expect("Could not start stream!");
-    0
+    Ok(())
 }
 
 fn trick_or_channel(message: Result<MessageType, TryRecvError>) -> DeviceOrTrick {
     match message {
         Ok(msg) => match msg {
             MessageType::Set(dev) => DeviceOrTrick::Device(dev),
-            MessageType::Close(code) => DeviceOrTrick::Exit(code),
-            MessageType::Die(code) => DeviceOrTrick::Exit(code),
+            MessageType::Close(code) => DeviceOrTrick::Exit("CLOSE_REQUEST".to_string()),
+            MessageType::Die(code) => DeviceOrTrick::Exit("DIE".to_string()),
         },
         Err(e) => match e {
-            TryRecvError::Disconnected => DeviceOrTrick::Exit(3),
+            TryRecvError::Disconnected => DeviceOrTrick::Exit("PIPE_DISCONNECT".to_string()),
             TryRecvError::Empty => DeviceOrTrick::None,
         },
     }
@@ -161,8 +166,8 @@ fn trick_or_channel(message: Result<MessageType, TryRecvError>) -> DeviceOrTrick
 
 // Trick or treat with death and webcams. Fun for the whole family!
 enum DeviceOrTrick {
-    Device(DeviceDesc),
-    Exit(u8),
+    Device(PossibleDevice),
+    Exit(String),
     None,
 }
 

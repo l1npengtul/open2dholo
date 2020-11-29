@@ -14,10 +14,10 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-use std::cell::Cell;
+use std::{cell::Cell, any::Any};
 use crate::util::camera::{device_utils::*, webcam::*};
 use usb_enumeration::{enumerate, Filters};
-use uvc::FormatDescriptor;
+use uvc::{FormatDescriptor, FrameFormat};
 use v4l::{
     capture::parameters::Parameters, format::Format, fraction::Fraction, framesize::FrameSizeEnum,
     prelude::*, FourCC,
@@ -27,6 +27,7 @@ use v4l::{
 pub struct V4LinuxDevice {
     device_type: WebcamType,
     device_format: Cell<DeviceFormat>,
+    device_path: PathIndex,
     pub inner: v4l::capture::Device,
 }
 impl V4LinuxDevice {
@@ -38,9 +39,11 @@ impl V4LinuxDevice {
             }
         };
         let device_type = WebcamType::V4linux2;
+        let device_path = PathIndex::Index(index.clone());
         Ok(V4LinuxDevice {
             device_type,
             device_format: Cell::new(DeviceFormat::YUYV),
+            device_path,
             inner: device,
         })
     }
@@ -52,9 +55,11 @@ impl V4LinuxDevice {
             }
         };
         let device_type = WebcamType::V4linux2;
+        let device_path = PathIndex::Path(path.clone());
         Ok(V4LinuxDevice {
             device_type,
             device_format: Cell::new(DeviceFormat::YUYV),
+            device_path,
             inner: device,
         })
     }
@@ -202,7 +207,7 @@ impl Webcam for V4LinuxDevice {
         self.device_type
     }
 
-    fn open_stream(&mut self) -> Result<StreamType, Box<dyn std::error::Error>> {
+    fn open_stream(&self) -> Result<StreamType, Box<dyn std::error::Error>> {
         return match MmapStream::with_buffers(&self.inner, 4) {
             Ok(stream) => Ok(StreamType::V4L2Stream(stream)),
             Err(why) => Err(Box::new(
@@ -212,17 +217,49 @@ impl Webcam for V4LinuxDevice {
             )),
         };
     }
+
+    fn get_inner(&self) -> PossibleDevice {
+        let current_format = match self.inner.format() {
+            Ok(format) => format,
+            Err(_) => {
+                Format::new(640, 480, FourCC::new(b"MJPG")) // TODO: proper error handling 
+            }
+        };
+
+        let res = Resolution {
+            x: current_format.width,
+            y: current_format.height,
+        };
+
+        let fps = match self.inner.params() {
+            Ok(param) => param.interval.denominator as u32,
+            Err(_) => 5
+        };
+
+        let fmt = current_format.fourcc;
+
+        PossibleDevice::V4L2{
+            location: self.device_path.clone(),
+            res,
+            fps,
+            fmt
+        }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-pub struct UVCameraDevice<'a> {
+pub struct UVCameraDevice {
     device_type: WebcamType,
     device_id: String,
     device_format: Cell<DeviceFormat>,
     device_resolution: Cell<Option<Resolution>>,
     device_framerate: Cell<Option<u32>>,
-    pub inner: uvc::Device<'a>,
+    pub inner: uvc::Device<'static>,
 }
-impl<'a> UVCameraDevice<'a> {
+impl UVCameraDevice {
     pub fn new(
         vendor_id: Option<i32>,
         product_id: Option<i32>,
@@ -264,7 +301,7 @@ impl<'a> UVCameraDevice<'a> {
         ))
     }
 
-    pub fn from_device(uvc_dev: uvc::Device<'a>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_device(uvc_dev: uvc::Device<'static>) -> Result<Self, Box<dyn std::error::Error>> {
         let inner = uvc_dev;
         if let Ok(description) = inner.description() {
             let device = enumerate()
@@ -299,7 +336,11 @@ impl<'a> UVCameraDevice<'a> {
     }
 }
 
-impl<'a> Webcam for UVCameraDevice<'a> {
+
+unsafe impl Send for V4LinuxDevice{}
+unsafe impl Sync for V4LinuxDevice{} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `V4LinuxDevice`!!!
+
+impl Webcam for UVCameraDevice {
     fn name(&self) -> String {
         self.device_id.clone()
     }
@@ -435,9 +476,10 @@ impl<'a> Webcam for UVCameraDevice<'a> {
         self.device_type
     }
 
-    fn open_stream(&mut self) -> Result<StreamType, Box<dyn std::error::Error>> {
+    fn open_stream(&self) -> Result<StreamType, Box<dyn std::error::Error>> {
         unimplemented!()
         /* - IDK how to return `handler`, so we'll let the caller deal with it
+           -> I'm too dumb to deal with borrow checker and lifetime annotations
         return match (self.device_resolution.get(), self.device_framerate.get()) {
             (Some(res), Some(fps)) => {
                 let format = match self.device_format.get() {
@@ -478,4 +520,42 @@ impl<'a> Webcam for UVCameraDevice<'a> {
         }
         */
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn get_inner(&self) -> PossibleDevice {
+        let (vendor_id, product_id, serial) = match self.inner.description() {
+            Ok(desc) => (Some(desc.vendor_id), Some(desc.product_id), desc.serial_number),
+            Err(_) => (None, None, None)
+        };
+
+        let res = match self.device_resolution.get() {
+            Some(r) => r,
+            None => Resolution{x: 640, y: 480},
+        };
+
+        let fps = match self.device_framerate.get() {
+            Some(f) => f,
+            None => 5,
+        };
+
+        let fmt = match self.device_format.get() {
+            DeviceFormat::YUYV => FrameFormat::YUYV,
+            DeviceFormat::MJPEG => FrameFormat::MJPEG,
+        };
+
+        PossibleDevice::UVCAM{
+            vendor_id,
+            product_id,
+            serial,
+            res,
+            fps,
+            fmt
+        }
+    }
 }
+
+unsafe impl<'a> Send for UVCameraDevice{}
+unsafe impl<'a> Sync for UVCameraDevice{} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `UVCameraDevice`!!!

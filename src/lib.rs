@@ -29,6 +29,7 @@ pub mod util;
 
 #[macro_use]
 extern crate lazy_static;
+extern crate downcast_rs;
 
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {

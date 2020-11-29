@@ -13,17 +13,18 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::device_utils::DeviceDesc;
 use dlib_face_recognition::Point;
 use parking_lot::RwLock;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
+use crate::util::camera::device_utils::PossibleDevice;
+
+
 // TODO: Change to acutal data format
-#[derive(Clone)]
 pub enum MessageType {
     Die(u8),
-    Set(DeviceDesc),
+    Set(PossibleDevice),
     Close(u8),
 }
 
