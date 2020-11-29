@@ -64,7 +64,7 @@ impl InputProcessing {
             thread_handle: thread,
         })
     }
-    pub fn fichange_device(&self, device: PossibleDevice) -> Result<(), ()> {
+    pub fn change_device(&self, device: PossibleDevice) -> Result<(), ()> {
         match self.sender_p1.send(MessageType::Set(device)) {
             Ok(_v) => Ok(()),
             Err(_e) => Err(()),
