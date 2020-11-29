@@ -13,9 +13,8 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
-use std::{cell::Cell, any::Any};
 use crate::util::camera::{device_utils::*, webcam::*};
+use std::{any::Any, cell::Cell};
 use usb_enumeration::{enumerate, Filters};
 use uvc::{FormatDescriptor, FrameFormat};
 use v4l::{
@@ -222,7 +221,7 @@ impl Webcam for V4LinuxDevice {
         let current_format = match self.inner.format() {
             Ok(format) => format,
             Err(_) => {
-                Format::new(640, 480, FourCC::new(b"MJPG")) // TODO: proper error handling 
+                Format::new(640, 480, FourCC::new(b"MJPG")) // TODO: proper error handling
             }
         };
 
@@ -233,16 +232,16 @@ impl Webcam for V4LinuxDevice {
 
         let fps = match self.inner.params() {
             Ok(param) => param.interval.denominator as u32,
-            Err(_) => 5
+            Err(_) => 5,
         };
 
         let fmt = current_format.fourcc;
 
-        PossibleDevice::V4L2{
+        PossibleDevice::V4L2 {
             location: self.device_path.clone(),
             res,
             fps,
-            fmt
+            fmt,
         }
     }
 
@@ -336,9 +335,8 @@ impl UVCameraDevice {
     }
 }
 
-
-unsafe impl Send for V4LinuxDevice{}
-unsafe impl Sync for V4LinuxDevice{} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `V4LinuxDevice`!!!
+unsafe impl Send for V4LinuxDevice {}
+unsafe impl Sync for V4LinuxDevice {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `V4LinuxDevice`!!!
 
 impl Webcam for UVCameraDevice {
     fn name(&self) -> String {
@@ -527,13 +525,17 @@ impl Webcam for UVCameraDevice {
 
     fn get_inner(&self) -> PossibleDevice {
         let (vendor_id, product_id, serial) = match self.inner.description() {
-            Ok(desc) => (Some(desc.vendor_id), Some(desc.product_id), desc.serial_number),
-            Err(_) => (None, None, None)
+            Ok(desc) => (
+                Some(desc.vendor_id),
+                Some(desc.product_id),
+                desc.serial_number,
+            ),
+            Err(_) => (None, None, None),
         };
 
         let res = match self.device_resolution.get() {
             Some(r) => r,
-            None => Resolution{x: 640, y: 480},
+            None => Resolution { x: 640, y: 480 },
         };
 
         let fps = match self.device_framerate.get() {
@@ -546,16 +548,16 @@ impl Webcam for UVCameraDevice {
             DeviceFormat::MJPEG => FrameFormat::MJPEG,
         };
 
-        PossibleDevice::UVCAM{
+        PossibleDevice::UVCAM {
             vendor_id,
             product_id,
             serial,
             res,
             fps,
-            fmt
+            fmt,
         }
     }
 }
 
-unsafe impl<'a> Send for UVCameraDevice{}
-unsafe impl<'a> Sync for UVCameraDevice{} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `UVCameraDevice`!!!
+unsafe impl<'a> Send for UVCameraDevice {}
+unsafe impl<'a> Sync for UVCameraDevice {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `UVCameraDevice`!!!

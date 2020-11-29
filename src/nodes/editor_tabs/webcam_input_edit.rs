@@ -490,7 +490,6 @@ impl WebcamInputEditor {
     #[export]
     pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
         self.update_device_list();
-        
     }
 
     // updates the device list to look for new devices, etc

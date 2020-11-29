@@ -13,9 +13,9 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::any::Any;
-use downcast_rs::DowncastSync;
 use crate::util::camera::device_utils::*;
+use downcast_rs::DowncastSync;
+use std::any::Any;
 
 pub trait Webcam: DowncastSync {
     fn name(&self) -> String;
@@ -34,7 +34,7 @@ pub trait Webcam: DowncastSync {
     fn set_camera_foramt(&self, format: DeviceFormat);
     fn get_camera_type(&self) -> WebcamType;
     fn open_stream(&self) -> Result<StreamType, Box<dyn std::error::Error>>;
-    fn get_inner(&self) -> PossibleDevice; 
+    fn get_inner(&self) -> PossibleDevice;
     fn as_any(&self) -> &dyn Any;
 }
 

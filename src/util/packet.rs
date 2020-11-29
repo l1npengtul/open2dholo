@@ -20,7 +20,6 @@ use std::sync::Arc;
 
 use crate::util::camera::device_utils::PossibleDevice;
 
-
 // TODO: Change to acutal data format
 pub enum MessageType {
     Die(u8),

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, error::Error, fmt::Display, os::raw::c_int};
 use usb_enumeration::USBDevice;
 use uvc::{DeviceHandle, FrameFormat, StreamHandle};
-use v4l::{FourCC, framesize::FrameSizeEnum, prelude::*};
+use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct DeviceDesc {
@@ -50,7 +50,6 @@ impl DeviceDesc {
         }
     }
 }
-
 
 #[derive(Clone)]
 pub struct DeviceHolder {
@@ -116,7 +115,6 @@ impl PartialEq for DeviceHolder {
     }
 }
 
-
 #[derive(Copy, Clone, Eq)]
 pub struct Resolution {
     pub x: u32,
@@ -179,7 +177,7 @@ pub enum StreamType<'a> {
 }
 
 pub enum PossibleDevice {
-    UVCAM{
+    UVCAM {
         vendor_id: Option<u16>,
         product_id: Option<u16>,
         serial: Option<String>,
@@ -187,7 +185,7 @@ pub enum PossibleDevice {
         fps: u32,
         fmt: FrameFormat,
     },
-    V4L2{
+    V4L2 {
         location: PathIndex,
         res: Resolution,
         fps: u32,
@@ -196,7 +194,7 @@ pub enum PossibleDevice {
 }
 
 #[derive(Clone)]
-pub enum PathIndex{
+pub enum PathIndex {
     Path(String),
     Index(usize),
 }
