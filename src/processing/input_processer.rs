@@ -13,22 +13,13 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    error::processing_error::ProcessingError,
-    util::{
-        camera::{
-            camera_device::{UVCameraDevice, V4LinuxDevice},
-            device_utils::{DeviceDesc, PossibleDevice},
-            webcam::Webcam,
-        },
-        packet::{MessageType, Processed, ProcessedPacket},
-    },
-};
+use crate::{error::processing_error::ProcessingError, util::{camera::{device_utils::{PathIndex, PossibleDevice, Resolution}, webcam::Webcam}, packet::{MessageType, Processed, ProcessedPacket}}};
 use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };
-use downcast_rs::*;
 use flume::{Receiver, Sender, TryRecvError};
+use uvc::Device;
+use v4l::{Format, FourCC, capture::Parameters, prelude::CaptureDevice, prelude::MmapStream, buffer::Stream};
 use std::{
     sync::{atomic::AtomicUsize, Arc},
     thread::{Builder, JoinHandle},
@@ -58,7 +49,7 @@ impl InputProcessing {
         };
         Ok(InputProcessing {
             sender_p1: to_thread_tx,
-            // To Thread
+            // To Thread 
             reciever_p2: from_thread_rx,
             // From Thread
             thread_handle: thread,
@@ -99,11 +90,8 @@ fn input_process_func(
             fps,
             fmt,
         } => {
-            let mut uvc_device = match crate::UVC.find_device(
-                vendor_id.map_or(None, |f| Some(f as i32)),
-                product_id.map_or(None, |f| Some(f as i32)),
-                serial.as_deref(),
-            ) {
+            // get the initial device
+            let mut uvc_device = match make_uvc_device(vendor_id, product_id, serial) {
                 Ok(d) => d,
                 Err(why) => {
                     return Err(Box::new(ProcessingError::General(format!(
@@ -117,6 +105,8 @@ fn input_process_func(
             let mut frame_rate = fps;
             let mut format = fmt;
 
+
+            // start looping so we dont exit until a kill signal
             loop {
                 // get messages we may need to respond to
                 if let Ok(message) = recv.try_recv() {
@@ -131,11 +121,8 @@ fn input_process_func(
                                 fmt,
                             } = device
                             {
-                                match crate::UVC.find_device(
-                                    vendor_id.map_or(None, |f| Some(f as i32)),
-                                    product_id.map_or(None, |f| Some(f as i32)),
-                                    serial.as_deref(),
-                                ) {
+                                match make_uvc_device(vendor_id, product_id, serial)
+                                {
                                     Ok(d) => {
                                         uvc_device = d;
                                         resolution = res;
@@ -151,11 +138,8 @@ fn input_process_func(
                                 }
                             }
                         }
-                        _ => {
-                            return Err(Box::new(ProcessingError::General(format!(
-                                "Thread Close/End request."
-                            ))))
-                        }
+                        _ => return Err(Box::new(ProcessingError::General(format!("Thread Close/End request."))))
+                        
                     }
 
                     // acutal input stream here
@@ -209,10 +193,102 @@ fn input_process_func(
             res,
             fps,
             fmt,
-        } => {}
+        } => {
+            let mut v4l_device = match make_v4l_device(&location, &res, &fps, &fmt) {
+                Ok(d) => d,
+                Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+            };
+
+            let mut stream = match MmapStream::new(&v4l_device) {
+                Ok(s) => s,
+                Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+            };
+
+            // main loop with processing
+            loop {
+                if let Ok(message) = recv.try_recv() {
+                    match message {
+                        MessageType::Set(possible) => {
+                            if let PossibleDevice::V4L2{location, res, fps, fmt,} = possible {
+                                match make_v4l_device(&location, &res, &fps, &fmt) {
+                                    Ok(d) => {
+                                        v4l_device = d; 
+                                        stream = match MmapStream::new(&v4l_device) {
+                                            Ok(s) => s,
+                                            Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+                                        };
+                                    }
+                                    Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+                                }
+                            }
+                        }
+                        _ => return Err(Box::new(ProcessingError::General(format!("Thread Close/End request."))))
+                    }
+                }
+
+                if let Ok(buffer) = stream.next() {
+                    // aaa go crazy
+                }
+                
+            }
+
+
+        }
     };
 
     Ok(())
+}
+
+fn make_v4l_device(location: &PathIndex, res: &Resolution, fps: &u32, fmt: &FourCC) -> Result<CaptureDevice, Box<dyn std::error::Error>>{
+    let mut device = match location {
+        PathIndex::Path(path) => {
+            let device = match CaptureDevice::with_path(path) {
+                Ok(d) => d,
+                Err(why) => return Err(Box::new(why))
+            };
+            device
+        }
+        PathIndex::Index(idx) => {
+            let device = match CaptureDevice::new(idx.clone()) {
+                Ok(d) => d,
+                Err(why) => return Err(Box::new(why))
+            };
+            device
+        }
+    };
+
+    let fcc = fmt.clone();
+
+    let format = match device.format() {
+        Ok(mut f) => {
+            f.width = res.x;
+            f.height = res.y;
+            f.fourcc = fcc;
+            f
+        }
+        Err(_) => {
+            Format::new(res.x, res.y, fcc)
+        }
+    };
+
+    let param = Parameters::with_fps(fps.clone());
+    
+    if let Err(why) = device.set_format(&format) {
+        return Err(Box::new(why))
+    }
+    if let Err(why) = device.set_params(&param) {
+        return Err(Box::new(why))
+    }
+
+    Ok(device)
+}
+
+fn make_uvc_device<'a>(vendor_id: Option<u16>, product_id: Option<u16>, serial: Option<String>) -> Result<Device<'a>, Box<dyn std::error::Error>> {
+    let device = match crate::UVC.find_device(vendor_id.map_or(None, |f| Some(f as i32)), product_id.map_or(None, |f| Some(f as i32)), serial.as_deref()) {
+        Ok(d) => d,
+        Err(why) => return Err(Box::new(why))
+    };
+    Ok(device)
 }
 
 fn trick_or_channel(message: Result<MessageType, TryRecvError>) -> DeviceOrTrick {

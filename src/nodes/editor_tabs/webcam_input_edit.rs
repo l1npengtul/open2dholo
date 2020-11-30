@@ -488,7 +488,7 @@ impl WebcamInputEditor {
     }
 
     #[export]
-    pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
+    pub fn on_start_button_pressed(&self, _owner: TRef<Tree>) {
         self.update_device_list();
     }
 
