@@ -18,6 +18,7 @@ ron = "0.6.2"
 serde = "1.0.117"
 usb_enumeration = "0.1.0"
 downcast-rs = "1.2.0"
+scheduled-thread-pool = "0.2.5"
 
 [dependencies.uvc] # TODO: Change back to cargo crate when updated
 git = "https://github.com/mulimoen/libuvc-rs.git"

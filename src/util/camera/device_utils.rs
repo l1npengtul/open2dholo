@@ -175,7 +175,7 @@ pub enum StreamType<'a> {
     V4L2Stream(MmapStream<'a>),
     UVCStream(StreamHandle<'a>, DeviceHandle<'a>),
 }
-
+#[derive(Clone)]
 pub enum PossibleDevice {
     UVCAM {
         vendor_id: Option<u16>,

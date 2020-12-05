@@ -19,4 +19,6 @@ use thiserror::Error;
 pub enum ThreadSendMessageError {
     #[error("Error sending message to thread.")]
     CannotSend,
+    #[error("Create a new thread")]
+    CreateNewThread,
 }

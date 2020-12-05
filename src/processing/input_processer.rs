@@ -13,33 +13,47 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::processing_error::ProcessingError, util::{camera::{device_utils::{PathIndex, PossibleDevice, Resolution}, webcam::Webcam}, packet::{MessageType, Processed, ProcessedPacket}}};
+use crate::{
+    error::{processing_error::ProcessingError, thread_send_message_error::ThreadSendMessageError},
+    util::{
+        camera::{
+            device_utils::{PathIndex, PossibleDevice, Resolution},
+            webcam::Webcam,
+        },
+        packet::{MessageType, Processed, ProcessedPacket},
+    },
+};
 use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };
-use flume::{Receiver, Sender, TryRecvError};
-use uvc::Device;
-use v4l::{Format, FourCC, capture::Parameters, prelude::CaptureDevice, prelude::MmapStream, buffer::Stream};
+use flume::{Receiver, Sender};
+use scheduled_thread_pool::ScheduledThreadPool;
 use std::{
     sync::{atomic::AtomicUsize, Arc},
     thread::{Builder, JoinHandle},
     time::Duration,
 };
+use uvc::Device;
+use v4l::{
+    buffer::Stream, capture::Parameters, prelude::CaptureDevice, prelude::MmapStream, Format,
+    FourCC,
+};
 
 pub struct InputProcessing {
-    sender_p1: Sender<MessageType>,
     // To Thread
-    reciever_p2: Receiver<ProcessedPacket>,
+    sender_p1: Sender<MessageType>,
     // From Thread
-    thread_handle: JoinHandle<Result<(), Box<ProcessingError>>>,
+    _reciever_p2: Receiver<Processed>,
+    // thread
+    _thread_handle: JoinHandle<Result<(), Box<ProcessingError>>>,
 }
 
 impl InputProcessing {
-    pub fn new(num_thread: usize, device: Box<dyn Webcam + Sync + Send>) -> Result<Self, ()> {
+    pub fn new(device: Box<dyn Webcam + Sync + Send>) -> Result<Self, ()> {
         let (to_thread_tx, to_thread_rx) = flume::unbounded();
         let (from_thread_tx, from_thread_rx) = flume::unbounded();
         let thread = match Builder::new()
-            .name(format!("input-processor_{}", num_thread))
+            .name(format!("input-processor-senpai_{}", 1))
             .spawn(move || input_process_func(to_thread_rx, from_thread_tx, device))
         {
             Ok(join) => join,
@@ -49,22 +63,44 @@ impl InputProcessing {
         };
         Ok(InputProcessing {
             sender_p1: to_thread_tx,
-            // To Thread 
-            reciever_p2: from_thread_rx,
+            // To Thread
+            _reciever_p2: from_thread_rx,
             // From Thread
-            thread_handle: thread,
+            _thread_handle: thread,
         })
     }
-    pub fn change_device(&self, device: PossibleDevice) -> Result<(), ()> {
-        match self.sender_p1.send(MessageType::Set(device)) {
-            Ok(_v) => Ok(()),
-            Err(_e) => Err(()),
+    pub fn change_device(&self, device: PossibleDevice) -> Result<(), Box<ThreadSendMessageError>> {
+        // WILL ERROR ON WINDOWS/MAC, RECREATE `InputProcessing`!
+        match device {
+            PossibleDevice::V4L2 {
+                location,
+                res,
+                fps,
+                fmt,
+            } => {
+                let dev = PossibleDevice::V4L2 {
+                    location,
+                    res,
+                    fps,
+                    fmt,
+                };
+                if let Err(_) = self.sender_p1.send(MessageType::Set(dev)) {
+                    return Err(Box::new(ThreadSendMessageError::CannotSend));
+                }
+                Ok(())
+            }
+            _ => {
+                // just return an error to tell the caller to fuck off and re-create the thread
+                Err(Box::new(ThreadSendMessageError::CreateNewThread))
+            }
         }
     }
 
     //pub fn get_output_handler
     pub fn kill(&mut self) {
-        unimplemented!()
+        if let Err(_) = self.sender_p1.send(MessageType::Die(0)) {
+            // /shrug if this fails to send we're fucked
+        }
     }
 }
 
@@ -76,10 +112,12 @@ impl Drop for InputProcessing {
 
 fn input_process_func(
     recv: Receiver<MessageType>,
-    send: Sender<ProcessedPacket>,
+    send: Sender<Processed>,
     startup_dev: Box<dyn Webcam>,
 ) -> Result<(), Box<ProcessingError>> {
     std::thread::sleep(Duration::from_millis(100));
+
+    let thread_pool = ScheduledThreadPool::with_name("input_processer-{}", 8); // Use num_threads from processing
 
     match startup_dev.get_inner() {
         PossibleDevice::UVCAM {
@@ -90,8 +128,7 @@ fn input_process_func(
             fps,
             fmt,
         } => {
-            // get the initial device
-            let mut uvc_device = match make_uvc_device(vendor_id, product_id, serial) {
+            let uvc_device = match make_uvc_device(vendor_id, product_id, serial) {
                 Ok(d) => d,
                 Err(why) => {
                     return Err(Box::new(ProcessingError::General(format!(
@@ -101,91 +138,81 @@ fn input_process_func(
                 }
             };
 
-            let mut resolution = res;
-            let mut frame_rate = fps;
-            let mut format = fmt;
+            let device_handler = match uvc_device.open() {
+                Ok(h) => h,
+                Err(why) => {
+                    return Err(Box::new(ProcessingError::General(format!(
+                        "Cannot open device: {}",
+                        why.to_string()
+                    ))))
+                }
+            };
 
+            let mut stream_handler = match device_handler
+                .get_stream_handle_with_format_size_and_fps(fmt, res.x, res.y, fps)
+            {
+                Ok(s) => s,
+                Err(why) => {
+                    return Err(Box::new(ProcessingError::General(format!(
+                        "Cannot open device: {}",
+                        why.to_string()
+                    ))))
+                }
+            };
 
-            // start looping so we dont exit until a kill signal
-            loop {
-                // get messages we may need to respond to
-                if let Ok(message) = recv.try_recv() {
-                    match message {
-                        MessageType::Set(device) => {
-                            if let PossibleDevice::UVCAM {
-                                vendor_id,
-                                product_id,
-                                serial,
-                                res,
-                                fps,
-                                fmt,
-                            } = device
-                            {
-                                match make_uvc_device(vendor_id, product_id, serial)
-                                {
-                                    Ok(d) => {
-                                        uvc_device = d;
-                                        resolution = res;
-                                        frame_rate = fps;
-                                        format = fmt;
-                                    }
-                                    Err(why) => {
-                                        return Err(Box::new(ProcessingError::General(format!(
-                                            "Cannot open device: {}",
-                                            why.to_string()
-                                        ))))
-                                    }
+            let cnt = Arc::new(AtomicUsize::new(0));
+
+            let stream = match stream_handler.start_stream(
+                move |frame, _count| {
+                    // aaaa go crazy
+                    let image = unsafe {
+                        ImageMatrix::new(
+                            frame.width() as usize,
+                            frame.height() as usize,
+                            frame.to_rgb().unwrap().to_bytes().as_ptr(),
+                        )
+                    };
+                    let cloned_send = send.clone();
+
+                    thread_pool.execute(move || {
+                        match find_landmarks(&image) {
+                            ProcessedPacket::FacialLandmark(landmarks) => {
+                                // stonks
+                                if let Err(_) = cloned_send.send(landmarks) {
+                                    () // ooh yeah i care about errors
                                 }
                             }
+                            ProcessedPacket::None => {
+                                std::thread::sleep(Duration::from_millis(50));
+                            }
+                            ProcessedPacket::GeneralError(_)
+                            | ProcessedPacket::MissingFacialPointsError(_)
+                            | ProcessedPacket::MissingFileError(_) => {}
                         }
-                        _ => return Err(Box::new(ProcessingError::General(format!("Thread Close/End request."))))
-                        
-                    }
-
-                    // acutal input stream here
-                    let device_handler = match uvc_device.open() {
-                        Ok(h) => h,
-                        Err(why) => {
-                            return Err(Box::new(ProcessingError::General(format!(
-                                "Cannot open device handler: {}",
-                                why.to_string()
-                            ))))
-                        }
-                    };
-
-                    let mut stream_handler = match device_handler
-                        .get_stream_handle_with_format_size_and_fps(
-                            format,
-                            resolution.x,
-                            resolution.y,
-                            frame_rate,
-                        ) {
-                        Ok(h) => h,
-                        Err(why) => {
-                            return Err(Box::new(ProcessingError::General(format!(
-                                "Cannot open device stream handler: {}",
-                                why.to_string()
-                            ))))
-                        }
-                    };
-
-                    let cnt = Arc::new(AtomicUsize::new(0));
-
-                    let _device_stream = match stream_handler.start_stream(
-                        |_frame, count| {
-                            // aaaa go crazy
-                        },
-                        cnt.clone(),
-                    ) {
-                        Ok(active) => active,
-                        Err(why) => {
-                            return Err(Box::new(ProcessingError::General(format!(
-                                "Cannot open device stream: {}",
-                                why.to_string()
-                            ))))
-                        }
-                    };
+                    });
+                },
+                cnt.clone(),
+            ) {
+                Ok(a) => a,
+                Err(why) => {
+                    return Err(Box::new(ProcessingError::General(format!(
+                        "Cannot open device: {}",
+                        why.to_string()
+                    ))))
                 }
+            };
+
+            loop {
+                if let Ok(message) = recv.try_recv() {
+                    match message {
+                        MessageType::Die(_) | MessageType::Close(_) => {
+                            stream.stop();
+                            return Ok(());
+                        }
+                        _ => continue,
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(50))
             }
         }
         PossibleDevice::V4L2 {
@@ -196,12 +223,22 @@ fn input_process_func(
         } => {
             let mut v4l_device = match make_v4l_device(&location, &res, &fps, &fmt) {
                 Ok(d) => d,
-                Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+                Err(why) => {
+                    return Err(Box::new(ProcessingError::General(format!(
+                        "Cannot open device: {}",
+                        why.to_string()
+                    ))))
+                }
             };
 
             let mut stream = match MmapStream::new(&v4l_device) {
                 Ok(s) => s,
-                Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+                Err(why) => {
+                    return Err(Box::new(ProcessingError::General(format!(
+                        "Cannot open device: {}",
+                        why.to_string()
+                    ))))
+                }
             };
 
             // main loop with processing
@@ -209,49 +246,93 @@ fn input_process_func(
                 if let Ok(message) = recv.try_recv() {
                     match message {
                         MessageType::Set(possible) => {
-                            if let PossibleDevice::V4L2{location, res, fps, fmt,} = possible {
+                            if let PossibleDevice::V4L2 {
+                                location,
+                                res,
+                                fps,
+                                fmt,
+                            } = possible
+                            {
                                 match make_v4l_device(&location, &res, &fps, &fmt) {
                                     Ok(d) => {
-                                        v4l_device = d; 
+                                        v4l_device = d;
                                         stream = match MmapStream::new(&v4l_device) {
                                             Ok(s) => s,
-                                            Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+                                            Err(why) => {
+                                                return Err(Box::new(ProcessingError::General(
+                                                    format!(
+                                                        "Cannot open device: {}",
+                                                        why.to_string()
+                                                    ),
+                                                )))
+                                            }
                                         };
                                     }
-                                    Err(why) => return Err(Box::new(ProcessingError::General(format!("Cannot open device: {}", why.to_string()))))
+                                    Err(why) => {
+                                        return Err(Box::new(ProcessingError::General(format!(
+                                            "Cannot open device: {}",
+                                            why.to_string()
+                                        ))))
+                                    }
                                 }
                             }
                         }
-                        _ => return Err(Box::new(ProcessingError::General(format!("Thread Close/End request."))))
+                        _ => return Ok(()),
                     }
                 }
 
+                //let mut cnt = Arc::new(AtomicUsize::new(0));
+
                 if let Ok(buffer) = stream.next() {
+                    let image = unsafe {
+                        ImageMatrix::new(res.x as usize, res.y as usize, buffer.as_ptr())
+                    };
                     // aaa go crazy
+                    let cloned_send = send.clone();
+                    thread_pool.execute(move || {
+                        match find_landmarks(&image) {
+                            ProcessedPacket::FacialLandmark(landmarks) => {
+                                // stonks
+                                if let Err(_) = cloned_send.send(landmarks) {
+                                    () // ooh yeah i care about errors
+                                }
+                            }
+                            ProcessedPacket::None => {
+                                std::thread::sleep(Duration::from_millis(50));
+                            }
+                            ProcessedPacket::GeneralError(_)
+                            | ProcessedPacket::MissingFacialPointsError(_)
+                            | ProcessedPacket::MissingFileError(_) => {}
+                        }
+                    });
+                } else {
+                    return Err(Box::new(ProcessingError::General(format!(
+                        "Error capturing V4L2 buffer"
+                    ))));
                 }
-                
             }
-
-
         }
     };
-
-    Ok(())
 }
 
-fn make_v4l_device(location: &PathIndex, res: &Resolution, fps: &u32, fmt: &FourCC) -> Result<CaptureDevice, Box<dyn std::error::Error>>{
+fn make_v4l_device(
+    location: &PathIndex,
+    res: &Resolution,
+    fps: &u32,
+    fmt: &FourCC,
+) -> Result<CaptureDevice, Box<dyn std::error::Error>> {
     let mut device = match location {
         PathIndex::Path(path) => {
             let device = match CaptureDevice::with_path(path) {
                 Ok(d) => d,
-                Err(why) => return Err(Box::new(why))
+                Err(why) => return Err(Box::new(why)),
             };
             device
         }
         PathIndex::Index(idx) => {
             let device = match CaptureDevice::new(idx.clone()) {
                 Ok(d) => d,
-                Err(why) => return Err(Box::new(why))
+                Err(why) => return Err(Box::new(why)),
             };
             device
         }
@@ -266,50 +347,35 @@ fn make_v4l_device(location: &PathIndex, res: &Resolution, fps: &u32, fmt: &Four
             f.fourcc = fcc;
             f
         }
-        Err(_) => {
-            Format::new(res.x, res.y, fcc)
-        }
+        Err(_) => Format::new(res.x, res.y, fcc),
     };
 
     let param = Parameters::with_fps(fps.clone());
-    
+
     if let Err(why) = device.set_format(&format) {
-        return Err(Box::new(why))
+        return Err(Box::new(why));
     }
     if let Err(why) = device.set_params(&param) {
-        return Err(Box::new(why))
+        return Err(Box::new(why));
     }
 
     Ok(device)
 }
 
-fn make_uvc_device<'a>(vendor_id: Option<u16>, product_id: Option<u16>, serial: Option<String>) -> Result<Device<'a>, Box<dyn std::error::Error>> {
-    let device = match crate::UVC.find_device(vendor_id.map_or(None, |f| Some(f as i32)), product_id.map_or(None, |f| Some(f as i32)), serial.as_deref()) {
+fn make_uvc_device<'a>(
+    vendor_id: Option<u16>,
+    product_id: Option<u16>,
+    serial: Option<String>,
+) -> Result<Device<'a>, Box<dyn std::error::Error>> {
+    let device = match crate::UVC.find_device(
+        vendor_id.map_or(None, |f| Some(f as i32)),
+        product_id.map_or(None, |f| Some(f as i32)),
+        serial.as_deref(),
+    ) {
         Ok(d) => d,
-        Err(why) => return Err(Box::new(why))
+        Err(why) => return Err(Box::new(why)),
     };
     Ok(device)
-}
-
-fn trick_or_channel(message: Result<MessageType, TryRecvError>) -> DeviceOrTrick {
-    match message {
-        Ok(msg) => match msg {
-            MessageType::Set(dev) => DeviceOrTrick::Device(dev),
-            MessageType::Close(code) => DeviceOrTrick::Exit("CLOSE_REQUEST".to_string()),
-            MessageType::Die(code) => DeviceOrTrick::Exit("DIE".to_string()),
-        },
-        Err(e) => match e {
-            TryRecvError::Disconnected => DeviceOrTrick::Exit("PIPE_DISCONNECT".to_string()),
-            TryRecvError::Empty => DeviceOrTrick::None,
-        },
-    }
-}
-
-// Trick or treat with death and webcams. Fun for the whole family!
-enum DeviceOrTrick {
-    Device(PossibleDevice),
-    Exit(String),
-    None,
 }
 
 fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
@@ -335,7 +401,7 @@ fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
         .face_landmarks(img, largest_rectangle)
         .to_vec();
     if landmarks.len() == 68 {
-        ProcessedPacket::FacialLandmark(Processed::new(landmarks, None))
+        ProcessedPacket::FacialLandmark(Processed::new(landmarks))
     } else {
         ProcessedPacket::MissingFacialPointsError(AtomicUsize::from(landmarks.len()))
     }

@@ -13,12 +13,9 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use dlib_face_recognition::Point;
-use parking_lot::RwLock;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
-
 use crate::util::camera::device_utils::PossibleDevice;
+use dlib_face_recognition::Point;
+use std::sync::atomic::AtomicUsize;
 
 // TODO: Change to acutal data format
 pub enum MessageType {
@@ -32,14 +29,10 @@ pub enum MessageType {
 #[derive(Clone)]
 pub struct Processed {
     landmarks: Vec<Point>,
-    frame_data: Option<Arc<RwLock<uvc::Frame>>>,
 }
 impl Processed {
-    pub fn new(data: Vec<Point>, imgframe: Option<Arc<RwLock<uvc::Frame>>>) -> Self {
-        Processed {
-            landmarks: data,
-            frame_data: imgframe,
-        }
+    pub fn new(data: Vec<Point>) -> Self {
+        Processed { landmarks: data }
     }
 }
 
