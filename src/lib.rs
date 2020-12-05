@@ -17,8 +17,6 @@
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
 use gdnative::prelude::*;
-use rayon::{ThreadPool, ThreadPoolBuilder};
-use std::sync::atomic::AtomicBool;
 use uvc;
 
 pub mod configuration;
@@ -36,16 +34,6 @@ lazy_static! {
     static ref UVC: uvc::Context<'static> = {
         let ctx = uvc::Context::new();
         ctx.expect("Could not get UVC Context! Aborting!")
-    };
-    // REPLACE WITH CONFIGURATION STRUCT
-    static ref FACE_DETECTED: AtomicBool = AtomicBool::new(false);
-    //static ref USER_CONFIG: RwLock<UserConfig> = {};
-    static ref PROCESSING_POOL: ThreadPool = {
-        let processing_pool = ThreadPoolBuilder::new()
-        .num_threads(8)
-        .build()
-        .expect("Could not build threadpool!");
-        processing_pool
     };
 }
 
