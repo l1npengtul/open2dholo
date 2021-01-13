@@ -14,12 +14,9 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    error::{processing_error::ProcessingError, thread_send_message_error::ThreadSendMessageError},
+    error::processing_error::ProcessingError,
     util::{
-        camera::{
-            device_utils::{PathIndex, PossibleDevice, Resolution},
-            webcam::Webcam,
-        },
+        camera::device_utils::{PathIndex, PossibleDevice, Resolution},
         packet::{MessageType, Processed, ProcessedPacket},
     },
 };
@@ -27,6 +24,7 @@ use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };
 use flume::{Receiver, Sender};
+use gdnative::godot_print;
 use scheduled_thread_pool::ScheduledThreadPool;
 use std::{
     sync::{atomic::AtomicUsize, Arc},
@@ -43,13 +41,13 @@ pub struct InputProcessing {
     // To Thread
     sender_p1: Sender<MessageType>,
     // From Thread
-    _reciever_p2: Receiver<Processed>,
+    reciever_p2: Receiver<Processed>,
     // thread
     _thread_handle: JoinHandle<Result<(), Box<ProcessingError>>>,
 }
 
 impl InputProcessing {
-    pub fn new(device: Box<dyn Webcam + Sync + Send>) -> Result<Self, ()> {
+    pub fn new(device: PossibleDevice) -> Result<Self, ()> {
         let (to_thread_tx, to_thread_rx) = flume::unbounded();
         let (from_thread_tx, from_thread_rx) = flume::unbounded();
         let thread = match Builder::new()
@@ -64,62 +62,41 @@ impl InputProcessing {
         Ok(InputProcessing {
             sender_p1: to_thread_tx,
             // To Thread
-            _reciever_p2: from_thread_rx,
+            reciever_p2: from_thread_rx,
             // From Thread
             _thread_handle: thread,
         })
     }
-    pub fn change_device(&self, device: PossibleDevice) -> Result<(), Box<ThreadSendMessageError>> {
-        // WILL ERROR ON WINDOWS/MAC, RECREATE `InputProcessing`!
-        match device {
-            PossibleDevice::V4L2 {
-                location,
-                res,
-                fps,
-                fmt,
-            } => {
-                let dev = PossibleDevice::V4L2 {
-                    location,
-                    res,
-                    fps,
-                    fmt,
-                };
-                if let Err(_) = self.sender_p1.send(MessageType::Set(dev)) {
-                    return Err(Box::new(ThreadSendMessageError::CannotSend));
-                }
-                Ok(())
-            }
-            _ => {
-                // just return an error to tell the caller to fuck off and re-create the thread
-                Err(Box::new(ThreadSendMessageError::CreateNewThread))
-            }
-        }
-    }
 
     //pub fn get_output_handler
-    pub fn kill(&mut self) {
+    pub fn kill(&self) {
         if let Err(_) = self.sender_p1.send(MessageType::Die(0)) {
             // /shrug if this fails to send we're fucked
         }
+    }
+
+    pub fn get_thread_output(&self) -> Receiver<Processed> {
+        return self.reciever_p2.clone();
     }
 }
 
 impl Drop for InputProcessing {
     fn drop(&mut self) {
-        unimplemented!()
+        self.kill()
     }
 }
 
 fn input_process_func(
     recv: Receiver<MessageType>,
     send: Sender<Processed>,
-    startup_dev: Box<dyn Webcam>,
+    startup_dev: PossibleDevice,
 ) -> Result<(), Box<ProcessingError>> {
-    std::thread::sleep(Duration::from_millis(100));
+    // std::thread::sleep(Duration::from_millis(100));
 
-    let thread_pool = ScheduledThreadPool::with_name("input_processer-{}", 8); // Use num_threads from processing
+    let thread_pool = ScheduledThreadPool::with_name("input_processer-{}", 2); // Use num_threads from processing
+    godot_print!("thread");
 
-    match startup_dev.get_inner() {
+    match startup_dev {
         PossibleDevice::UVCAM {
             vendor_id,
             product_id,
@@ -222,7 +199,10 @@ fn input_process_func(
             fmt,
         } => {
             let mut v4l_device = match make_v4l_device(&location, &res, &fps, &fmt) {
-                Ok(d) => d,
+                Ok(d) => {
+                    godot_print!("b");
+                    d
+                }
                 Err(why) => {
                     return Err(Box::new(ProcessingError::General(format!(
                         "Cannot open device: {}",

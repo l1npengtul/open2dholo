@@ -1,0 +1,8 @@
+[gd_resource type="NativeScript" format=2]
+
+[ext_resource path="res://open2dh_lib.gdnlib" type="GDNativeLibrary" id=1]
+
+[resource]
+resource_name = "ViewportHolder"
+class_name = "ViewportHolder"
+library = ExtResource( 1 )

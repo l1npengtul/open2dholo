@@ -8,8 +8,8 @@ edition = "2018"
 # with every dependency added we get closer and closer to NPM levels of dependency
 
 [dependencies]
-parking_lot = "0.11.0"
-flume = "0.9.1"
+parking_lot = "0.11.1"
+flume = "0.10.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.22"
 cv-core = "0.15.0"
@@ -18,9 +18,10 @@ serde = "1.0.117"
 usb_enumeration = "0.1.0"
 downcast-rs = "1.2.0"
 scheduled-thread-pool = "0.2.5"
+regex = "1.4.2"
 
 [dependencies.uvc] # TODO: Change back to cargo crate when updated
-git = "https://github.com/mulimoen/libuvc-rs.git"
+version = "0.2.0"
 features = ["vendor"]
 
 [dependencies.gdnative]

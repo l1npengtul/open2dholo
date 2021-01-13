@@ -13,10 +13,11 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::{device_utils::DeviceFormat, webcam::Webcam};
 use crate::{
     nodes::editor_tabs::util::create_custom_editable_item,
-    util::camera::{device_utils::Resolution, enumerate::enumerate_devices},
+    util::camera::device_utils::{
+        enumerate_cache_device, CachedDevice, DeviceFormat, PossibleDevice, Resolution,
+    },
 };
 use gdnative::{
     api::{
@@ -32,26 +33,79 @@ use std::collections::HashMap;
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
+#[register_with(Self::register_signals)]
 pub struct WebcamInputEditor {
-    device_list: RefCell<HashMap<String, Box<dyn Webcam>>>,
-    device_selected: RefCell<Option<Box<dyn Webcam>>>,
+    device_list: RefCell<HashMap<String, CachedDevice>>,
+    device_selected: RefCell<Option<String>>,
     resolution_selected: RefCell<Option<Resolution>>,
-    format_selected: RefCell<Option<DeviceFormat>>,
+    //format_selected: RefCell<Option<DeviceFormat>>,
     fps_selected: RefCell<Option<i32>>,
 }
 
 #[methods]
 impl WebcamInputEditor {
+    // register the signals to viewport we will need
+    fn register_signals(builder: &ClassBuilder<Self>) {
+        // we have to do this disgustingness becuase godot signals can only transport variants like why
+        builder.add_signal(Signal {
+            name: "new_input_processer_uvc",
+            args: &[
+                // resolution
+                SignalArgument {
+                    name: "resolution",
+                    default: Variant::from_vector2(&Vector2::new(-1.0, -1.0)),
+                    export_info: ExportInfo::new(VariantType::Vector2),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                // fps
+                SignalArgument {
+                    name: "framerate",
+                    default: Variant::from_i64(-1),
+                    export_info: ExportInfo::new(VariantType::I64),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                // frameformat
+            ],
+        });
+
+        builder.add_signal(Signal {
+            name: "new_input_processer_v4l",
+            args: &[
+                // resolution
+                SignalArgument {
+                    name: "resolution",
+                    default: Variant::from_vector2(&Vector2::new(-1.0, -1.0)),
+                    export_info: ExportInfo::new(VariantType::Vector2),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                // fps
+                SignalArgument {
+                    name: "framerate",
+                    default: Variant::from_i64(-1),
+                    export_info: ExportInfo::new(VariantType::I64),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                // frameformat
+            ],
+        });
+
+        // kill thread and release lazy static signal
+        builder.add_signal(Signal {
+            name: "input_kill",
+            args: &[],
+        });
+    }
+
     fn new(_owner: &Tree) -> Self {
-        let dev_list = RefCell::new(enumerate_devices().unwrap_or(HashMap::new()));
+        let dev_list = RefCell::new(enumerate_cache_device().unwrap_or(HashMap::new()));
         WebcamInputEditor {
             device_list: dev_list,
             device_selected: RefCell::new(None),
             resolution_selected: RefCell::new(None),
-            format_selected: RefCell::new(None),
             fps_selected: RefCell::new(None),
         }
     }
+
     #[export]
     fn _ready(&self, owner: TRef<Tree>) {
         let camera_popup = unsafe {
@@ -93,24 +147,24 @@ impl WebcamInputEditor {
             panic!("Failed to initialise UI!");
         }
 
-        let format_popup = unsafe {
-            owner
-                .get_node("../FormatPopup")
-                .unwrap()
-                .assume_safe()
-                .cast::<PopupMenu>()
-                .unwrap()
-        };
-        format_popup.set_visible(false);
-        if let Err(_why) = format_popup.connect(
-            "id_pressed",
-            owner,
-            "on_format_popup_menu_clicked",
-            VariantArray::new_shared(),
-            0,
-        ) {
-            panic!("Failed to initialise UI!");
-        }
+        // let format_popup = unsafe {
+        //     owner
+        //         .get_node("../FormatPopup")
+        //         .unwrap()
+        //         .assume_safe()
+        //         .cast::<PopupMenu>()
+        //         .unwrap()
+        // };
+        // format_popup.set_visible(false);
+        // if let Err(_why) = format_popup.connect(
+        //     "id_pressed",
+        //     owner,
+        //     "on_format_popup_menu_clicked",
+        //     VariantArray::new_shared(),
+        //     0,
+        // ) {
+        //     panic!("Failed to initialise UI!");
+        // }
 
         let resolution_popup = unsafe {
             owner
@@ -175,9 +229,16 @@ impl WebcamInputEditor {
                 .cast::<Button>()
                 .unwrap()
         };
-        if let Err(_why) = button.connect("pressed", owner, "", VariantArray::new_shared(), 0) {
+        if let Err(_why) = button.connect(
+            "pressed",
+            owner,
+            "on_start_button_pressed",
+            VariantArray::new_shared(),
+            0,
+        ) {
             panic!("Failed to initialise UI");
         }
+        button.set_disabled(true);
     }
 
     #[export]
@@ -223,7 +284,7 @@ impl WebcamInputEditor {
                         camera_popup.set_visible(true);
                     }
                 }
-                "Webcam Resolution:" => match self.device_selected.borrow().as_deref() {
+                "Webcam Resolution:" => match &*self.device_selected.borrow() {
                     Some(camera) => {
                         let resolution_popup = unsafe {
                             owner
@@ -240,22 +301,19 @@ impl WebcamInputEditor {
                             let rect = owner.get_custom_popup_rect();
                             let size = rect.size.to_vector();
                             let position = rect.origin.to_vector();
-                            let mut counter = 0;
 
-                            if let Some(fmt) = self.format_selected.borrow_mut().to_owned() {
-                                camera.set_camera_foramt(fmt);
+                            let selected_cache_dev = match self.device_list.borrow().get(camera) {
+                                Some(dev) => dev.to_owned(),
+                                None => panic!("The device no longer exists!"),
+                            };
+
+                            let mut id_cnt = 0;
+                            for res in selected_cache_dev.get_supported_mjpg().keys() {
+                                resolution_popup.add_item(format!("{}", res), id_cnt, -1);
+                                id_cnt += 1;
                             }
-                            match camera.get_supported_resolutions() {
-                                Ok(res_list) => {
-                                    for res in res_list {
-                                        resolution_popup.add_item(res.to_string(), counter, 1);
-                                        counter += 1;
-                                    }
-                                }
-                                Err(why) => {
-                                    godot_print!("{}", why)
-                                }
-                            }
+
+                            // for selected_cache_dev.
                             resolution_popup.set_size(size, true);
                             resolution_popup.set_position(position, true);
                             resolution_popup.set_visible(true);
@@ -266,7 +324,7 @@ impl WebcamInputEditor {
                     }
                 },
                 "Webcam Frame Rate:" => match self.device_selected.borrow().as_deref() {
-                    Some(camera) => {
+                    Some(_camera) => {
                         let fps_popup = unsafe {
                             owner
                                 .get_node("../FrameratePopup")
@@ -282,23 +340,19 @@ impl WebcamInputEditor {
                             let rect = owner.get_custom_popup_rect();
                             let size = rect.size.to_vector();
                             let position = rect.origin.to_vector();
-                            let mut counter = 0;
 
-                            if let Some(fmt) = self.format_selected.borrow_mut().to_owned() {
-                                camera.set_camera_foramt(fmt);
-                            }
-                            if let Some(resolution) =
-                                self.resolution_selected.borrow_mut().to_owned()
-                            {
-                                match camera.get_supported_framerate(resolution) {
-                                    Ok(res_list) => {
-                                        for res in res_list {
-                                            fps_popup.add_item(res.to_string(), counter, 1);
-                                            counter += 1;
+                            if let Some(device_name) = &*self.device_selected.borrow() {
+                                if let Some(device) = self.device_list.borrow().get(device_name) {
+                                    if let Some(res) = *self.resolution_selected.borrow() {
+                                        if let Some(framerate_list) =
+                                            device.get_supported_mjpg().get(&res)
+                                        {
+                                            let mut id_cnt = 0;
+                                            for fps in framerate_list {
+                                                fps_popup.add_item(format!("{}", fps), id_cnt, -1);
+                                                id_cnt += 1;
+                                            }
                                         }
-                                    }
-                                    Err(why) => {
-                                        godot_print!("{}", why)
                                     }
                                 }
                             }
@@ -312,47 +366,46 @@ impl WebcamInputEditor {
                         godot_print!("No Camera!");
                     }
                 },
-                "Webcam Video Format:" => match self.device_selected.borrow().as_deref() {
-                    Some(device) => {
-                        let format_popup = unsafe {
-                            owner
-                                .get_node("../FormatPopup")
-                                .unwrap()
-                                .assume_safe()
-                                .cast::<PopupMenu>()
-                                .unwrap()
-                        };
-                        format_popup.clear();
-                        if format_popup.is_visible() {
-                            format_popup.set_visible(false);
-                        } else {
-                            if let Ok(resolutions) = device.get_supported_resolutions() {
-                                if let Some(res) = resolutions.get(0) {
-                                    let rect = owner.get_custom_popup_rect();
-                                    let size = rect.size.to_vector();
-                                    let position = rect.origin.to_vector();
-                                    let mut counter = 0;
-                                    if let Ok(dev_fmt) = device.get_supported_formats(res.clone()) {
-                                        for fourcc in dev_fmt {
-                                            format_popup.add_item(fourcc.to_string(), counter, 1);
-                                            counter += 1;
-                                        }
-                                    }
+                // // TODO: remove, just only support MJPG
+                // "Webcam Video Format:" => match self.device_selected.borrow().as_deref() {
+                //     Some(device) => {
+                //         let format_popup = unsafe {
+                //             owner
+                //                 .get_node("../FormatPopup")
+                //                 .unwrap()
+                //                 .assume_safe()
+                //                 .cast::<PopupMenu>()
+                //                 .unwrap()
+                //         };
+                //         format_popup.clear();
+                //         if format_popup.is_visible() {
+                //             format_popup.set_visible(false);
+                //         } else {
+                //             if let Ok(resolutions) = device.get_supported_resolutions() {
+                //                 if let Some(res) = resolutions.get(0) {
+                //                     let rect = owner.get_custom_popup_rect();
+                //                     let size = rect.size.to_vector();
+                //                     let position = rect.origin.to_vector();
+                //                     let mut counter = 0;
+                //                     if let Ok(dev_fmt) = device.get_supported_formats(res.clone()) {
+                //                         for fourcc in dev_fmt {
+                //                             format_popup.add_item(fourcc.to_string(), counter, 1);
+                //                             counter += 1;
+                //                         }
+                //                     }
 
-                                    format_popup.set_size(size, true);
-                                    format_popup.set_position(position, true);
-                                    format_popup.set_visible(true);
-                                }
-                            }
-                        }
-                    }
-                    None => {
-                        godot_print!("No Camera!");
-                    }
-                },
-                _ => {
-                    return;
-                }
+                //                     format_popup.set_size(size, true);
+                //                     format_popup.set_position(position, true);
+                //                     format_popup.set_visible(true);
+                //                 }
+                //             }
+                //         }
+                //     }
+                //     None => {
+                //         godot_print!("No Camera!");
+                //     }
+                // },
+                _ => (),
             }
         }
     }
@@ -368,7 +421,7 @@ impl WebcamInputEditor {
                 .cast::<PopupMenu>()
                 .unwrap()
         };
-        let clicked_item = unsafe {
+        let _clicked_item = unsafe {
             owner
                 .assume_shared()
                 .assume_safe()
@@ -380,15 +433,10 @@ impl WebcamInputEditor {
             .get_item_text(camera_popup.get_item_index(id as i64))
             .to_string();
         // set selected device
-        match self.device_list.borrow_mut().remove(&clicked_popup) {
-            Some(device) => {
-                *self.device_selected.borrow_mut() = Some(device);
-                clicked_item.set_text(1, clicked_popup);
-            }
-            None => {
-                godot_print!("Error!");
-            }
-        }
+
+        *self.device_selected.borrow_mut() = Some(clicked_popup);
+
+        self.check_button_eligibility(owner);
     }
 
     #[export]
@@ -422,6 +470,7 @@ impl WebcamInputEditor {
         };
         *self.resolution_selected.borrow_mut() = Some(res);
         clicked_item.set_text(1, clicked_popup);
+        self.check_button_eligibility(owner);
     }
 
     #[export]
@@ -449,53 +498,141 @@ impl WebcamInputEditor {
         let fps_int = clicked_popup.parse::<i32>().unwrap();
         *self.fps_selected.borrow_mut() = Some(fps_int);
         clicked_item.set_text(1, clicked_popup);
+        self.check_button_eligibility(owner);
     }
 
+    // #[export]
+    // pub fn on_format_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
+    //     self.clear_other_fields(owner, "format");
+    //     let format_popup = unsafe {
+    //         owner
+    //             .get_node("../FormatPopup")
+    //             .unwrap()
+    //             .assume_safe()
+    //             .cast::<PopupMenu>()
+    //             .unwrap()
+    //     };
+    //     // TODO: Get USB device from thing and open device
+    //     let clicked_item = unsafe {
+    //         owner
+    //             .assume_shared()
+    //             .assume_safe()
+    //             .get_edited()
+    //             .unwrap()
+    //             .assume_safe()
+    //     };
+    //     let clicked_popup = format_popup
+    //         .get_item_text(format_popup.get_item_index(id as i64))
+    //         .to_string();
+    //     match &clicked_popup.clone().to_ascii_lowercase().to_owned()[..] {
+    //         "yuyv" => {
+    //             *self.format_selected.borrow_mut() = Some(DeviceFormat::YUYV);
+    //             clicked_item.set_text(1, clicked_popup);
+    //             self.check_button_eligibility(owner);
+    //         }
+    //         "mjpg" | "mjpeg" => {
+    //             *self.format_selected.borrow_mut() = Some(DeviceFormat::MJPEG);
+    //             clicked_item.set_text(1, clicked_popup);
+    //             self.check_button_eligibility(owner);
+    //         }
+    //         _ => {}
+    //     }
+    // }
+
     #[export]
-    pub fn on_format_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
-        self.clear_other_fields(owner, "format");
-        let format_popup = unsafe {
-            owner
-                .get_node("../FormatPopup")
-                .unwrap()
-                .assume_safe()
-                .cast::<PopupMenu>()
-                .unwrap()
+    pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
+        self.update_device_list();
+
+        owner.emit_signal("input_kill", &[]);
+
+        let dev = match self.device_list.borrow().get(
+            &*self
+                .device_selected
+                .borrow()
+                .as_ref()
+                .unwrap_or(&"".to_string()),
+        ) {
+            Some(dev) => dev.to_owned(),
+            None => return, // TODO: Global Error handler
         };
-        // TODO: Get USB device from thing and open device
-        let clicked_item = unsafe {
-            owner
-                .assume_shared()
-                .assume_safe()
-                .get_edited()
-                .unwrap()
-                .assume_safe()
+
+        let res = match &*self.resolution_selected.borrow() {
+            Some(r) => r.clone(),
+            None => return,
         };
-        let clicked_popup = format_popup
-            .get_item_text(format_popup.get_item_index(id as i64))
-            .to_string();
-        match &clicked_popup.clone().to_ascii_lowercase().to_owned()[..] {
-            "yuyv" => {
-                *self.format_selected.borrow_mut() = Some(DeviceFormat::YUYV);
-                clicked_item.set_text(1, clicked_popup);
+
+        let fps = match &*self.fps_selected.borrow() {
+            Some(r) => r.clone() as u32,
+            None => return,
+        };
+
+        let possible = PossibleDevice::from_cached_device(&dev, res, fps, DeviceFormat::MJPEG);
+
+        let device_contact = possible.to_device_contact();
+
+        match possible {
+            crate::util::camera::device_utils::PossibleDevice::UVCAM {
+                vendor_id: _vendor_id,
+                product_id: _product_id,
+                serial: _serial,
+                res,
+                fps,
+                fmt: _fmt,
+            } => {
+                let resolution = Vector2::new(res.x as f32, res.y as f32);
+
+                crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
+
+                owner.emit_signal(
+                    "new_input_processer_uvc",
+                    &[
+                        Variant::from_vector2(&resolution),
+                        Variant::from_i64(fps as i64),
+                    ],
+                );
             }
-            "mjpg" | "mjpeg" => {
-                *self.format_selected.borrow_mut() = Some(DeviceFormat::MJPEG);
-                clicked_item.set_text(1, clicked_popup);
+            crate::util::camera::device_utils::PossibleDevice::V4L2 {
+                location,
+                res,
+                fps,
+                fmt,
+            } => {
+                let resolution = Vector2::new(res.x as f32, res.y as f32);
+                crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
+                owner.emit_signal(
+                    "new_input_processer_v4l",
+                    &[
+                        Variant::from_vector2(&resolution),
+                        Variant::from_i64(fps as i64),
+                    ],
+                );
             }
-            _ => {}
         }
     }
 
     #[export]
-    pub fn on_start_button_pressed(&self, _owner: TRef<Tree>) {
-        self.update_device_list();
+    pub fn check_button_eligibility(&self, owner: TRef<Tree>) {
+        if let Some(_) = &*self.device_selected.borrow_mut() {
+            if let Some(_) = &*self.resolution_selected.borrow_mut() {
+                if let Some(_) = &*self.fps_selected.borrow_mut() {
+                    let button = unsafe {
+                        owner
+                            .get_node("../StartButton")
+                            .unwrap()
+                            .assume_safe()
+                            .cast::<Button>()
+                            .unwrap()
+                    };
+                    button.set_disabled(false);
+                }
+            }
+        }
     }
 
     // updates the device list to look for new devices, etc
     fn update_device_list(&self) {
         self.device_list.borrow_mut().clear();
-        match enumerate_devices() {
+        match enumerate_cache_device() {
             Some(new_list) => {
                 *self.device_list.borrow_mut() = new_list;
             }
@@ -516,7 +653,6 @@ impl WebcamInputEditor {
             "camera" => {
                 self.update_device_list();
                 *self.device_selected.borrow_mut() = None;
-                *self.format_selected.borrow_mut() = None;
                 *self.resolution_selected.borrow_mut() = None;
                 *self.fps_selected.borrow_mut() = None;
                 let mut child = unsafe {

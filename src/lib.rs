@@ -16,8 +16,11 @@
 
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
+#![allow(clippy::clippy::module_name_repetitions)]
+
+use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
-use uvc;
+use std::cell::RefCell;
 
 pub mod configuration;
 pub mod error;
@@ -37,10 +40,16 @@ lazy_static! {
     };
 }
 
+thread_local! {
+    pub(crate) static CURRENT_DEVICE: RefCell<Option<DeviceContact>> = RefCell::new(None);
+    pub(crate) static UVC_DEV_H: RefCell<Option<uvc::DeviceHandle<'static>>> = RefCell::new(None);
+}
+
 fn init(handle: InitHandle) {
     handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
     handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<crate::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();
+    handle.add_class::<crate::nodes::viewports::viewport_holder::ViewportHolder>()
 }
 
 godot_init!(init);
