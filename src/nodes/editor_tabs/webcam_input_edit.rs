@@ -207,7 +207,6 @@ impl WebcamInputEditor {
         webcam_video_input.set_disable_folding(false);
 
         create_custom_editable_item(owner, root_item, "Input Webcam:", 2);
-        create_custom_editable_item(owner, root_item, "Webcam Video Format:", 3);
         create_custom_editable_item(owner, root_item, "Webcam Resolution:", 4);
         create_custom_editable_item(owner, root_item, "Webcam Frame Rate:", 5);
 
@@ -421,7 +420,7 @@ impl WebcamInputEditor {
                 .cast::<PopupMenu>()
                 .unwrap()
         };
-        let _clicked_item = unsafe {
+        let clicked_item = unsafe {
             owner
                 .assume_shared()
                 .assume_safe()
@@ -433,9 +432,8 @@ impl WebcamInputEditor {
             .get_item_text(camera_popup.get_item_index(i64::from(id)))
             .to_string();
         // set selected device
-
+        clicked_item.set_text(1, clicked_popup.clone());
         *self.device_selected.borrow_mut() = Some(clicked_popup);
-
         self.check_button_eligibility(owner);
     }
 
@@ -566,7 +564,8 @@ impl WebcamInputEditor {
             None => return,
         };
 
-        let possible = PossibleDevice::from_cached_device(&dev, res, framerate, DeviceFormat::MJPEG);
+        let possible =
+            PossibleDevice::from_cached_device(&dev, res, framerate, DeviceFormat::MJPEG);
 
         let device_contact = possible.to_device_contact();
 
@@ -612,7 +611,10 @@ impl WebcamInputEditor {
 
     #[export]
     pub fn check_button_eligibility(&self, owner: TRef<Tree>) {
-        if self.device_selected.borrow_mut().is_some() && self.resolution_selected.borrow_mut().is_some() && self.fps_selected.borrow_mut().is_some() {
+        if self.device_selected.borrow_mut().is_some()
+            && self.resolution_selected.borrow_mut().is_some()
+            && self.fps_selected.borrow_mut().is_some()
+        {
             let button = unsafe {
                 owner
                     .get_node("../StartButton")
@@ -673,37 +675,37 @@ impl WebcamInputEditor {
                     }
                 }
             }
-            "format" => {
-                self.update_device_list();
-                *self.resolution_selected.borrow_mut() = None;
-                *self.fps_selected.borrow_mut() = None;
-                let mut child = unsafe {
-                    owner
-                        .get_root()
-                        .unwrap()
-                        .assume_safe()
-                        .get_children()
-                        .unwrap()
-                        .assume_safe()
-                };
-                let mut clearable = false;
-                loop {
-                    // see if the child is a custom tree item
-                    if child.get_text(0).to_string() != *"Webcam Video Format:"
-                        && child.get_cell_mode(1) == TreeCellMode::CUSTOM
-                        && clearable
-                    {
-                        child.set_text(1, "");
-                    } else if child.get_text(0).to_string() == *"Webcam Video Format:" {
-                        clearable = true;
-                    }
-                    if let Some(a) = child.get_next() {
-                        child = unsafe { a.assume_safe() };
-                    } else {
-                        break;
-                    }
-                }
-            }
+            // "format" => {
+            //     self.update_device_list();
+            //     *self.resolution_selected.borrow_mut() = None;
+            //     *self.fps_selected.borrow_mut() = None;
+            //     let mut child = unsafe {
+            //         owner
+            //             .get_root()
+            //             .unwrap()
+            //             .assume_safe()
+            //             .get_children()
+            //             .unwrap()
+            //             .assume_safe()
+            //     };
+            //     let mut clearable = false;
+            //     loop {
+            //         // see if the child is a custom tree item
+            //         if child.get_text(0).to_string() != *"Webcam Video Format:"
+            //             && child.get_cell_mode(1) == TreeCellMode::CUSTOM
+            //             && clearable
+            //         {
+            //             child.set_text(1, "");
+            //         } else if child.get_text(0).to_string() == *"Webcam Video Format:" {
+            //             clearable = true;
+            //         }
+            //         if let Some(a) = child.get_next() {
+            //             child = unsafe { a.assume_safe() };
+            //         } else {
+            //             break;
+            //         }
+            //     }
+            // }
             "res" => {
                 self.update_device_list();
                 *self.fps_selected.borrow_mut() = None;

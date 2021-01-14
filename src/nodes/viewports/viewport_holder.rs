@@ -72,7 +72,6 @@ impl ViewportHolder {
         _owner: TRef<VSplitContainer>,
         res: Variant,
         fps: Variant,
-        _fmt: Variant,
     ) {
         let _resolution = match Resolution::from_variant(&res) {
             Ok(r) => r,
@@ -148,7 +147,6 @@ impl ViewportHolder {
         _owner: TRef<VSplitContainer>,
         res: Variant,
         fps: Variant,
-        fmt: Variant,
     ) {
         let mut ret_bool = false;
         let dev_locat = crate::CURRENT_DEVICE.with(|dev| match &*dev.borrow() {
@@ -201,12 +199,7 @@ impl ViewportHolder {
             None => panic!("Improper resolution format set!"),
         };
 
-        match DeviceFormat::from_variant(&fmt) {
-            Ok(ft) => {
-                v4l_device.set_camera_format(ft);
-            }
-            Err(_) => panic!("Improper format set!"),
-        };
+        v4l_device.set_camera_format(DeviceFormat::MJPEG);
 
         godot_print!("a");
 

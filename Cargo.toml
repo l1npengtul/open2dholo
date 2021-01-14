@@ -33,7 +33,8 @@ version = "0.1.7"
 features = ["embed-all"]
 
 [dependencies.v4l]
-git = "https://github.com/l1npengtul/libv4l-rs" # v4l2-sys-mit is out-of-date on crates.io so were using the git repo until its updated
+version = "0.12.0"
+features = ["v4l2-sys"]
 
 #[dependencies.opencv]
 #version = "0.46.3"

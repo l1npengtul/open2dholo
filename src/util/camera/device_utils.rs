@@ -26,7 +26,7 @@ use std::{
 };
 use usb_enumeration::USBDevice;
 use uvc::{DeviceHandle, FrameFormat};
-use v4l::{device::List, framesize::FrameSizeEnum, prelude::*, FourCC};
+use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct DeviceDesc {
@@ -371,7 +371,10 @@ impl CachedDevice {
         let device_location = DeviceContact::from(camera.get_inner());
         let resolutions = match camera.get_supported_resolutions() {
             Ok(res) => res,
-            Err(_) => return Err(()),
+            Err(why) => {
+                println!("{}", why.to_string());
+                return Err(());
+            }
         };
 
         let mut fmt_res_mjpg: HashMap<Resolution, Vec<u32>> = HashMap::new();
@@ -429,62 +432,63 @@ impl PartialEq for CachedDevice {
     }
 }
 
-pub fn enumerate_devices() -> Option<HashMap<String, Box<dyn Webcam>>> {
-    return match std::env::consts::OS {
-        "linux" => {
-            let mut known_devices: HashMap<String, Box<dyn Webcam>> = HashMap::new();
-            // get device list from v4l2
-            for sys_device in List::new() {
-                // get device from v4l2 using the index, getting /dev/video0 if it falis
-                let v4l_device = match V4LinuxDevice::new(sys_device.index().unwrap_or(0)) {
-                    Ok(dev) => Box::new(dev),
-                    Err(_why) => continue,
-                };
-                // weed out the repeating
-                known_devices.entry(v4l_device.name()).or_insert(v4l_device);
-            }
-            Some(known_devices)
-        }
-        "macos" | "windows" => {
-            let mut known_devices: HashMap<String, Box<dyn Webcam>> = HashMap::new();
-            match crate::UVC.devices() {
-                Ok(list) => {
-                    for uvc_device in list {
-                        if let Ok(camera_device) = UVCameraDevice::from_device(uvc_device) {
-                            let camera_name = camera_device.name();
-                            known_devices
-                                .entry(camera_name)
-                                .or_insert_with(|| Box::new(camera_device));
-                        }
-                    }
-                }
-                Err(_why) => {
-                    return None;
-                }
-            }
-            Some(known_devices)
-        }
-        _ => None,
-    };
-}
+// pub fn enumerate_devices() -> Option<HashMap<String, Box<dyn Webcam>>> {
+//     return match std::env::consts::OS {
+//         "linux" => {
+//             let mut known_devices: HashMap<String, Box<dyn Webcam>> = HashMap::new();
+//             // get device list from v4l2
+//             for sys_device in List::new() {
+//                 // get device from v4l2 using the index, getting /dev/video0 if it falis
+//                 let v4l_device = match V4LinuxDevice::new(sys_device.index().unwrap_or(0)) {
+//                     Ok(dev) => Box::new(dev),
+//                     Err(_why) => continue,
+//                 };
+//                 // weed out the repeating
+//                 known_devices.entry(v4l_device.name()).or_insert(v4l_device);
+//             }
+//             Some(known_devices)
+//         }
+//         "macos" | "windows" => {
+//             let mut known_devices: HashMap<String, Box<dyn Webcam>> = HashMap::new();
+//             match crate::UVC.devices() {
+//                 Ok(list) => {
+//                     for uvc_device in list {
+//                         if let Ok(camera_device) = UVCameraDevice::from_device(uvc_device) {
+//                             let camera_name = camera_device.name();
+//                             known_devices
+//                                 .entry(camera_name)
+//                                 .or_insert_with(|| Box::new(camera_device));
+//                         }
+//                     }
+//                 }
+//                 Err(_why) => {
+//                     return None;
+//                 }
+//             }
+//             Some(known_devices)
+//         }
+//         _ => None,
+//     };
+// }
 
 pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
     return match std::env::consts::OS {
         "linux" => {
             let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
             // get device list from v4l2
-            for sys_device in List::new() {
-                // get device from v4l2 using the index, getting /dev/video0 if it falis
-                let v4l_device = match V4LinuxDevice::new(sys_device.index().unwrap_or(0)) {
-                    Ok(dev) => {
-                        let b: Box<dyn Webcam> = Box::new(dev);
-                        CachedDevice::from_webcam(&b).unwrap()
+            for dev in v4l::context::enum_devices() {
+                if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
+                    let b: Box<dyn Webcam> = Box::new(v4l_dev);
+                    if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
+                        known_devices.insert(
+                            format!(
+                                "{}",
+                                dev.name().unwrap_or(format!("/dev/video{}", dev.index()))
+                            ),
+                            c_dev,
+                        );
                     }
-                    Err(_why) => continue,
-                };
-                let dev_name = v4l_device.get_name();
-                // weed out the repeating
-                known_devices.entry(dev_name).or_insert(v4l_device);
+                }
             }
             Some(known_devices)
         }

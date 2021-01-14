@@ -16,6 +16,7 @@
 
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
+// NO MATTER WHAT LINT COMES THROUGH THAT GATE
 #![allow(clippy::clippy::module_name_repetitions)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::must_use_candidate)]

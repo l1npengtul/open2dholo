@@ -23,9 +23,11 @@ use std::{
 };
 use usb_enumeration::{enumerate, Filters};
 use uvc::{FormatDescriptor, FrameFormat};
+use v4l::buffer::Type;
+use v4l::io::mmap::Stream;
+use v4l::video::capture::Parameters;
 use v4l::{
-    capture::parameters::Parameters, format::Format, fraction::Fraction, framesize::FrameSizeEnum,
-    prelude::*, FourCC,
+    format::Format, fraction::Fraction, framesize::FrameSizeEnum, video::traits::Capture, FourCC,
 };
 
 // USE set_format for v4l2 device
@@ -33,18 +35,18 @@ pub struct V4LinuxDevice {
     device_type: WebcamType,
     device_format: Cell<DeviceFormat>,
     device_path: PathIndex,
-    pub inner: RefCell<v4l::capture::Device>,
+    pub inner: RefCell<v4l::Device>,
 }
 impl V4LinuxDevice {
     pub fn new(index: usize) -> Result<Self, ()> {
-        let device = match v4l::capture::Device::new(index.clone()) {
+        let device = match v4l::Device::new(index) {
             Ok(dev) => dev,
             Err(_why) => {
                 return Err(());
             }
         };
         let device_type = WebcamType::V4linux2;
-        let device_path = PathIndex::Index(index.clone());
+        let device_path = PathIndex::Index(index);
         Ok(V4LinuxDevice {
             device_type,
             device_format: Cell::new(DeviceFormat::MJPEG),
@@ -52,15 +54,15 @@ impl V4LinuxDevice {
             inner: RefCell::new(device),
         })
     }
-    pub fn new_path(path: &String) -> Result<Self, ()> {
-        let device = match v4l::capture::Device::with_path(path.clone()) {
+    pub fn new_path(path: &str) -> Result<Self, ()> {
+        let device = match v4l::Device::with_path(path.to_string()) {
             Ok(dev) => dev,
             Err(_why) => {
                 return Err(());
             }
         };
         let device_type = WebcamType::V4linux2;
-        let device_path = PathIndex::Path(path.clone());
+        let device_path = PathIndex::Path(path.to_string());
         Ok(V4LinuxDevice {
             device_type,
             device_format: Cell::new(DeviceFormat::MJPEG),
@@ -70,10 +72,10 @@ impl V4LinuxDevice {
     }
 
     pub fn new_location(location: &PathIndex) -> Result<Self, ()> {
-        return match location {
+        match location {
             PathIndex::Path(p) => V4LinuxDevice::new_path(p),
             PathIndex::Index(i) => V4LinuxDevice::new(i.to_owned()),
-        };
+        }
     }
 }
 impl Webcam for V4LinuxDevice {
@@ -210,7 +212,7 @@ impl Webcam for V4LinuxDevice {
         };
     }
     fn get_camera_format(&self) -> DeviceFormat {
-        return self.device_format.get();
+        self.device_format.get()
     }
 
     fn set_camera_format(&self, format: DeviceFormat) {
@@ -222,7 +224,7 @@ impl Webcam for V4LinuxDevice {
     }
 
     fn open_stream(&self) -> Result<StreamType, Box<dyn std::error::Error>> {
-        return match MmapStream::with_buffers(&*self.inner.borrow_mut(), 4) {
+        return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
             Ok(stream) => Ok(StreamType::V4L2Stream(stream)),
             Err(why) => Err(Box::new(
                 crate::error::invalid_device_error::InvalidDeviceError::CannotOpenStream(
@@ -292,7 +294,10 @@ impl UVCameraDevice {
                     "{}:{} {}",
                     description.vendor_id,
                     description.product_id,
-                    usb_dev.description.clone().unwrap_or(String::from(""))
+                    usb_dev
+                        .description
+                        .clone()
+                        .unwrap_or_else(|| String::from(""))
                 );
                 let device_type = match DeviceHolder::from_devices(usb_dev, &inner) {
                     Ok(_dt) => WebcamType::USBVideo,
@@ -326,7 +331,10 @@ impl UVCameraDevice {
                     "{}:{} {}",
                     description.vendor_id,
                     description.product_id,
-                    usb_dev.description.clone().unwrap_or(String::from(""))
+                    usb_dev
+                        .description
+                        .clone()
+                        .unwrap_or_else(|| String::from(""))
                 );
                 let device_type = match DeviceHolder::from_devices(usb_dev, &inner) {
                     Ok(_dt) => WebcamType::USBVideo,
@@ -375,8 +383,8 @@ impl Webcam for UVCameraDevice {
                 for format in handler.supported_formats() {
                     for frame in format.supported_formats() {
                         let resolution_string = Resolution {
-                            x: frame.width() as u32,
-                            y: frame.height() as u32,
+                            x: u32::from(frame.width()),
+                            y: u32::from(frame.height()),
                         };
                         if !resolutions.contains(&resolution_string) {
                             resolutions.push(resolution_string);
@@ -407,7 +415,7 @@ impl Webcam for UVCameraDevice {
                             uvc::FrameFormat::YUYV,
                             res.x,
                             res.y,
-                            fps.clone(),
+                            *fps,
                         ) {
                             framerates.push(DeviceFormat::YUYV);
                         }
@@ -415,7 +423,7 @@ impl Webcam for UVCameraDevice {
                             uvc::FrameFormat::MJPEG,
                             res.x,
                             res.y,
-                            fps.clone(),
+                            *fps,
                         ) {
                             framerates.push(DeviceFormat::MJPEG);
                         }
@@ -454,7 +462,7 @@ impl Webcam for UVCameraDevice {
         match self.inner.open() {
             Ok(handler) => {
                 let formats: Vec<FormatDescriptor> =
-                    handler.supported_formats().into_iter().map(|f| f).collect();
+                    handler.supported_formats().into_iter().collect();
                 let mut framerates: Vec<u32> = Vec::new();
                 for fmt_desc in formats {
                     for frame_desc in fmt_desc.supported_formats() {
@@ -478,7 +486,7 @@ impl Webcam for UVCameraDevice {
     }
 
     fn get_camera_format(&self) -> DeviceFormat {
-        return self.device_format.get();
+        self.device_format.get()
     }
 
     fn set_camera_format(&self, format: DeviceFormat) {
@@ -538,10 +546,7 @@ impl Webcam for UVCameraDevice {
             None => Resolution { x: 640, y: 480 },
         };
 
-        let fps = match self.device_framerate.get() {
-            Some(f) => f,
-            None => 5,
-        };
+        let fps = self.device_framerate.get().unwrap_or(5);
 
         let fmt = match self.device_format.get() {
             DeviceFormat::YUYV => FrameFormat::YUYV,

@@ -26,15 +26,19 @@ use dlib_face_recognition::{
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
 use scheduled_thread_pool::ScheduledThreadPool;
+use std::path::Path;
 use std::{
     sync::{atomic::AtomicUsize, Arc},
     thread::{Builder, JoinHandle},
     time::Duration,
 };
-use uvc::Device;
+use uvc::Device as UVCDevice;
+use v4l::buffer::Type;
+use v4l::io::traits::CaptureStream;
 use v4l::{
-    buffer::Stream, capture::Parameters, prelude::CaptureDevice, prelude::MmapStream, Format,
-    FourCC,
+    io::mmap::Stream,
+    video::{capture::Parameters, traits::Capture},
+    Device, Format, FourCC,
 };
 
 pub struct InputProcessing {
@@ -70,13 +74,13 @@ impl InputProcessing {
 
     //pub fn get_output_handler
     pub fn kill(&self) {
-        if let Err(_) = self.sender_p1.send(MessageType::Die(0)) {
+        if self.sender_p1.send(MessageType::Die(0)).is_err() {
             // /shrug if this fails to send we're fucked
         }
     }
 
     pub fn get_thread_output(&self) -> Receiver<Processed> {
-        return self.reciever_p2.clone();
+        self.reciever_p2.clone()
     }
 }
 
@@ -155,7 +159,7 @@ fn input_process_func(
                         match find_landmarks(&image) {
                             ProcessedPacket::FacialLandmark(landmarks) => {
                                 // stonks
-                                if let Err(_) = cloned_send.send(landmarks) {
+                                if cloned_send.send(landmarks).is_err() {
                                     // ooh yeah i care about errors
                                 }
                             }
@@ -168,7 +172,7 @@ fn input_process_func(
                         }
                     });
                 },
-                cnt.clone(),
+                cnt,
             ) {
                 Ok(a) => a,
                 Err(why) => {
@@ -198,7 +202,7 @@ fn input_process_func(
             fps,
             fmt,
         } => {
-            let mut v4l_device = match make_v4l_device(&location, &res, &fps, &fmt) {
+            let mut v4l_device = match make_v4l_device(&location, res, fps, fmt) {
                 Ok(d) => {
                     godot_print!("b");
                     d
@@ -211,7 +215,7 @@ fn input_process_func(
                 }
             };
 
-            let mut stream = match MmapStream::new(&v4l_device) {
+            let mut stream = match Stream::with_buffers(&v4l_device, Type::VideoCapture, 4) {
                 Ok(s) => s,
                 Err(why) => {
                     return Err(Box::new(ProcessingError::General(format!(
@@ -229,14 +233,18 @@ fn input_process_func(
                             if let PossibleDevice::V4L2 {
                                 location,
                                 res,
-                                fps,
+                                fps: framerate,
                                 fmt,
                             } = possible
                             {
-                                match make_v4l_device(&location, &res, &fps, &fmt) {
+                                match make_v4l_device(&location, res, framerate, fmt) {
                                     Ok(d) => {
                                         v4l_device = d;
-                                        stream = match MmapStream::new(&v4l_device) {
+                                        stream = match Stream::with_buffers(
+                                            &v4l_device,
+                                            Type::VideoCapture,
+                                            4,
+                                        ) {
                                             Ok(s) => s,
                                             Err(why) => {
                                                 return Err(Box::new(ProcessingError::General(
@@ -263,19 +271,21 @@ fn input_process_func(
 
                 //let mut cnt = Arc::new(AtomicUsize::new(0));
 
-                if let Ok(buffer) = stream.next() {
+                if let Ok((buffer, _meta)) = stream.next() {
                     let image = unsafe {
                         ImageMatrix::new(res.x as usize, res.y as usize, buffer.as_ptr())
                     };
+                    godot_print!("img");
                     // aaa go crazy
                     let cloned_send = send.clone();
                     thread_pool.execute(move || {
                         match find_landmarks(&image) {
                             ProcessedPacket::FacialLandmark(landmarks) => {
                                 // stonks
-                                if let Err(_) = cloned_send.send(landmarks) {
+                                if cloned_send.send(landmarks).is_err() {
                                     // ooh yeah i care about errors
                                 }
+                                godot_print!("img");
                             }
                             ProcessedPacket::None => {
                                 std::thread::sleep(Duration::from_millis(50));
@@ -286,9 +296,9 @@ fn input_process_func(
                         }
                     });
                 } else {
-                    return Err(Box::new(ProcessingError::General(format!(
-                        "Error capturing V4L2 buffer"
-                    ))));
+                    return Err(Box::new(ProcessingError::General(
+                        "Error capturing V4L2 buffer".to_string(),
+                    )));
                 }
             }
         }
@@ -297,28 +307,28 @@ fn input_process_func(
 
 fn make_v4l_device(
     location: &PathIndex,
-    res: &Resolution,
-    fps: &u32,
-    fmt: &FourCC,
-) -> Result<CaptureDevice, Box<dyn std::error::Error>> {
-    let mut device = match location {
+    res: Resolution,
+    fps: u32,
+    fmt: FourCC,
+) -> Result<Device, Box<dyn std::error::Error>> {
+    let device = match location {
         PathIndex::Path(path) => {
-            let device = match CaptureDevice::with_path(path) {
+            let dev = match Device::with_path(Path::new(path)) {
                 Ok(d) => d,
                 Err(why) => return Err(Box::new(why)),
             };
-            device
+            dev
         }
         PathIndex::Index(idx) => {
-            let device = match CaptureDevice::new(idx.clone()) {
+            let dev = match Device::new(*idx) {
                 Ok(d) => d,
                 Err(why) => return Err(Box::new(why)),
             };
-            device
+            dev
         }
     };
 
-    let fcc = fmt.clone();
+    let fcc = fmt;
 
     let format = match device.format() {
         Ok(mut f) => {
@@ -330,7 +340,7 @@ fn make_v4l_device(
         Err(_) => Format::new(res.x, res.y, fcc),
     };
 
-    let param = Parameters::with_fps(fps.clone());
+    let param = Parameters::with_fps(fps);
 
     if let Err(why) = device.set_format(&format) {
         return Err(Box::new(why));
@@ -346,10 +356,10 @@ fn make_uvc_device<'a>(
     vendor_id: Option<u16>,
     product_id: Option<u16>,
     serial: Option<String>,
-) -> Result<Device<'a>, Box<dyn std::error::Error>> {
+) -> Result<UVCDevice<'a>, Box<dyn std::error::Error>> {
     let device = match crate::UVC.find_device(
-        vendor_id.map_or(None, |f| Some(f as i32)),
-        product_id.map_or(None, |f| Some(f as i32)),
+        vendor_id.map(i32::from),
+        product_id.map(i32::from),
         serial.as_deref(),
     ) {
         Ok(d) => d,
@@ -360,7 +370,7 @@ fn make_uvc_device<'a>(
 
 fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
     let faces = FaceDetector::new().face_locations(img).to_vec();
-    let faces2 = faces.clone();
+    let faces2 = faces;
     let largest_rectangle = match faces2.get(0) {
         Some(rt) => rt,
         None => {
