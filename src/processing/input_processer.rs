@@ -156,7 +156,7 @@ fn input_process_func(
                             ProcessedPacket::FacialLandmark(landmarks) => {
                                 // stonks
                                 if let Err(_) = cloned_send.send(landmarks) {
-                                    () // ooh yeah i care about errors
+                                    // ooh yeah i care about errors
                                 }
                             }
                             ProcessedPacket::None => {
@@ -274,7 +274,7 @@ fn input_process_func(
                             ProcessedPacket::FacialLandmark(landmarks) => {
                                 // stonks
                                 if let Err(_) = cloned_send.send(landmarks) {
-                                    () // ooh yeah i care about errors
+                                    // ooh yeah i care about errors
                                 }
                             }
                             ProcessedPacket::None => {

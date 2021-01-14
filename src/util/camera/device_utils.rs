@@ -25,7 +25,7 @@ use std::{
     os::raw::c_int,
 };
 use usb_enumeration::USBDevice;
-use uvc::{DeviceHandle, FrameFormat, StreamHandle};
+use uvc::{DeviceHandle, FrameFormat};
 use v4l::{device::List, framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -35,7 +35,7 @@ pub struct DeviceDesc {
     pub(crate) ser: Option<String>,
 }
 impl DeviceDesc {
-    pub fn new(device: uvc::Device) -> Result<Self, Box<dyn Error>> {
+    pub fn new(device: &uvc::Device) -> Result<Self, Box<dyn Error>> {
         let device_desc = device.description()?;
         Ok(DeviceDesc {
             vid: Some(c_int::from(device_desc.vendor_id)),
@@ -91,10 +91,10 @@ impl DeviceHolder {
         if let Ok(uvc_desc) = uvc.description() {
             if uvc_desc.vendor_id == usb.vendor_id && uvc_desc.product_id == usb.product_id {
                 let mut description: String =
-                    String::from(format!("{}:{}", uvc_desc.vendor_id, uvc_desc.product_id));
+                    format!("{}:{}", uvc_desc.vendor_id, uvc_desc.product_id);
                 let serial = uvc_desc.serial_number.clone();
                 if let Some(descript) = usb.description.clone() {
-                    description = String::from(format!("{} {}", description, descript));
+                    description = format!("{} {}", description, descript);
                 }
                 let device: DeviceHolder = DeviceHolder::new(
                     usb.id.clone(),
@@ -106,7 +106,7 @@ impl DeviceHolder {
                 return Ok(device);
             }
         }
-        return Err(Box::new(InvalidDeviceError::CannotFindDevice));
+        Err(Box::new(InvalidDeviceError::CannotFindDevice))
     }
 }
 
@@ -123,22 +123,22 @@ impl PartialEq for DeviceHolder {
     }
 }
 
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Resolution {
     pub x: u32,
     pub y: u32,
 }
 
 impl Resolution {
-    pub fn from_variant(var: Variant) -> Result<Self, ()> {
+    pub fn from_variant(var: &Variant) -> Result<Self, ()> {
         if let Some(v) = var.try_to_vector2() {
-            if v.x <= 0.0 || v.y <= 0.0 {
-                return Err(());
-            } else {
+            return if v.x > 0.0 && v.y > 0.0 {
                 let x = v.x as u32;
                 let y = v.y as u32;
-                return Ok(Resolution { x, y });
-            }
+                Ok(Resolution { x, y })
+            } else {
+                Err(())
+            };
         }
         Err(())
     }
@@ -161,14 +161,14 @@ impl TryFrom<v4l::framesize::FrameSize> for Resolution {
     }
 }
 
-impl PartialEq for Resolution {
-    fn eq(&self, other: &Self) -> bool {
-        if self.x == other.x && self.y == other.y {
-            return false;
-        }
-        true
-    }
-}
+// impl PartialEq for Resolution {
+//     fn eq(&self, other: &Self) -> bool {
+//         if self.x == other.x && self.y == other.y {
+//             return false;
+//         }
+//         true
+//     }
+// }
 
 impl Display for Resolution {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -181,11 +181,11 @@ impl PartialOrd for Resolution {
         let total_self = self.x;
         let total_other = other.x;
         if total_self > total_other {
-            return Some(Ordering::Greater);
+            Some(Ordering::Greater)
         } else if total_self < total_other {
-            return Some(Ordering::Less);
+            Some(Ordering::Less)
         } else {
-            return Some(Ordering::Equal);
+            Some(Ordering::Equal)
         }
     }
 }
@@ -196,17 +196,13 @@ pub enum DeviceFormat {
 }
 
 impl DeviceFormat {
-    pub fn from_variant(var: Variant) -> Result<Self, ()> {
+    pub fn from_variant(var: &Variant) -> Result<Self, ()> {
         if let Some(st) = var.try_to_string() {
-            match &st.to_lowercase().to_owned()[..] {
-                "yuyv" => {
-                    return Ok(DeviceFormat::YUYV);
-                }
-                "mjpg" | "mjpeg" => {
-                    return Ok(DeviceFormat::MJPEG);
-                }
-                _ => return Err(()),
-            }
+            return match &st.to_lowercase()[..] {
+                "yuyv" => Ok(DeviceFormat::YUYV),
+                "mjpg" | "mjpeg" => Ok(DeviceFormat::MJPEG),
+                _ => Err(()),
+            };
         }
         Err(())
     }
@@ -293,28 +289,28 @@ impl PossibleDevice {
     }
 
     pub fn to_device_contact(&self) -> DeviceContact {
-        return match self {
+        match self {
             PossibleDevice::UVCAM {
                 vendor_id,
                 product_id,
                 serial,
-                res,
-                fps,
-                fmt,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
             } => DeviceContact::UVCAM {
-                vendor_id: vendor_id.clone(),
-                product_id: product_id.clone(),
+                vendor_id: *vendor_id,
+                product_id: *product_id,
                 serial: serial.clone(),
             },
             PossibleDevice::V4L2 {
                 location,
-                res,
-                fps,
-                fmt,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
             } => DeviceContact::V4L2 {
                 location: location.clone(),
             },
-        };
+        }
     }
 }
 
@@ -342,9 +338,9 @@ impl From<PossibleDevice> for DeviceContact {
                 vendor_id,
                 product_id,
                 serial,
-                res,
-                fps,
-                fmt,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
             } => DeviceContact::UVCAM {
                 vendor_id,
                 product_id,
@@ -352,9 +348,9 @@ impl From<PossibleDevice> for DeviceContact {
             },
             PossibleDevice::V4L2 {
                 location,
-                res,
-                fps,
-                fmt,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
             } => DeviceContact::V4L2 { location },
         }
     }
@@ -369,7 +365,8 @@ pub struct CachedDevice {
 }
 
 impl CachedDevice {
-    pub fn from_webcam(camera: Box<dyn Webcam>) -> Result<Self, ()> {
+    // DO NOT REMOVE THE `&`
+    pub fn from_webcam(camera: &Box<dyn Webcam>) -> Result<Self, ()> {
         let device_name = camera.name();
         let device_location = DeviceContact::from(camera.get_inner());
         let resolutions = match camera.get_supported_resolutions() {
@@ -380,31 +377,21 @@ impl CachedDevice {
         let mut fmt_res_mjpg: HashMap<Resolution, Vec<u32>> = HashMap::new();
         let mut fmt_res_yuyv: HashMap<Resolution, Vec<u32>> = HashMap::new();
 
-        let mut has_yuyv = false;
-        let mut has_mjpg = false;
-
-        // let mut framerate_list: Vec<u32> = Vec::new();
-
         for res in resolutions {
-            has_yuyv = false;
-            has_mjpg = false;
-
-            match camera.get_supported_formats(res) {
-                Ok(fmt) => {
-                    for dev_fmt in fmt {
-                        match dev_fmt {
-                            DeviceFormat::YUYV => has_yuyv = true,
-                            DeviceFormat::MJPEG => has_mjpg = true,
+            if let Ok(fmt) = camera.get_supported_formats(res) {
+                for dev_fmt in fmt {
+                    match dev_fmt {
+                        DeviceFormat::YUYV => {
+                            if let Ok(framerates) = camera.get_supported_framerate(res) {
+                                fmt_res_yuyv.insert(res, framerates.clone());
+                            }
+                        }
+                        DeviceFormat::MJPEG => {
+                            if let Ok(framerates) = camera.get_supported_framerate(res) {
+                                fmt_res_mjpg.insert(res, framerates.clone());
+                            }
                         }
                     }
-                }
-                Err(_) => {}
-            }
-
-            if has_yuyv && has_mjpg {
-                if let Ok(framerates) = camera.get_supported_framerate(res) {
-                    fmt_res_mjpg.insert(res, framerates.clone());
-                    fmt_res_yuyv.insert(res, framerates.clone());
                 }
             }
         }
@@ -449,14 +436,12 @@ pub fn enumerate_devices() -> Option<HashMap<String, Box<dyn Webcam>>> {
             // get device list from v4l2
             for sys_device in List::new() {
                 // get device from v4l2 using the index, getting /dev/video0 if it falis
-                let v4l_device = match V4LinuxDevice::new(&sys_device.index().unwrap_or(0)) {
+                let v4l_device = match V4LinuxDevice::new(sys_device.index().unwrap_or(0)) {
                     Ok(dev) => Box::new(dev),
                     Err(_why) => continue,
                 };
                 // weed out the repeating
-                if !known_devices.contains_key(&v4l_device.name()) {
-                    known_devices.insert(v4l_device.name(), v4l_device);
-                }
+                known_devices.entry(v4l_device.name()).or_insert(v4l_device);
             }
             Some(known_devices)
         }
@@ -467,9 +452,9 @@ pub fn enumerate_devices() -> Option<HashMap<String, Box<dyn Webcam>>> {
                     for uvc_device in list {
                         if let Ok(camera_device) = UVCameraDevice::from_device(uvc_device) {
                             let camera_name = camera_device.name();
-                            if !known_devices.contains_key(&camera_name) {
-                                known_devices.insert(camera_name, Box::new(camera_device));
-                            }
+                            known_devices
+                                .entry(camera_name)
+                                .or_insert_with(|| Box::new(camera_device));
                         }
                     }
                 }
@@ -490,15 +475,16 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
             // get device list from v4l2
             for sys_device in List::new() {
                 // get device from v4l2 using the index, getting /dev/video0 if it falis
-                let v4l_device = match V4LinuxDevice::new(&sys_device.index().unwrap_or(0)) {
-                    Ok(dev) => CachedDevice::from_webcam(Box::new(dev)).unwrap(),
+                let v4l_device = match V4LinuxDevice::new(sys_device.index().unwrap_or(0)) {
+                    Ok(dev) => {
+                        let b: Box<dyn Webcam> = Box::new(dev);
+                        CachedDevice::from_webcam(&b).unwrap()
+                    }
                     Err(_why) => continue,
                 };
                 let dev_name = v4l_device.get_name();
                 // weed out the repeating
-                if !known_devices.contains_key(&dev_name) {
-                    known_devices.insert(dev_name, v4l_device);
-                }
+                known_devices.entry(dev_name).or_insert(v4l_device);
             }
             Some(known_devices)
         }
@@ -507,14 +493,14 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
             match crate::UVC.devices() {
                 Ok(list) => {
                     for uvc_device in list {
-                        if let Ok(camera_device) = CachedDevice::from_webcam(Box::new(
-                            UVCameraDevice::from_device(uvc_device).unwrap(),
-                        )) {
+                        if let Ok(camera_device) = {
+                            let b: Box<dyn Webcam> =
+                                Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
+                            CachedDevice::from_webcam(&b)
+                        } {
                             let dev_name = camera_device.get_name();
                             // weed out the repeating
-                            if !known_devices.contains_key(&dev_name) {
-                                known_devices.insert(dev_name, camera_device);
-                            }
+                            known_devices.entry(dev_name).or_insert(camera_device);
                         }
                     }
                 }

@@ -13,14 +13,16 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::{device_utils::*, webcam::*};
-use std::ops::Deref;
+use crate::util::camera::{
+    device_utils::{DeviceFormat, DeviceHolder, PathIndex, PossibleDevice, Resolution, StreamType},
+    webcam::{Webcam, WebcamType},
+};
 use std::{
     any::Any,
     cell::{Cell, RefCell},
 };
 use usb_enumeration::{enumerate, Filters};
-use uvc::{DeviceHandle, FormatDescriptor, FrameFormat};
+use uvc::{FormatDescriptor, FrameFormat};
 use v4l::{
     capture::parameters::Parameters, format::Format, fraction::Fraction, framesize::FrameSizeEnum,
     prelude::*, FourCC,
@@ -34,7 +36,7 @@ pub struct V4LinuxDevice {
     pub inner: RefCell<v4l::capture::Device>,
 }
 impl V4LinuxDevice {
-    pub fn new(index: &usize) -> Result<Self, ()> {
+    pub fn new(index: usize) -> Result<Self, ()> {
         let device = match v4l::capture::Device::new(index.clone()) {
             Ok(dev) => dev,
             Err(_why) => {
@@ -70,7 +72,7 @@ impl V4LinuxDevice {
     pub fn new_location(location: &PathIndex) -> Result<Self, ()> {
         return match location {
             PathIndex::Path(p) => V4LinuxDevice::new_path(p),
-            PathIndex::Index(i) => V4LinuxDevice::new(i),
+            PathIndex::Index(i) => V4LinuxDevice::new(i.to_owned()),
         };
     }
 }
@@ -110,7 +112,7 @@ impl Webcam for V4LinuxDevice {
                 v4l2_format = FourCC::new(b"MJPG");
             }
         }
-        match self.inner.borrow().enum_framesizes(v4l2_format) {
+        return match self.inner.borrow().enum_framesizes(v4l2_format) {
             Ok(formats) => {
                 let mut ret: Vec<Resolution> = Vec::new();
                 for fs in formats {
@@ -126,19 +128,48 @@ impl Webcam for V4LinuxDevice {
                     };
                     ret.push(compat);
                 }
-                return Ok(ret);
+                Ok(ret)
             }
-            Err(why) => {
-                return Err(Box::new(
-                    crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
-                        prop: "Supported Resolutions".to_string(),
-                        msg: why.to_string(),
-                    },
-                ))
-            }
+            Err(why) => Err(Box::new(
+                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                    prop: "Supported Resolutions".to_string(),
+                    msg: why.to_string(),
+                },
+            )),
         };
     }
 
+    fn get_supported_formats(
+        &self,
+        _res: Resolution,
+    ) -> Result<Vec<DeviceFormat>, Box<dyn std::error::Error>> {
+        return match self.inner.borrow().enum_formats() {
+            Ok(desc) => {
+                let mut dev_format_list: Vec<DeviceFormat> = Vec::new();
+                for fmt in desc {
+                    // see if the format is either YUYV for MJPG
+                    match &fmt.fourcc.to_string().to_ascii_lowercase().to_owned()[..] {
+                        "yuyv" => {
+                            dev_format_list.push(DeviceFormat::YUYV);
+                        }
+                        "mjpg" | "mjpeg" => {
+                            dev_format_list.push(DeviceFormat::MJPEG);
+                        }
+                        _ => {
+                            // do nothing
+                        }
+                    }
+                }
+                Ok(dev_format_list)
+            }
+            Err(why) => Err(Box::new(
+                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                    prop: "Supported Format (FourCC)".to_string(),
+                    msg: why.to_string(),
+                },
+            )),
+        };
+    }
     fn get_supported_framerate(
         &self,
         res: Resolution,
@@ -173,37 +204,6 @@ impl Webcam for V4LinuxDevice {
             Err(why) => Err(Box::new(
                 crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
                     prop: "Supported Framerates".to_string(),
-                    msg: why.to_string(),
-                },
-            )),
-        };
-    }
-    fn get_supported_formats(
-        &self,
-        _res: Resolution,
-    ) -> Result<Vec<DeviceFormat>, Box<dyn std::error::Error>> {
-        return match self.inner.borrow().enum_formats() {
-            Ok(desc) => {
-                let mut dev_format_list: Vec<DeviceFormat> = Vec::new();
-                for fmt in desc {
-                    // see if the format is either YUYV for MJPG
-                    match &fmt.fourcc.to_string().to_ascii_lowercase().to_owned()[..] {
-                        "yuyv" => {
-                            dev_format_list.push(DeviceFormat::YUYV);
-                        }
-                        "mjpg" | "mjpeg" => {
-                            dev_format_list.push(DeviceFormat::MJPEG);
-                        }
-                        _ => {
-                            // do nothing
-                        }
-                    }
-                }
-                Ok(dev_format_list)
-            }
-            Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
-                    prop: "Supported Format (FourCC)".to_string(),
                     msg: why.to_string(),
                 },
             )),
@@ -277,7 +277,7 @@ impl UVCameraDevice {
     pub fn new(
         vendor_id: Option<i32>,
         product_id: Option<i32>,
-        serial_number: Option<String>,
+        serial_number: &Option<String>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let inner = match crate::UVC.find_device(vendor_id, product_id, serial_number.as_deref()) {
             Ok(dev) => dev,
@@ -394,36 +394,6 @@ impl Webcam for UVCameraDevice {
         }
     }
 
-    fn get_supported_framerate(
-        &self,
-        _res: Resolution,
-    ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
-        match self.inner.open() {
-            Ok(handler) => {
-                let formats: Vec<FormatDescriptor> =
-                    handler.supported_formats().into_iter().map(|f| f).collect();
-                let mut framerates: Vec<u32> = Vec::new();
-                for fmt_desc in formats {
-                    for frame_desc in fmt_desc.supported_formats() {
-                        let mut fps_from_arr: Vec<u32> = frame_desc
-                            .intervals_duration()
-                            .into_iter()
-                            .map(|duration| (1000 / duration.as_millis()) as u32)
-                            .collect();
-                        framerates.append(&mut fps_from_arr);
-                    }
-                }
-                Ok(framerates)
-            }
-            Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
-                    prop: "Supported Resolutions".to_string(),
-                    msg: why.to_string(),
-                },
-            )),
-        }
-    }
-
     fn get_supported_formats(
         &self,
         res: Resolution,
@@ -477,6 +447,36 @@ impl Webcam for UVCameraDevice {
         }
     }
 
+    fn get_supported_framerate(
+        &self,
+        _res: Resolution,
+    ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
+        match self.inner.open() {
+            Ok(handler) => {
+                let formats: Vec<FormatDescriptor> =
+                    handler.supported_formats().into_iter().map(|f| f).collect();
+                let mut framerates: Vec<u32> = Vec::new();
+                for fmt_desc in formats {
+                    for frame_desc in fmt_desc.supported_formats() {
+                        let mut fps_from_arr: Vec<u32> = frame_desc
+                            .intervals_duration()
+                            .into_iter()
+                            .map(|duration| (1000 / duration.as_millis()) as u32)
+                            .collect();
+                        framerates.append(&mut fps_from_arr);
+                    }
+                }
+                Ok(framerates)
+            }
+            Err(why) => Err(Box::new(
+                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                    prop: "Supported Resolutions".to_string(),
+                    msg: why.to_string(),
+                },
+            )),
+        }
+    }
+
     fn get_camera_format(&self) -> DeviceFormat {
         return self.device_format.get();
     }
@@ -491,8 +491,8 @@ impl Webcam for UVCameraDevice {
 
     fn open_stream(&'static self) -> Result<StreamType, Box<dyn std::error::Error>> {
         return match (self.device_resolution.get(), self.device_framerate.get()) {
-            (Some(res), Some(fps)) => {
-                let format = match self.device_format.get() {
+            (Some(_res), Some(_fps)) => {
+                let _format = match self.device_format.get() {
                     DeviceFormat::YUYV => FrameFormat::YUYV,
                     DeviceFormat::MJPEG => FrameFormat::MJPEG,
                 };
@@ -521,10 +521,6 @@ impl Webcam for UVCameraDevice {
                 ),
             )),
         };
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn get_inner(&self) -> PossibleDevice {
@@ -560,6 +556,10 @@ impl Webcam for UVCameraDevice {
             fps,
             fmt,
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 

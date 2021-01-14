@@ -8,7 +8,7 @@ use crate::{
         packet::Processed,
     },
 };
-use downcast_rs::__std::os::raw::c_int;
+
 use flume::Receiver;
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
@@ -72,19 +72,19 @@ impl ViewportHolder {
         _owner: TRef<VSplitContainer>,
         res: Variant,
         fps: Variant,
-        fmt: Variant,
+        _fmt: Variant,
     ) {
-        let res = match Resolution::from_variant(res) {
+        let _resolution = match Resolution::from_variant(&res) {
             Ok(r) => r,
-            Err(_) => panic!("Improper resolution format set!"),
+            Err(_why) => panic!("Improper resolution format set!"),
         };
 
-        let fps = match fps.try_to_i64() {
+        let _framerate = match fps.try_to_i64() {
             Some(fs) => fs as u32,
             None => panic!("Improper resolution format set!"),
         };
 
-        let fmt = DeviceFormat::MJPEG;
+        let _format = DeviceFormat::MJPEG;
 
         let mut ret_bool = false;
 
@@ -118,16 +118,16 @@ impl ViewportHolder {
         }
 
         let vendor = match dev_ven {
-            Some(i) => Some(i as c_int),
+            Some(i) => Some(i32::from(i)),
             None => None,
         };
 
         let product = match dev_prod {
-            Some(i) => Some(i as c_int),
+            Some(i) => Some(i32::from(i)),
             None => None,
         };
 
-        let uvc_device = match UVCameraDevice::new(vendor, product, dev_ser.clone().to_owned()) {
+        let uvc_device = match UVCameraDevice::new(vendor, product, &dev_ser) {
             Ok(d) => d,
             Err(why) => panic!("Error getting device: {}", why.to_string()),
         };
@@ -176,10 +176,10 @@ impl ViewportHolder {
 
         let v4l_device = match V4LinuxDevice::new_location(&dev_locat) {
             Ok(d) => d,
-            Err(why) => panic!("Error getting device!"),
+            Err(_) => panic!("Error getting device!"),
         };
 
-        match Resolution::from_variant(res) {
+        match Resolution::from_variant(&res) {
             Ok(r) => {
                 if let Err(why) = v4l_device.set_resolution(&r) {
                     panic!("Improper resolution format set: {}!", why.to_string())
@@ -201,7 +201,7 @@ impl ViewportHolder {
             None => panic!("Improper resolution format set!"),
         };
 
-        match DeviceFormat::from_variant(fmt) {
+        match DeviceFormat::from_variant(&fmt) {
             Ok(ft) => {
                 v4l_device.set_camera_format(ft);
             }

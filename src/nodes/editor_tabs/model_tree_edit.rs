@@ -15,7 +15,7 @@
 
 use crate::nodes::editor_tabs::util::create_editable_item;
 use gdnative::{
-    api::{tree::Tree, tree_item::*},
+    api::{tree::Tree, tree_item::TreeItem},
     prelude::*,
     NativeClass,
 };
@@ -65,7 +65,10 @@ impl ModelTreeEditor {
                 .unwrap()
                 .assume_safe()
         };
-        create_editable_item(model_offset_editor_x.clone(), "X Offset");
+        create_editable_item(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_x),
+            "X Offset",
+        );
         // Y Modifier
         let model_offset_editor_y: &TreeItem = unsafe {
             &*owner
@@ -73,7 +76,10 @@ impl ModelTreeEditor {
                 .unwrap()
                 .assume_safe()
         };
-        create_editable_item(model_offset_editor_y.clone(), "Y Offset");
+        create_editable_item(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_y),
+            "Y Offset",
+        );
         // Z Modifier
         let model_offset_editor_z: &TreeItem = unsafe {
             &*owner
@@ -81,6 +87,9 @@ impl ModelTreeEditor {
                 .unwrap()
                 .assume_safe()
         };
-        create_editable_item(model_offset_editor_z.clone(), "Z Offset");
+        create_editable_item(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_z),
+            "Z Offset",
+        );
     }
 }

@@ -97,7 +97,7 @@ impl WebcamInputEditor {
     }
 
     fn new(_owner: &Tree) -> Self {
-        let dev_list = RefCell::new(enumerate_cache_device().unwrap_or(HashMap::new()));
+        let dev_list = RefCell::new(enumerate_cache_device().unwrap_or_default());
         WebcamInputEditor {
             device_list: dev_list,
             device_selected: RefCell::new(None),
@@ -252,7 +252,7 @@ impl WebcamInputEditor {
                     .unwrap()
                     .assume_safe()
             };
-            let clicked_string = clicked_item.get_text(0).to_string().to_owned();
+            let clicked_string = clicked_item.get_text(0).to_string();
             match &clicked_string[..] {
                 "Input Webcam:" => {
                     let camera_popup = unsafe {
@@ -430,7 +430,7 @@ impl WebcamInputEditor {
                 .assume_safe()
         };
         let clicked_popup = camera_popup
-            .get_item_text(camera_popup.get_item_index(id as i64))
+            .get_item_text(camera_popup.get_item_index(i64::from(id)))
             .to_string();
         // set selected device
 
@@ -461,9 +461,9 @@ impl WebcamInputEditor {
                 .assume_safe()
         };
         let clicked_popup = resolution_popup
-            .get_item_text(resolution_popup.get_item_index(id as i64))
+            .get_item_text(resolution_popup.get_item_index(i64::from(id)))
             .to_string();
-        let resolutin_string_vec: Vec<&str> = clicked_popup.split("x").into_iter().collect();
+        let resolutin_string_vec: Vec<&str> = clicked_popup.split('x').into_iter().collect();
         let res = Resolution {
             x: resolutin_string_vec.get(0).unwrap().parse::<u32>().unwrap(),
             y: resolutin_string_vec.get(1).unwrap().parse::<u32>().unwrap(),
@@ -493,7 +493,7 @@ impl WebcamInputEditor {
                 .assume_safe()
         };
         let clicked_popup = framerate_popup
-            .get_item_text(framerate_popup.get_item_index(id as i64))
+            .get_item_text(framerate_popup.get_item_index(i64::from(id)))
             .to_string();
         let fps_int = clicked_popup.parse::<i32>().unwrap();
         *self.fps_selected.borrow_mut() = Some(fps_int);
@@ -557,16 +557,16 @@ impl WebcamInputEditor {
         };
 
         let res = match &*self.resolution_selected.borrow() {
-            Some(r) => r.clone(),
+            Some(r) => *r,
             None => return,
         };
 
-        let fps = match &*self.fps_selected.borrow() {
-            Some(r) => r.clone() as u32,
+        let framerate = match &*self.fps_selected.borrow() {
+            Some(r) => *r as u32,
             None => return,
         };
 
-        let possible = PossibleDevice::from_cached_device(&dev, res, fps, DeviceFormat::MJPEG);
+        let possible = PossibleDevice::from_cached_device(&dev, res, framerate, DeviceFormat::MJPEG);
 
         let device_contact = possible.to_device_contact();
 
@@ -587,15 +587,15 @@ impl WebcamInputEditor {
                     "new_input_processer_uvc",
                     &[
                         Variant::from_vector2(&resolution),
-                        Variant::from_i64(fps as i64),
+                        Variant::from_i64(i64::from(fps)),
                     ],
                 );
             }
             crate::util::camera::device_utils::PossibleDevice::V4L2 {
-                location,
+                location: _location,
                 res,
                 fps,
-                fmt,
+                fmt: _fmt,
             } => {
                 let resolution = Vector2::new(res.x as f32, res.y as f32);
                 crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
@@ -603,7 +603,7 @@ impl WebcamInputEditor {
                     "new_input_processer_v4l",
                     &[
                         Variant::from_vector2(&resolution),
-                        Variant::from_i64(fps as i64),
+                        Variant::from_i64(i64::from(fps)),
                     ],
                 );
             }
@@ -612,33 +612,24 @@ impl WebcamInputEditor {
 
     #[export]
     pub fn check_button_eligibility(&self, owner: TRef<Tree>) {
-        if let Some(_) = &*self.device_selected.borrow_mut() {
-            if let Some(_) = &*self.resolution_selected.borrow_mut() {
-                if let Some(_) = &*self.fps_selected.borrow_mut() {
-                    let button = unsafe {
-                        owner
-                            .get_node("../StartButton")
-                            .unwrap()
-                            .assume_safe()
-                            .cast::<Button>()
-                            .unwrap()
-                    };
-                    button.set_disabled(false);
-                }
-            }
+        if self.device_selected.borrow_mut().is_some() && self.resolution_selected.borrow_mut().is_some() && self.fps_selected.borrow_mut().is_some() {
+            let button = unsafe {
+                owner
+                    .get_node("../StartButton")
+                    .unwrap()
+                    .assume_safe()
+                    .cast::<Button>()
+                    .unwrap()
+            };
+            button.set_disabled(false);
         }
     }
 
     // updates the device list to look for new devices, etc
     fn update_device_list(&self) {
         self.device_list.borrow_mut().clear();
-        match enumerate_cache_device() {
-            Some(new_list) => {
-                *self.device_list.borrow_mut() = new_list;
-            }
-            None => {
-                // do nothing
-            }
+        if let Some(new_list) = enumerate_cache_device() {
+            *self.device_list.borrow_mut() = new_list;
         };
     }
 
@@ -667,12 +658,12 @@ impl WebcamInputEditor {
                 let mut clearable = false;
                 loop {
                     // see if the child is a custom tree item
-                    if child.get_text(0).to_string() != "Input Webcam:".to_string()
+                    if child.get_text(0).to_string() != *"Input Webcam:"
                         && child.get_cell_mode(1) == TreeCellMode::CUSTOM
                         && clearable
                     {
                         child.set_text(1, "");
-                    } else if child.get_text(0).to_string() == "Input Webcam:".to_string() {
+                    } else if child.get_text(0).to_string() == *"Input Webcam:" {
                         clearable = true;
                     }
                     if let Some(a) = child.get_next() {
@@ -698,12 +689,12 @@ impl WebcamInputEditor {
                 let mut clearable = false;
                 loop {
                     // see if the child is a custom tree item
-                    if child.get_text(0).to_string() != "Webcam Video Format:".to_string()
+                    if child.get_text(0).to_string() != *"Webcam Video Format:"
                         && child.get_cell_mode(1) == TreeCellMode::CUSTOM
                         && clearable
                     {
                         child.set_text(1, "");
-                    } else if child.get_text(0).to_string() == "Webcam Video Format:".to_string() {
+                    } else if child.get_text(0).to_string() == *"Webcam Video Format:" {
                         clearable = true;
                     }
                     if let Some(a) = child.get_next() {
@@ -728,12 +719,12 @@ impl WebcamInputEditor {
                 let mut clearable = false;
                 loop {
                     // see if the child is a custom tree item
-                    if child.get_text(0).to_string() != "Webcam Resolution:".to_string()
+                    if child.get_text(0).to_string() != *"Webcam Resolution:"
                         && child.get_cell_mode(1) == TreeCellMode::CUSTOM
                         && clearable
                     {
                         child.set_text(1, "");
-                    } else if child.get_text(0).to_string() == "Webcam Resolution:".to_string() {
+                    } else if child.get_text(0).to_string() == *"Webcam Resolution:" {
                         clearable = true;
                     }
                     if let Some(a) = child.get_next() {

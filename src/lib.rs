@@ -17,6 +17,15 @@
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
 #![allow(clippy::clippy::module_name_repetitions)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::unused_self)]
+#![allow(clippy::match_wild_err_arm)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::cast_precision_loss)]
 
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
@@ -42,7 +51,6 @@ lazy_static! {
 
 thread_local! {
     pub(crate) static CURRENT_DEVICE: RefCell<Option<DeviceContact>> = RefCell::new(None);
-    pub(crate) static UVC_DEV_H: RefCell<Option<uvc::DeviceHandle<'static>>> = RefCell::new(None);
 }
 
 fn init(handle: InitHandle) {
