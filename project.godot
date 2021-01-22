@@ -18,7 +18,7 @@ _global_script_class_icons={
 config/name="Open 2 Dh"
 run/main_scene="res://Open2DH.tscn"
 run/low_processor_mode=true
-run/low_processor_mode_sleep_usec=6969
+run/low_processor_mode_sleep_usec=3000
 config/icon="res://icon.png"
 
 [display]

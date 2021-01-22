@@ -85,13 +85,12 @@ impl WebcamInputEditor {
                     export_info: ExportInfo::new(VariantType::I64),
                     usage: PropertyUsage::DEFAULT,
                 },
-                // frameformat
             ],
         });
 
-        // kill thread and release lazy static signal
+        // kill input processer sigbal
         builder.add_signal(Signal {
-            name: "input_kill",
+            name: "kill_input_process",
             args: &[],
         });
     }
@@ -539,9 +538,8 @@ impl WebcamInputEditor {
 
     #[export]
     pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {
+        owner.emit_signal("kill_input_process", &[]);
         self.update_device_list();
-
-        owner.emit_signal("input_kill", &[]);
 
         let dev = match self.device_list.borrow().get(
             &*self

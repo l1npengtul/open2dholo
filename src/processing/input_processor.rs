@@ -54,6 +54,7 @@ impl InputProcessing {
     pub fn new(device: PossibleDevice) -> Result<Self, ()> {
         let (to_thread_tx, to_thread_rx) = flume::unbounded();
         let (from_thread_tx, from_thread_rx) = flume::unbounded();
+        godot_print!("a");
         let thread = match Builder::new()
             .name(format!("input-processor-senpai_{}", 1))
             .spawn(move || input_process_func(to_thread_rx, from_thread_tx, device))
@@ -73,7 +74,7 @@ impl InputProcessing {
     }
 
     //pub fn get_output_handler
-    pub fn kill(&self) {
+    pub fn kill(&mut self) {
         if self.sender_p1.send(MessageType::Die(0)).is_err() {
             // /shrug if this fails to send we're fucked
         }
@@ -95,10 +96,7 @@ fn input_process_func(
     send: Sender<Processed>,
     startup_dev: PossibleDevice,
 ) -> Result<(), Box<ProcessingError>> {
-    // std::thread::sleep(Duration::from_millis(100));
-
-    let thread_pool = ScheduledThreadPool::with_name("input_processer-{}", 2); // Use num_threads from processing
-    godot_print!("thread");
+    std::thread::sleep(Duration::from_millis(100));
 
     match startup_dev {
         PossibleDevice::UVCAM {
@@ -154,23 +152,6 @@ fn input_process_func(
                         )
                     };
                     let cloned_send = send.clone();
-
-                    thread_pool.execute(move || {
-                        match find_landmarks(&image) {
-                            ProcessedPacket::FacialLandmark(landmarks) => {
-                                // stonks
-                                if cloned_send.send(landmarks).is_err() {
-                                    // ooh yeah i care about errors
-                                }
-                            }
-                            ProcessedPacket::None => {
-                                std::thread::sleep(Duration::from_millis(50));
-                            }
-                            ProcessedPacket::GeneralError(_)
-                            | ProcessedPacket::MissingFacialPointsError(_)
-                            | ProcessedPacket::MissingFileError(_) => {}
-                        }
-                    });
                 },
                 cnt,
             ) {
@@ -214,6 +195,8 @@ fn input_process_func(
                     ))))
                 }
             };
+
+            // godot_print!("c");
 
             let mut stream = match Stream::with_buffers(&v4l_device, Type::VideoCapture, 4) {
                 Ok(s) => s,
@@ -275,26 +258,7 @@ fn input_process_func(
                     let image = unsafe {
                         ImageMatrix::new(res.x as usize, res.y as usize, buffer.as_ptr())
                     };
-                    godot_print!("img");
-                    // aaa go crazy
-                    let cloned_send = send.clone();
-                    thread_pool.execute(move || {
-                        match find_landmarks(&image) {
-                            ProcessedPacket::FacialLandmark(landmarks) => {
-                                // stonks
-                                if cloned_send.send(landmarks).is_err() {
-                                    // ooh yeah i care about errors
-                                }
-                                godot_print!("img");
-                            }
-                            ProcessedPacket::None => {
-                                std::thread::sleep(Duration::from_millis(50));
-                            }
-                            ProcessedPacket::GeneralError(_)
-                            | ProcessedPacket::MissingFacialPointsError(_)
-                            | ProcessedPacket::MissingFileError(_) => {}
-                        }
-                    });
+                // aaa go crazy
                 } else {
                     return Err(Box::new(ProcessingError::General(
                         "Error capturing V4L2 buffer".to_string(),
@@ -371,11 +335,11 @@ fn make_uvc_device<'a>(
 fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
     let faces = FaceDetector::new().face_locations(img).to_vec();
     let faces2 = faces;
-    let largest_rectangle = match faces2.get(0) {
-        Some(rt) => rt,
-        None => {
-            return ProcessedPacket::None;
-        }
+    let largest_rectangle = if let Some(rt) = faces2.get(0) {
+        rt
+    } else {
+        godot_print!("no face!");
+        return ProcessedPacket::None;
     };
 
     // Get facial landmarks
@@ -383,6 +347,7 @@ fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
     let landmark_getter = match LandmarkPredictor::new(filename) {
         Ok(detector) => detector,
         Err(_why) => {
+            godot_print!("no file!");
             return ProcessedPacket::MissingFileError(String::from(filename));
         }
     };
@@ -396,3 +361,5 @@ fn find_landmarks(img: &ImageMatrix) -> ProcessedPacket {
         ProcessedPacket::MissingFacialPointsError(AtomicUsize::from(landmarks.len()))
     }
 }
+
+fn find_landmark_tf() {}

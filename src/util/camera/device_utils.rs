@@ -177,16 +177,17 @@ impl Display for Resolution {
 }
 
 impl PartialOrd for Resolution {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let total_self = self.x;
-        let total_other = other.x;
-        if total_self > total_other {
-            Some(Ordering::Greater)
-        } else if total_self < total_other {
-            Some(Ordering::Less)
-        } else {
-            Some(Ordering::Equal)
-        }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Resolution {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let selfint = format!("{}{}", self.x, self.y).parse::<i64>().unwrap();
+        let otherint = format!("{}{}", other.x, other.y).parse::<i64>().unwrap();
+
+        selfint.cmp(&otherint)
     }
 }
 #[derive(Copy, Clone)]
@@ -369,13 +370,15 @@ impl CachedDevice {
     pub fn from_webcam(camera: &Box<dyn Webcam>) -> Result<Self, ()> {
         let device_name = camera.name();
         let device_location = DeviceContact::from(camera.get_inner());
-        let resolutions = match camera.get_supported_resolutions() {
+        let mut resolutions = match camera.get_supported_resolutions() {
             Ok(res) => res,
             Err(why) => {
                 println!("{}", why.to_string());
                 return Err(());
             }
         };
+
+        resolutions.sort();
 
         let mut fmt_res_mjpg: HashMap<Resolution, Vec<u32>> = HashMap::new();
         let mut fmt_res_yuyv: HashMap<Resolution, Vec<u32>> = HashMap::new();

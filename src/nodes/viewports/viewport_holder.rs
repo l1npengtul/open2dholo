@@ -1,8 +1,8 @@
 use crate::util::camera::camera_device::{UVCameraDevice, V4LinuxDevice};
-use crate::util::camera::device_utils::{DeviceContact, PathIndex};
+use crate::util::camera::device_utils::{DeviceContact, PathIndex, PossibleDevice};
 use crate::util::camera::webcam::Webcam;
 use crate::{
-    processing::input_processer::InputProcessing,
+    processing::input_processor::InputProcessing,
     util::{
         camera::device_utils::{DeviceFormat, Resolution},
         packet::Processed,
@@ -51,6 +51,16 @@ impl ViewportHolder {
         ) {
             panic!("Failed to connect signals: {}!", why.to_string())
         }
+
+        if let Err(why) = emitter.connect(
+            "kill_input_process",
+            owner,
+            "on_kill_signal",
+            VariantArray::new_shared(),
+            0,
+        ) {
+            panic!("Failed to connect signals: {}!", why.to_string())
+        }
     }
 
     #[export]
@@ -63,6 +73,13 @@ impl ViewportHolder {
             if let Ok(_pro) = a.try_recv() {
                 godot_print!("Processed Packet!");
             }
+        }
+    }
+
+    #[export]
+    pub fn on_kill_signal(&self, _owner: TRef<VSplitContainer>) {
+        if let Some(mut input) = self.input_processer.replace(None) {
+            input.kill();
         }
     }
 

@@ -3,6 +3,7 @@ name = "open2dh"
 version = "0.1.0"
 authors = ["l1npengtul <l1npengtul@protonmail.com>"]
 edition = "2018"
+license = "GPL-3.0-or-later"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 # with every dependency added we get closer and closer to NPM levels of dependency
@@ -12,13 +13,13 @@ parking_lot = "0.11.1"
 flume = "0.10.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.22"
-cv-core = "0.15.0"
 ron = "0.6.2"
 serde = "1.0.117"
 usb_enumeration = "0.1.0"
+regex = "1.4.2"
+tch = "0.3.1"
 downcast-rs = "1.2.0"
 scheduled-thread-pool = "0.2.5"
-regex = "1.4.2"
 
 [dependencies.uvc] # TODO: Change back to cargo crate when updated
 version = "0.2.0"
@@ -36,9 +37,13 @@ features = ["embed-all"]
 version = "0.12.0"
 features = ["v4l2-sys"]
 
-#[dependencies.opencv]
-#version = "0.46.3"
-#features = ["buildtime-bindgen", "clang-runtime"]
+[dependencies.opencv]
+version = "0.48.0"
+features = ["buildtime-bindgen", "clang-runtime"]
+
+[dependencies.tensorflow]
+version = "0.16.1"
+features = ["tensorflow_gpu"]
 
 [lib]
 crate-type = ["cdylib"]
