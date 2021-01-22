@@ -1,4 +1,4 @@
-# Open2DH
+<h1 align="center">Open2DHolo</h1>
 "Its facerig but worse and open source" 
 - Sun Tzu, *The Art of VTubers*
 ## Contributing
