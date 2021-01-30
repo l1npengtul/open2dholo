@@ -1,4 +1,4 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an anime girl.
+//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
 //     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
@@ -15,4 +15,5 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod camera;
+pub mod macros;
 pub mod packet;

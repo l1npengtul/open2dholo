@@ -1,4 +1,4 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an anime girl.
+//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
 //     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
@@ -30,6 +30,7 @@
 
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
+use pyo3::prelude::*;
 use std::cell::RefCell;
 
 pub mod configuration;
@@ -48,6 +49,11 @@ lazy_static! {
         let ctx = uvc::Context::new();
         ctx.expect("Could not get UVC Context! Aborting!")
     };
+    static ref USER_DIR: String = {
+        gdnative::api::OS::godot_singleton()
+            .get_user_data_dir()
+            .to_string()
+    };
 }
 
 thread_local! {
@@ -55,6 +61,8 @@ thread_local! {
 }
 
 fn init(handle: InitHandle) {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
     handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
     handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<crate::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();

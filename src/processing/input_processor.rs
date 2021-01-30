@@ -1,3 +1,4 @@
+//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
 //     Copyright (C) 2020-2021l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
@@ -13,6 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::processing::face_detector::facial_existance::FacialDetector;
 use crate::{
     error::processing_error::ProcessingError,
     util::{
@@ -97,6 +99,15 @@ fn input_process_func(
     startup_dev: PossibleDevice,
 ) -> Result<(), Box<ProcessingError>> {
     std::thread::sleep(Duration::from_millis(100));
+    let mut face_detector = match FacialDetector::new(
+        "deploy.prototxt",
+        "res10_300x300_ssd_iter_140000.caffemodel",
+    ) {
+        Ok(face) => face,
+        Err(_why) => {
+            panic!("could not get DNN!")
+        }
+    };
 
     match startup_dev {
         PossibleDevice::UVCAM {
@@ -139,19 +150,20 @@ fn input_process_func(
                 }
             };
 
+            // face_detector.detect_face(
+            //     frame.height() as i32,
+            //     frame.width() as i32,
+            //     frame.to_rgb().unwrap().to_bytes(),
+            // );
+
+            let (img_send, img_recv) = flume::unbounded();
             let cnt = Arc::new(AtomicUsize::new(0));
 
             let stream = match stream_handler.start_stream(
                 move |frame, _count| {
                     // aaaa go crazy
-                    let image = unsafe {
-                        ImageMatrix::new(
-                            frame.width() as usize,
-                            frame.height() as usize,
-                            frame.to_rgb().unwrap().to_bytes().as_ptr(),
-                        )
-                    };
-                    let cloned_send = send.clone();
+                    let img_data = frame.to_rgb().unwrap().to_bytes().to_vec();
+                    img_send.send(img_data);
                 },
                 cnt,
             ) {
@@ -165,6 +177,9 @@ fn input_process_func(
             };
 
             loop {
+                if let Ok(img) = img_recv.try_recv() {
+                    face_detector.detect_face(res.x, res.y, img.as_slice());
+                }
                 if let Ok(message) = recv.try_recv() {
                     match message {
                         MessageType::Die(_) | MessageType::Close(_) => {
@@ -174,7 +189,6 @@ fn input_process_func(
                         _ => continue,
                     }
                 }
-                std::thread::sleep(Duration::from_millis(50))
             }
         }
         PossibleDevice::V4L2 {
@@ -255,9 +269,7 @@ fn input_process_func(
                 //let mut cnt = Arc::new(AtomicUsize::new(0));
 
                 if let Ok((buffer, _meta)) = stream.next() {
-                    let image = unsafe {
-                        ImageMatrix::new(res.x as usize, res.y as usize, buffer.as_ptr())
-                    };
+                    face_detector.detect_face(res.x, res.y, buffer);
                 // aaa go crazy
                 } else {
                     return Err(Box::new(ProcessingError::General(
