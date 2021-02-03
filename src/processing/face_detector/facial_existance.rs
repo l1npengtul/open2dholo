@@ -63,7 +63,7 @@ impl FacialDetector {
                 false,
                 5,
             )
-            .unwrap(),
+                .unwrap(),
             Err(why) => {
                 panic!("{}", why.to_string())
             }
@@ -73,11 +73,12 @@ impl FacialDetector {
 
 #[derive(Copy, Clone)]
 pub struct FaceBox {
-    x_left_bottom: i32,
-    x_right_bottom: i32,
-    y_left_top: i32,
-    y_right_top: i32,
+    pub(crate) x_left_bottom: i32,
+    pub(crate) x_right_bottom: i32,
+    pub(crate) y_left_top: i32,
+    pub(crate) y_right_top: i32,
 }
+
 impl FaceBox {
     pub fn new(x_left_bottom: i32, x_right_bottom: i32, y_left_top: i32, y_right_top: i32) -> Self {
         FaceBox {

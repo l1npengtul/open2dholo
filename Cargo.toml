@@ -23,7 +23,7 @@ scheduled-thread-pool = "0.2.5"
 nalgebra = "0.24.0"
 image = "0.23.12"
 
-[dependencies.uvc] 
+[dependencies.uvc]
 version = "0.2.0"
 features = ["vendor"]
 

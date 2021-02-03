@@ -61,8 +61,6 @@ thread_local! {
 }
 
 fn init(handle: InitHandle) {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
     handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
     handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<crate::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();
