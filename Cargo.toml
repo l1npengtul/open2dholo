@@ -51,9 +51,6 @@ version = "0.2"
 default-features = false
 features = ["opencv-4", "opencv-buildtime-bindgen", "nalgebra", "image"]
 
-[dependencies.pyo3]
-version = "0.13.1"
-features = ["extension-module"]
 
 [lib]
 crate-type = ["cdylib"]

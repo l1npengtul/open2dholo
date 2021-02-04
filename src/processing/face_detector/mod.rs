@@ -14,7 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod face_align;
 pub mod facial_existance;
 pub mod head_pose;
 pub mod util_funcs;
+pub mod detectors;
