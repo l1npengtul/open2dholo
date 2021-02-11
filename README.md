@@ -1,7 +1,14 @@
 <h1 align="center">Open2DHolo</h1>
 "Its facerig but worse and open source" 
-- Sun Tzu, *The Art of VTubers*
-<h3> Contributing</h3>
+- Sun Tzu, <em>The Art of VTubers</em>
+
+<h3>Installing</h3>
+<h4>Linux: </h4>
+
+<h4>Windows: </h4>
+You need Visual 
+
+<h3>Contributing</h3>
 
 - Please `rustfmt` all your code.
 

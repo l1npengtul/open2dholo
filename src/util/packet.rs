@@ -19,6 +19,7 @@ use dlib_face_recognition::Point;
 use std::sync::atomic::AtomicUsize;
 
 // TODO: Change to acutal data format
+#[derive(Clone)]
 pub enum MessageType {
     Die(u8),
     Set(PossibleDevice),

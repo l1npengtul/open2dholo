@@ -15,10 +15,8 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::util::camera::device_utils::{DeviceFormat, PossibleDevice, Resolution, StreamType};
-use downcast_rs::DowncastSync;
-use std::any::Any;
 
-pub trait Webcam: DowncastSync {
+pub trait Webcam<'a> {
     fn name(&self) -> String;
     fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>>;
     fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>>;
@@ -34,15 +32,22 @@ pub trait Webcam: DowncastSync {
     fn get_camera_format(&self) -> DeviceFormat;
     fn set_camera_format(&self, format: DeviceFormat);
     fn get_camera_type(&self) -> WebcamType;
-    fn open_stream(&'static self) -> Result<StreamType, Box<dyn std::error::Error>>;
+    fn open_stream(&'a self) -> Result<StreamType<'a>, Box<dyn std::error::Error + 'a>>;
     fn get_inner(&self) -> PossibleDevice;
-    fn as_any(&self) -> &dyn Any;
+    // fn as_any(&self) -> &dyn Any;
 }
-
-downcast_rs::impl_downcast!(sync Webcam);
 
 #[derive(Copy, Clone)]
 pub enum WebcamType {
     V4linux2,
     USBVideo,
+}
+
+impl WebcamType {
+    pub fn from_possible_device(pd: &PossibleDevice) -> Self {
+        return match pd {
+            PossibleDevice::UVCAM { .. } => WebcamType::USBVideo,
+            PossibleDevice::V4L2 { .. } => WebcamType::V4linux2,
+        };
+    }
 }

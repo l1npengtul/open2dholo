@@ -195,6 +195,32 @@ impl WebcamInputEditor {
         owner.set_hide_root(true);
         owner.set_columns(2);
 
+        let camera_settings_item: &TreeItem = unsafe {
+            &*owner
+                .create_item(root_item.assume_shared(), 6)
+                .unwrap()
+                .assume_safe()
+        };
+
+        camera_settings_item.set_disable_folding(false);
+        camera_settings_item.set_collapsed(false);
+        camera_settings_item.set_text(0, "Webcam Input Settings");
+        camera_settings_item.set_text_align(0, TreeItem::ALIGN_CENTER);
+        camera_settings_item.set_selectable(1, false);
+
+        let face_detection_settings: &TreeItem = unsafe {
+            &*owner
+                .create_item(root_item.assume_shared(), 7)
+                .unwrap()
+                .assume_safe()
+        };
+
+        face_detection_settings.set_disable_folding(false);
+        face_detection_settings.set_collapsed(true);
+        face_detection_settings.set_text(0, "Face Detection Input Settigns");
+        face_detection_settings.set_text_align(0, TreeItem::ALIGN_CENTER);
+        face_detection_settings.set_selectable(1, false);
+
         // get ready for some UI spaghetti
         let webcam_video_input: &TreeItem = unsafe {
             &*owner
@@ -206,9 +232,18 @@ impl WebcamInputEditor {
         webcam_video_input.set_text_align(0, TreeItem::ALIGN_LEFT);
         webcam_video_input.set_disable_folding(false);
 
-        create_custom_editable_item(owner, root_item, "Input Webcam:", 2);
-        create_custom_editable_item(owner, root_item, "Webcam Resolution:", 4);
-        create_custom_editable_item(owner, root_item, "Webcam Frame Rate:", 5);
+        create_custom_editable_item(owner, camera_settings_item, "Input Webcam:", 2);
+        create_custom_editable_item(owner, camera_settings_item, "Webcam Resolution:", 4);
+        create_custom_editable_item(owner, camera_settings_item, "Webcam Frame Rate:", 5);
+
+        // 2: Where did 3 go?
+        // 5: 4 8 3.
+        // 4: you're next 2
+        // 2: .
+        // 5: ㅋㅋㅋㅋㅋㅋ
+
+        create_custom_editable_item(owner, face_detection_settings, "Detector Hardware:", 8); // CPU, GPGPU(CUDA/ROCm)
+        create_custom_editable_item(owner, face_detection_settings, "Detector Type:", 9); // DLIB_FHOG, DLIB_CNN, <insert other face reconizer here>
 
         if let Err(_why) = owner.connect(
             "custom_popup_edited",
@@ -563,10 +598,7 @@ impl WebcamInputEditor {
             None => return,
         };
 
-        let possible =
-            PossibleDevice::from_cached_device(&dev, res, framerate, DeviceFormat::MJPEG);
-
-        let device_contact = possible.to_device_contact();
+        let possible = PossibleDevice::from_cached_device(dev, res, framerate, DeviceFormat::MJPEG);
 
         match possible {
             crate::util::camera::device_utils::PossibleDevice::UVCAM {
@@ -579,7 +611,7 @@ impl WebcamInputEditor {
             } => {
                 let resolution = Vector2::new(res.x as f32, res.y as f32);
 
-                crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
+                // crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
 
                 owner.emit_signal(
                     "new_input_processer_uvc",
@@ -596,7 +628,7 @@ impl WebcamInputEditor {
                 fmt: _fmt,
             } => {
                 let resolution = Vector2::new(res.x as f32, res.y as f32);
-                crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
+                // crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
                 owner.emit_signal(
                     "new_input_processer_v4l",
                     &[

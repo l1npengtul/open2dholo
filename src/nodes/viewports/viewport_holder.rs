@@ -17,22 +17,23 @@
 use crate::util::camera::camera_device::{UVCameraDevice, V4LinuxDevice};
 use crate::util::camera::device_utils::{DeviceContact, PathIndex, PossibleDevice};
 use crate::util::camera::webcam::Webcam;
-use crate::{
-    processing::input_processor::InputProcessing,
-    util::{
-        camera::device_utils::{DeviceFormat, Resolution},
-        packet::Processed,
-    },
+use crate::util::{
+    camera::device_utils::{DeviceFormat, Resolution},
+    packet::Processed,
 };
 
+use crate::processing::input_processor::InputProcessingThreadless;
 use flume::Receiver;
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+use uvc::ActiveStream;
 
 #[derive(NativeClass)]
 #[inherit(VSplitContainer)]
 pub struct ViewportHolder {
-    input_processer: RefCell<Option<InputProcessing>>,
+    input_processer: RefCell<Option<PossibleDevice>>,
     process_channel: RefCell<Option<Receiver<Processed>>>,
 }
 
@@ -94,9 +95,9 @@ impl ViewportHolder {
 
     #[export]
     pub fn on_kill_signal(&self, _owner: TRef<VSplitContainer>) {
-        if let Some(mut input) = self.input_processer.replace(None) {
-            input.kill();
-        }
+        //     if let Some(mut input) = self.input_processer.replace(None) {
+        //         input.kill();
+        //     }
     }
 
     #[export]
@@ -159,19 +160,19 @@ impl ViewportHolder {
             None => None,
         };
 
-        let uvc_device = match UVCameraDevice::new(vendor, product, &dev_ser) {
+        let uvc_device = match UVCameraDevice::new(vendor, product, dev_ser) {
             Ok(d) => d,
             Err(why) => panic!("Error getting device: {}", why.to_string()),
         };
 
         // start the input processer
-        let input_processer = match InputProcessing::new(uvc_device.get_inner()) {
-            Ok(input) => input,
-            Err(_) => panic!("Cannot start input processer!"),
-        };
-        let channel = input_processer.get_thread_output();
-        *self.input_processer.borrow_mut() = Some(input_processer);
-        *self.process_channel.borrow_mut() = Some(channel);
+        // let input_processer = match InputProcessing::new(uvc_device.get_inner()) {
+        //     Ok(input) => input,
+        //     Err(_) => panic!("Cannot start input processer!"),
+        // };
+        // let channel = input_processer.get_thread_output();
+        // *self.input_processer.borrow_mut() = Some(input_processer);
+        // *self.process_channel.borrow_mut() = Some(channel);
     }
 
     #[export]
@@ -205,7 +206,7 @@ impl ViewportHolder {
             return;
         }
 
-        let v4l_device = match V4LinuxDevice::new_location(&dev_locat) {
+        let v4l_device = match V4LinuxDevice::new_location(dev_locat) {
             Ok(d) => d,
             Err(_) => panic!("Error getting device!"),
         };
@@ -237,25 +238,25 @@ impl ViewportHolder {
         godot_print!("a");
 
         // start the input processer
-        let input_processer = match InputProcessing::new(v4l_device.get_inner()) {
-            Ok(input) => input,
-            Err(_) => panic!("Cannot start input processer!"),
-        };
+        // let input_processer = match InputProcessing::new(v4l_device.get_inner()) {
+        //     Ok(input) => input,
+        //     Err(_) => panic!("Cannot start input processer!"),
+        // };
 
-        let channel = input_processer.get_thread_output();
-        *self.input_processer.borrow_mut() = Some(input_processer);
-        *self.process_channel.borrow_mut() = Some(channel);
+        // let channel = input_processer.get_thread_output();
+        // *self.input_processer.borrow_mut() = Some(input_processer);
+        // *self.process_channel.borrow_mut() = Some(channel);
     }
 
     fn kill_input_processer(&mut self) {
-        if let Some(processer) = self.input_processer.get_mut() {
-            processer.kill();
-        }
+        // if let Some(processer) = self.input_processer.get_mut() {
+        //     // processer.kill();
+        // }
     }
 }
 
-impl Drop for ViewportHolder {
+impl<'a> Drop for ViewportHolder {
     fn drop(&mut self) {
-        self.kill_input_processer();
+        // self.kill_input_processer();
     }
 }

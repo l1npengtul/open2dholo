@@ -14,10 +14,17 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::error::invalid_device_error::InvalidDeviceError;
+use crate::util::camera::device_utils::get_os_webcam_index;
 use crate::util::camera::{
     device_utils::{DeviceFormat, DeviceHolder, PathIndex, PossibleDevice, Resolution, StreamType},
     webcam::{Webcam, WebcamType},
 };
+use opencv::core::Mat;
+use opencv::videoio::{VideoCapture, VideoCaptureProperties, VideoCaptureTrait};
+use opencv::viz::get_window_by_name;
+use opencv::Error;
+use std::cell::{BorrowMutError, RefMut};
 use std::{
     any::Any,
     cell::{Cell, RefCell},
@@ -55,7 +62,7 @@ impl V4LinuxDevice {
             inner: RefCell::new(device),
         })
     }
-    pub fn new_path(path: &str) -> Result<Self, ()> {
+    pub fn new_path(path: String) -> Result<Self, ()> {
         let device = match v4l::Device::with_path(path.to_string()) {
             Ok(dev) => dev,
             Err(_why) => {
@@ -63,7 +70,7 @@ impl V4LinuxDevice {
             }
         };
         let device_type = WebcamType::V4linux2;
-        let device_path = PathIndex::Path(path.to_string());
+        let device_path = PathIndex::Path(path);
         Ok(V4LinuxDevice {
             device_type,
             device_format: Cell::new(DeviceFormat::MJPEG),
@@ -71,15 +78,14 @@ impl V4LinuxDevice {
             inner: RefCell::new(device),
         })
     }
-
-    pub fn new_location(location: &PathIndex) -> Result<Self, ()> {
+    pub fn new_location(location: PathIndex) -> Result<Self, ()> {
         match location {
             PathIndex::Path(p) => V4LinuxDevice::new_path(p),
             PathIndex::Index(i) => V4LinuxDevice::new(i.to_owned()),
         }
     }
 }
-impl Webcam for V4LinuxDevice {
+impl<'a> Webcam<'a> for V4LinuxDevice {
     fn name(&self) -> String {
         let device_name = match self.inner.borrow().query_caps() {
             Ok(capability) => capability.card,
@@ -189,9 +195,9 @@ impl Webcam for V4LinuxDevice {
             .borrow()
             .enum_frameintervals(v4l2_format, res.x, res.y)
         {
-            Ok(inte) => {
+            Ok(interval) => {
                 let mut re_t: Vec<u32> = Vec::new();
-                for frame in inte {
+                for frame in interval {
                     match frame.interval {
                         v4l::frameinterval::FrameIntervalEnum::Discrete(dis) => {
                             re_t.push(dis.denominator);
@@ -262,25 +268,21 @@ impl Webcam for V4LinuxDevice {
             fmt,
         }
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
-pub struct UVCameraDevice {
+pub struct UVCameraDevice<'a> {
     device_type: WebcamType,
     device_id: String,
     device_format: Cell<DeviceFormat>,
     device_resolution: Cell<Option<Resolution>>,
     device_framerate: Cell<Option<u32>>,
-    pub inner: uvc::Device<'static>,
+    pub inner: uvc::Device<'a>,
 }
-impl UVCameraDevice {
+impl<'a> UVCameraDevice<'a> {
     pub fn new(
         vendor_id: Option<i32>,
         product_id: Option<i32>,
-        serial_number: &Option<String>,
+        serial_number: Option<String>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let inner = match crate::UVC.find_device(vendor_id, product_id, serial_number.as_deref()) {
             Ok(dev) => dev,
@@ -321,7 +323,7 @@ impl UVCameraDevice {
         ))
     }
 
-    pub fn from_device(uvc_dev: uvc::Device<'static>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_device(uvc_dev: uvc::Device<'a>) -> Result<Self, Box<dyn std::error::Error>> {
         let inner = uvc_dev;
         if let Ok(description) = inner.description() {
             let device = enumerate()
@@ -362,7 +364,7 @@ impl UVCameraDevice {
 unsafe impl Send for V4LinuxDevice {}
 unsafe impl Sync for V4LinuxDevice {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `V4LinuxDevice`!!!
 
-impl Webcam for UVCameraDevice {
+impl<'a> Webcam<'a> for UVCameraDevice<'a> {
     fn name(&self) -> String {
         self.device_id.clone()
     }
@@ -498,7 +500,7 @@ impl Webcam for UVCameraDevice {
         self.device_type
     }
 
-    fn open_stream(&'static self) -> Result<StreamType, Box<dyn std::error::Error>> {
+    fn open_stream(&'a self) -> Result<StreamType, Box<dyn std::error::Error>> {
         return match (self.device_resolution.get(), self.device_framerate.get()) {
             (Some(_res), Some(_fps)) => {
                 let _format = match self.device_format.get() {
@@ -557,17 +559,457 @@ impl Webcam for UVCameraDevice {
         PossibleDevice::UVCAM {
             vendor_id,
             product_id,
-            serial,
+            serial: serial.clone(),
             res,
             fps,
             fmt,
         }
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
-unsafe impl<'a> Send for UVCameraDevice {}
-unsafe impl<'a> Sync for UVCameraDevice {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `UVCameraDevice`!!!
+unsafe impl<'a> Send for UVCameraDevice<'a> {}
+unsafe impl<'a> Sync for UVCameraDevice<'a> {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `UVCameraDevice`!!!
+
+pub struct OpenCVCameraDevice {
+    name: RefCell<String>,
+    res: Cell<Resolution>,
+    fps: Cell<u32>,
+    index: Cell<u32>,
+    video_capture: RefCell<VideoCapture>,
+}
+
+impl OpenCVCameraDevice {
+    pub fn new(
+        name: String,
+        idx: u32,
+        frame: u32,
+        resolution: Resolution,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let video_capture = {
+            // generate video capture with auto detect backend
+
+            let mut v_cap = {
+                match std::env::consts::OS {
+                    "linux" => {
+                        let a = match VideoCapture::new(idx as i32, opencv::videoio::CAP_V4L2) {
+                            Ok(vc) => vc,
+                            Err(why) => {
+                                return Err(Box::new(why));
+                            }
+                        };
+                        a
+                    }
+                    "windows" => {
+                        let a = match VideoCapture::new(idx as i32, opencv::videoio::CAP_MSMF) {
+                            Ok(vc) => vc,
+                            Err(why) => {
+                                return Err(Box::new(why));
+                            }
+                        };
+                        a
+                    }
+                    &_ => {
+                        return Err(Box::new(InvalidDeviceError::InvalidPlatform(
+                            "[\"linux\", \"windows\"]".to_string(),
+                        )))
+                    }
+                }
+            };
+
+            match v_cap.set(
+                VideoCaptureProperties::CAP_PROP_FRAME_HEIGHT as i32,
+                resolution.y as f64,
+            ) {
+                Ok(r) => {
+                    if !r {
+                        return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                            String::from("CAP_PROP_FRAME_HEIGHT"),
+                        )));
+                    }
+                }
+                Err(why) => {
+                    return Err(Box::new(why));
+                }
+            }
+
+            match v_cap.set(
+                VideoCaptureProperties::CAP_PROP_FRAME_WIDTH as i32,
+                resolution.x as f64,
+            ) {
+                Ok(r) => {
+                    if !r {
+                        return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                            String::from("CAP_PROP_FRAME_WIDTH"),
+                        )));
+                    }
+                }
+                Err(why) => {
+                    return Err(Box::new(why));
+                }
+            }
+
+            match v_cap.set(VideoCaptureProperties::CAP_PROP_FPS as i32, frame as f64) {
+                Ok(r) => {
+                    if !r {
+                        return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                            String::from("CAP_PROP_FPS"),
+                        )));
+                    }
+                }
+                Err(why) => {
+                    return Err(Box::new(why));
+                }
+            }
+
+            RefCell::new(v_cap)
+        };
+
+        Ok(OpenCVCameraDevice {
+            name: RefCell::new(name),
+            res: Cell::new(resolution),
+            fps: Cell::new(frame),
+            index: Cell::new(idx),
+            video_capture,
+        })
+    }
+
+    pub fn from_possible_device(
+        n: String,
+        possible_device: PossibleDevice,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let name = RefCell::new(n);
+        let res = Cell::new(possible_device.res());
+        let fps = Cell::new(possible_device.fps());
+        let idx = match get_os_webcam_index(possible_device) {
+            Ok(i) => i,
+            Err(why) => return Err(why),
+        };
+
+        let video_capture = {
+            // generate video capture with auto detect backend
+            let mut v_cap = {
+                match std::env::consts::OS {
+                    "linux" => {
+                        let a = match VideoCapture::new(idx as i32, opencv::videoio::CAP_V4L2) {
+                            Ok(vc) => vc,
+                            Err(why) => {
+                                return Err(Box::new(why));
+                            }
+                        };
+                        a
+                    }
+                    "windows" => {
+                        let a = match VideoCapture::new(idx as i32, opencv::videoio::CAP_MSMF) {
+                            Ok(vc) => vc,
+                            Err(why) => {
+                                return Err(Box::new(why));
+                            }
+                        };
+                        a
+                    }
+                    &_ => {
+                        return Err(Box::new(InvalidDeviceError::InvalidPlatform(
+                            "[\"linux\", \"windows\"]".to_string(),
+                        )))
+                    }
+                }
+            };
+
+            match v_cap.set(
+                VideoCaptureProperties::CAP_PROP_FRAME_HEIGHT as i32,
+                res.get().y as f64,
+            ) {
+                Ok(r) => {
+                    if !r {
+                        return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                            String::from("CAP_PROP_FRAME_HEIGHT"),
+                        )));
+                    }
+                }
+                Err(why) => {
+                    return Err(Box::new(why));
+                }
+            }
+
+            match v_cap.set(
+                VideoCaptureProperties::CAP_PROP_FRAME_WIDTH as i32,
+                res.get().x as f64,
+            ) {
+                Ok(r) => {
+                    if !r {
+                        return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                            String::from("CAP_PROP_FRAME_WIDTH"),
+                        )));
+                    }
+                }
+                Err(why) => {
+                    return Err(Box::new(why));
+                }
+            }
+
+            match v_cap.set(
+                VideoCaptureProperties::CAP_PROP_FPS as i32,
+                fps.get() as f64,
+            ) {
+                Ok(r) => {
+                    if !r {
+                        return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                            String::from("CAP_PROP_FPS"),
+                        )));
+                    }
+                }
+                Err(why) => {
+                    return Err(Box::new(why));
+                }
+            }
+
+            RefCell::new(v_cap)
+        };
+
+        Ok(OpenCVCameraDevice {
+            name,
+            res,
+            fps,
+            index: Cell::new(idx),
+            video_capture,
+        })
+    }
+
+    pub fn res(&self) -> Resolution {
+        self.res.get()
+    }
+
+    pub fn fps(&self) -> u32 {
+        self.fps.get()
+    }
+
+    pub fn idx(&self) -> u32 {
+        self.index.get()
+    }
+
+    pub fn set_res(&self, new_res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
+        {
+            // make sure we drop the edit lock
+            self.res.set(new_res);
+        }
+        match self.video_capture.try_borrow_mut() {
+            Ok(vc) => {
+                let v_dev = &mut *vc;
+                match v_dev.set(
+                    VideoCaptureProperties::CAP_PROP_FRAME_HEIGHT as i32,
+                    self.res.get().y as f64,
+                ) {
+                    Ok(r) => {
+                        if !r {
+                            return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                                String::from("CAP_PROP_FRAME_HEIGHT"),
+                            )));
+                        }
+                    }
+                    Err(why) => {
+                        return Err(Box::new(why));
+                    }
+                }
+
+                match v_dev.set(
+                    VideoCaptureProperties::CAP_PROP_FRAME_WIDTH as i32,
+                    self.res.get().x as f64,
+                ) {
+                    Ok(r) => {
+                        if !r {
+                            return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                                String::from("CAP_PROP_FRAME_WIDTH"),
+                            )));
+                        }
+                    }
+                    Err(why) => {
+                        return Err(Box::new(why));
+                    }
+                }
+            }
+            Err(why) => return Err(Box::new(why)),
+        }
+        Ok(())
+    }
+
+    pub fn set_fps(&self, frame: u32) -> Result<(), Box<dyn std::error::Error>> {
+        {
+            self.fps.set(frame);
+        }
+        match self.video_capture.try_borrow_mut() {
+            Ok(vc) => {
+                let v_dev = &mut *vc;
+                match v_dev.set(
+                    VideoCaptureProperties::CAP_PROP_FPS as i32,
+                    self.fps.get() as f64,
+                ) {
+                    Ok(r) => {
+                        if !r {
+                            return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+                                String::from("CAP_PROP_FPS"),
+                            )));
+                        }
+                    }
+                    Err(why) => return Err(Box::new(why)),
+                }
+            }
+            Err(why) => return Err(Box::new(why)),
+        }
+        Ok(())
+    }
+
+    pub fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
+        return match self.video_capture.try_borrow_mut() {
+            Ok(vc) => {
+                let v_dev = &mut *vc;
+                if v_dev.is_opened() {
+                    Ok(())
+                } else {
+                    match std::env::consts::OS {
+                        "linux" => {
+                            match v_dev.open(self.index.get() as i32, opencv::videoio::CAP_V4L2) {
+                                Ok(o) => {
+                                    if r {
+                                        Ok(())
+                                    } else {
+                                        Err(Box::new(InvalidDeviceError::CannotOpenStream(
+                                            "Failed to open V4L2 Stream".to_string(),
+                                        )))
+                                    }
+                                }
+                                Err(why) => Err(Box::new(why)),
+                            }
+                        }
+                        "windows" => {
+                            match v_dev.open(self.index.get() as i32, opencv::videoio::CAP_MSMF) {
+                                Ok(o) => {
+                                    if r {
+                                        Ok(())
+                                    } else {
+                                        Err(Box::new(InvalidDeviceError::CannotOpenStream(
+                                            "Failed to open MS Media Foundation Stream".to_string(),
+                                        )))
+                                    }
+                                }
+                                Err(why) => Err(Box::new(why)),
+                            }
+                        }
+                        &_ => Err(Box::new(InvalidDeviceError::InvalidPlatform(
+                            "[\"linux\", \"windows\"]".to_string(),
+                        ))),
+                    }
+                }
+            }
+            Err(why) => Err(Box::new(why)),
+        };
+    }
+
+    // This function assumes that `open_stream()` has already been called.
+    pub fn get_next_frame(&self) -> Result<Mat, Box<dyn std::error::Error>> {
+        let mut read_frame = match unsafe {
+            Mat::new_rows_cols(
+                self.res.get().y as i32,
+                self.res.get().x as i32,
+                opencv::core::CV_8UC3,
+            )
+        } {
+            Ok(m) => m,
+            Err(why) => return Err(Box::new(why)),
+        };
+
+        return match self.video_capture.try_borrow_mut() {
+            Ok(vc) => {
+                let v = &mut *vc;
+                match v.read(&mut read_frame) {
+                    Ok(r) => {
+                        if r {
+                            Ok(read_frame)
+                        } else {
+                            Err(Box::new(InvalidDeviceError::CannotOpenStream(
+                                "OpenCV Error".to_string(),
+                            )))
+                        }
+                    }
+                    Err(why) => Err(Box::new(why)),
+                }
+            }
+            Err(why) => Err(Box::new(why)),
+        };
+    }
+    
+    // hide the body
+    // dissolve it in lime, 
+    // all for a crime
+    // of saying "pettan"
+    pub fn dispose_of_body(self) {
+        
+    }
+
+    // pub fn set_new_video_capture_index(
+    //     &self,
+    //     new_idx: u32,
+    // ) -> Result<(), Box<dyn std::error::Error>> {
+    //     {
+    //         self.index.set(new_idx as u32);
+    //     }
+    //     let new_video_capture = {
+    //         let mut v_cap =
+    //             match VideoCapture::new(self.index.get() as i32, opencv::videoio::CAP_ANY) {
+    //                 Ok(v) => v,
+    //                 Err(why) => return Err(Box::new(why)),
+    //             };
+    //
+    //         match v_cap.set(
+    //             VideoCaptureProperties::CAP_PROP_FRAME_HEIGHT as i32,
+    //             self.res.get().y as f64,
+    //         ) {
+    //             Ok(r) => {
+    //                 if !r {
+    //                     return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+    //                         String::from("CAP_PROP_FRAME_HEIGHT"),
+    //                     )));
+    //                 }
+    //             }
+    //             Err(why) => {
+    //                 return Err(Box::new(why));
+    //             }
+    //         }
+    //
+    //         match v_cap.set(
+    //             VideoCaptureProperties::CAP_PROP_FRAME_WIDTH as i32,
+    //             self.res.get().x as f64,
+    //         ) {
+    //             Ok(r) => {
+    //                 if !r {
+    //                     return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+    //                         String::from("CAP_PROP_FRAME_WIDTH"),
+    //                     )));
+    //                 }
+    //             }
+    //             Err(why) => {
+    //                 return Err(Box::new(why));
+    //             }
+    //         }
+    //
+    //         match v_cap.set(
+    //             VideoCaptureProperties::CAP_PROP_FPS as i32,
+    //             self.fps.get() as f64,
+    //         ) {
+    //             Ok(r) => {
+    //                 if !r {
+    //                     return Err(Box::new(InvalidDeviceError::CannotSetProperty(
+    //                         String::from("CAP_PROP_FPS"),
+    //                     )));
+    //                 }
+    //             }
+    //             Err(why) => {
+    //                 return Err(Box::new(why));
+    //             }
+    //         }
+    //
+    //         v_cap
+    //     };
+    //     self.video_capture.replace(new_video_capture);
+    //     Ok(())
+    // }
+}

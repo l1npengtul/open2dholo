@@ -24,10 +24,16 @@ pub enum InvalidDeviceError {
         prod: String,
         ser: String,
     },
-    #[error("Could not find and open the device!")]
-    CannotFindDevice,
+    #[error("Could not find and open the device: {0}")]
+    CannotFindDevice(String),
     #[error("Could not get device property \"{prop}\": {msg}")]
     CannotGetDeviceInfo { prop: String, msg: String },
     #[error("Could not open the device stream: {0}")]
     CannotOpenStream(String),
+    #[error("Cannot set camera property: {0}")]
+    CannotSetProperty(String),
+    #[error("Expected platform {0}.")]
+    InvalidPlatform(String),
+    #[error("Cannot get frame from camera: {0}")]
+    CannotGetFrame(String),
 }

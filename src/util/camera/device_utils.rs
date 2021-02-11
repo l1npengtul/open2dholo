@@ -19,14 +19,22 @@ use crate::util::camera::{
     camera_device::{UVCameraDevice, V4LinuxDevice},
     webcam::Webcam,
 };
+use flume::Receiver;
 use gdnative::prelude::*;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::num::ParseIntError;
 use std::{
-    cmp::Ordering, collections::HashMap, convert::TryFrom, error::Error, fmt::Display,
-    os::raw::c_int,
+    cmp::Ordering,
+    collections::HashMap,
+    convert::TryFrom,
+    error::Error,
+    fmt::Display,
+    os::raw::{c_int, c_void},
 };
 use usb_enumeration::USBDevice;
-use uvc::{DeviceHandle, FrameFormat};
+use uvc::{ActiveStream, DeviceHandle, Frame, FrameFormat, StreamHandle};
+use uvc_sys::{uvc_error_t, uvc_frame_t, uvc_stream_get_frame, uvc_stream_handle_t};
 use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -245,9 +253,9 @@ pub enum PossibleDevice {
     },
 }
 
-impl PossibleDevice {
+impl<'a> PossibleDevice {
     pub fn from_cached_device(
-        cached: &CachedDevice,
+        cached: CachedDevice,
         res: Resolution,
         fps: u32,
         fmt: DeviceFormat,
@@ -262,10 +270,11 @@ impl PossibleDevice {
                     DeviceFormat::YUYV => FrameFormat::YUYV,
                     DeviceFormat::MJPEG => FrameFormat::MJPEG,
                 };
+
                 PossibleDevice::UVCAM {
                     vendor_id: vendor_id.to_owned(),
                     product_id: product_id.to_owned(),
-                    serial: serial.to_owned(),
+                    serial: serial.clone(),
                     res,
                     fps,
                     fmt: dev_format,
@@ -276,9 +285,9 @@ impl PossibleDevice {
                     DeviceFormat::YUYV => FourCC::new(b"MJPG"),
                     DeviceFormat::MJPEG => FourCC::new(b"YUYV"),
                 };
-                let lc = match location {
-                    PathIndex::Path(p) => PathIndex::Path(p.to_owned()),
-                    PathIndex::Index(i) => PathIndex::Index(i.to_owned()),
+                let lc: PathIndex = match location {
+                    PathIndex::Path(p) => PathIndex::Path(p.clone()),
+                    PathIndex::Index(i) => PathIndex::Index(*i),
                 };
                 PossibleDevice::V4L2 {
                     location: lc,
@@ -313,6 +322,48 @@ impl PossibleDevice {
                 location: location.clone(),
             },
         }
+    }
+
+    pub fn res(&self) -> Resolution {
+        return match self {
+            PossibleDevice::UVCAM {
+                vendor_id: _vendor_id,
+                product_id: _product_id,
+                serial: _serial,
+                res,
+                fps: _fps,
+                fmt: _fmt,
+            } => *res,
+            PossibleDevice::V4L2 {
+                location: _location,
+                res,
+                fps: _fps,
+                fmt: _fmt,
+            } => *res,
+        };
+    }
+
+    pub fn fps(&self) -> u32 {
+        return match self {
+            PossibleDevice::UVCAM {
+                vendor_id: _vendor_id,
+                product_id: _product_id,
+                serial: _serial,
+                res: _res,
+                fps,
+                fmt: _fmt,
+            } => *fps,
+            PossibleDevice::V4L2 {
+                location: _location,
+                res: _res,
+                fps,
+                fmt: _fmt,
+            } => *fps,
+        };
+    }
+
+    pub fn fmt(&self) -> DeviceFormat {
+        DeviceFormat::MJPEG
     }
 }
 
@@ -368,7 +419,7 @@ pub struct CachedDevice {
 
 impl CachedDevice {
     // DO NOT REMOVE THE `&`
-    pub fn from_webcam(camera: &Box<dyn Webcam>) -> Result<Self, ()> {
+    pub fn from_webcam(camera: Box<dyn Webcam>) -> Result<Self, ()> {
         let device_name = camera.name();
         let device_location = DeviceContact::from(camera.get_inner());
         let mut resolutions = match camera.get_supported_resolutions() {
@@ -483,12 +534,11 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
             for dev in v4l::context::enum_devices() {
                 if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
                     let b: Box<dyn Webcam> = Box::new(v4l_dev);
-                    if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
+                    if let Ok(c_dev) = CachedDevice::from_webcam(b) {
                         known_devices.insert(
-                            format!(
-                                "{}",
-                                dev.name().unwrap_or(format!("/dev/video{}", dev.index()))
-                            ),
+                            dev.name()
+                                .unwrap_or(format!("/dev/video{}", dev.index()))
+                                .to_string(),
                             c_dev,
                         );
                     }
@@ -497,6 +547,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
             Some(known_devices)
         }
         "macos" | "windows" => {
+            // The only supported platforms are Linux and winshit. If anyone wants to PR for macos cool with me
             let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
             match crate::UVC.devices() {
                 Ok(list) => {
@@ -504,7 +555,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
                         if let Ok(camera_device) = {
                             let b: Box<dyn Webcam> =
                                 Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
-                            CachedDevice::from_webcam(&b)
+                            CachedDevice::from_webcam(b)
                         } {
                             let dev_name = camera_device.get_name();
                             // weed out the repeating
@@ -520,4 +571,49 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
         }
         _ => None,
     };
+}
+
+pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::error::Error>> {
+    match device {
+        PossibleDevice::UVCAM {
+            vendor_id,
+            product_id,
+            serial,
+            res: _res,
+            fps: _fps,
+            fmt: _fmt,
+        } => {
+            // I've been trying way too much to find a way on windows to get the webcam index. The user probably has only one webcam anyway, lol
+            // IIYA IIYA IIYA
+            // #PortV4L2ForLinuxOrGiveUsAcutalWindowsMediaFoundationBindingsForRustMicrosoft
+            Ok(0)
+        }
+        PossibleDevice::V4L2 {
+            location,
+            res: _res,
+            fps: _fps,
+            fmt: _fmt,
+        } => match location {
+            PathIndex::Path(p) => {
+                let mut idx = 0u32;
+                let mut p_owned = p.clone();
+                for ch in 0..10 {
+                    // /dev/video = 10
+                    p_owned.remove(ch);
+                }
+                match p_owned.parse::<u32>() {
+                    Ok(i) => return Ok(i),
+                    Err(why) => {
+                        return Err(Box::new(InvalidDeviceError::CannotFindDevice(
+                            why.to_string(),
+                        )))
+                    }
+                }
+            }
+            PathIndex::Index(i) => Ok(i as u32),
+        },
+    }
+    Err(Box::new(InvalidDeviceError::CannotFindDevice(
+        "No index found".to_string(),
+    )))
 }

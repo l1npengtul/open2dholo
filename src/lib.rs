@@ -21,17 +21,17 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::cast_sign_loss)]
-#![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::unused_self)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::needless_pass_by_value)]
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
 
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
-use pyo3::prelude::*;
 use std::cell::RefCell;
+use std::sync::Arc;
 
 pub mod configuration;
 pub mod error;
@@ -45,14 +45,16 @@ extern crate downcast_rs;
 
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
-    static ref UVC: uvc::Context<'static> = {
+    static ref UVC: Arc<uvc::Context<'static>> = {
         let ctx = uvc::Context::new();
-        ctx.expect("Could not get UVC Context! Aborting!")
+        Arc::new(ctx.expect("Could not get UVC Context! Aborting!"))
     };
-    static ref USER_DIR: String = {
-        gdnative::api::OS::godot_singleton()
-            .get_user_data_dir()
-            .to_string()
+    static ref USER_DIR: Arc<String> = {
+        Arc::new(
+            gdnative::api::OS::godot_singleton()
+                .get_user_data_dir()
+                .to_string(),
+        )
     };
 }
 
