@@ -16,6 +16,7 @@
 
 use crate::util::camera::device_utils::PossibleDevice;
 use dlib_face_recognition::Point;
+use opencv::core::Mat;
 use std::sync::atomic::AtomicUsize;
 
 // TODO: Change to acutal data format
@@ -38,11 +39,9 @@ impl Processed {
     }
 }
 
-// For future reference, the `FaceLandmarks` struct is a Vector<Point>.
-pub enum ProcessedPacket {
-    None,
-    FacialLandmark(Processed),
-    GeneralError(String),
-    MissingFacialPointsError(AtomicUsize),
-    MissingFileError(String),
+#[derive(Clone)]
+pub struct ProcessPacket {
+    pub(crate) img_data: Mat,
+    pub(crate) img_height: u32,
+    pub(crate) img_width: u32,
 }

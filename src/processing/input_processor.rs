@@ -21,6 +21,7 @@ use crate::processing::face_detector::detectors::util::{
 use crate::util::camera::camera_device::{UVCameraDevice, V4LinuxDevice};
 use crate::util::camera::device_utils::{DeviceFormat, StreamType};
 use crate::util::camera::webcam::{Webcam, WebcamType};
+use crate::util::packet::ProcessPacket;
 use crate::{
     error::processing_error::ProcessingError,
     util::{
@@ -479,6 +480,14 @@ impl<'a> InputProcessingThreadless<'a> {
         let a = &*self.face_detector.borrow();
         a.detect_face_rects(img_height, img_width, img_data)
     }
+}
+
+pub struct ThreadedWorker<T, Y> {
+    thread_handle: JoinHandle<_>,
+    func: dyn Fn(Sender<T>, Receiver<Y>),
+    recv: Receiver<Y>,
+    int_sender: Sender<T>,
+    int_recv: Receiver<T>,
 }
 
 // hack us election
