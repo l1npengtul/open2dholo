@@ -24,6 +24,7 @@ nalgebra = "0.24.0"
 image = "0.23.12"
 windows = "0.3.1"
 pyo3 = "0.13.1"
+suspend = "0.1.3"
 
 
 [dependencies.uvc-sys]
@@ -35,7 +36,7 @@ version = "0.2.0"
 features = ["vendor"]
 
 [dependencies.gdnative]
-version = "0.9.1"
+version = "0.9.3"
 
 [dependencies.dlib-face-recognition]
 version = "0.1.7"

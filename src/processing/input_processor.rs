@@ -37,11 +37,13 @@ use gdnative::godot_print;
 use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::path::Path;
+use std::thread::Thread;
 use std::{
     sync::{atomic::AtomicUsize, Arc},
     thread::{Builder, JoinHandle},
     time::Duration,
 };
+use suspend::{Listener, Notifier, Suspend};
 use uvc::Device as UVCDevice;
 use v4l::buffer::Type;
 use v4l::io::traits::CaptureStream;
@@ -482,12 +484,28 @@ impl<'a> InputProcessingThreadless<'a> {
     }
 }
 
-pub struct ThreadedWorker<T, Y> {
+pub struct ThreadedWorker<EMILIA, MAJITENSHI> {
+    // degenerate generic tag go brrrrrr
+    // readability go *adios*
     thread_handle: JoinHandle<_>,
-    func: dyn Fn(Sender<T>, Receiver<Y>),
-    recv: Receiver<Y>,
-    int_sender: Sender<T>,
-    int_recv: Receiver<T>,
+    func: Box<dyn Fn(Sender<EMILIA>, Receiver<MAJITENSHI>, Listener) + Sync + Send>,
+    recv: Receiver<MAJITENSHI>,
+    int_sender: Sender<EMILIA>,
+    int_recv: Receiver<EMILIA>,
+    suspend: Suspend,
+    notiy: Notifier,
+}
+
+impl ThreadedWorker<EMILIA, MAJITENSHI> {
+    pub fn new(
+        func: Box<dyn Fn(Sender<EMILIA>, Receiver<MAJITENSHI>) + Sync + Send>,
+        recv: Receiver<MAJITENSHI>,
+        int_send: Sender<EMILIA>,
+        int_recv: Receiver<EMILIA>,
+        thread_name: String,
+    ) -> Self {
+        let thread_handle = match Builder::new().name(thread_name).spawn(func) {};
+    }
 }
 
 // hack us election
