@@ -13,20 +13,19 @@
 //
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-use crate::processing::face_detector::detectors::dlib::dlib_detector::DLibDetector;
-use crate::processing::face_detector::detectors::util::{
-    DetectorHardware, DetectorTrait, DetectorType, Rect,
-};
-use crate::util::camera::camera_device::{UVCameraDevice, V4LinuxDevice};
-use crate::util::camera::device_utils::{DeviceFormat, StreamType};
-use crate::util::camera::webcam::{Webcam, WebcamType};
-use crate::util::packet::ProcessPacket;
 use crate::{
     error::processing_error::ProcessingError,
+    processing::face_detector::detectors::{
+        dlib::dlib_detector::DLibDetector,
+        util::{DetectorHardware, DetectorTrait, DetectorType, Rect},
+    },
     util::{
-        camera::device_utils::{PathIndex, PossibleDevice, Resolution},
-        packet::{MessageType, Processed},
+        camera::{
+            camera_device::{UVCameraDevice, V4LinuxDevice},
+            device_utils::{DeviceFormat, PathIndex, PossibleDevice, Resolution, StreamType},
+            webcam::{Webcam, WebcamType},
+        },
+        packet::{MessageType, ProcessPacket, Processed},
     },
 };
 use dlib_face_recognition::{
@@ -34,21 +33,20 @@ use dlib_face_recognition::{
 };
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
-use std::cell::{Cell, RefCell};
-use std::error::Error;
-use std::path::Path;
-use std::thread::Thread;
 use std::{
+    cell::{Cell, RefCell},
+    error::Error,
+    path::Path,
     sync::{atomic::AtomicUsize, Arc},
-    thread::{Builder, JoinHandle},
+    thread::{Builder, JoinHandle, Thread},
     time::Duration,
 };
+
 use suspend::{Listener, Notifier, Suspend};
 use uvc::Device as UVCDevice;
-use v4l::buffer::Type;
-use v4l::io::traits::CaptureStream;
 use v4l::{
-    io::mmap::Stream,
+    buffer::Type,
+    io::{io::traits::CaptureStream, mmap::Stream},
     video::{capture::Parameters, traits::Capture},
     Device, Format, FourCC,
 };
@@ -351,7 +349,8 @@ fn make_uvc_device<'a>(
 
 pub struct InputProcessingThreadless<'a> {
     // device: PossibleDevice,
-    pub device_held: RefCell<Box<dyn Webcam<'a> + 'a>>, // bruh wtf
+    pub device_held: RefCell<Box<dyn Webcam<'a> + 'a>>,
+    // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
     face_detector: RefCell<Box<dyn DetectorTrait>>,
@@ -484,29 +483,45 @@ impl<'a> InputProcessingThreadless<'a> {
     }
 }
 
-pub struct ThreadedWorker<EMILIA, MAJITENSHI> {
-    // degenerate generic tag go brrrrrr
-    // readability go *adios*
-    thread_handle: JoinHandle<_>,
-    func: Box<dyn Fn(Sender<EMILIA>, Receiver<MAJITENSHI>, Listener) + Sync + Send>,
-    recv: Receiver<MAJITENSHI>,
-    int_sender: Sender<EMILIA>,
-    int_recv: Receiver<EMILIA>,
-    suspend: Suspend,
-    notiy: Notifier,
-}
 
-impl ThreadedWorker<EMILIA, MAJITENSHI> {
-    pub fn new(
-        func: Box<dyn Fn(Sender<EMILIA>, Receiver<MAJITENSHI>) + Sync + Send>,
-        recv: Receiver<MAJITENSHI>,
-        int_send: Sender<EMILIA>,
-        int_recv: Receiver<EMILIA>,
-        thread_name: String,
-    ) -> Self {
-        let thread_handle = match Builder::new().name(thread_name).spawn(func) {};
-    }
-}
+// haha comment out large swathes of code hahahahaahahahahaahaeawuihwauiawuifaiuphehguiergsghsihgpiurshiurHPGIHPI:UG
+// pub struct ThreadedWorker<EMILIA, MAJITENSHI> {
+//     // degenerate generic tag go brrrrrr
+//     // readability go *adios*
+//     thread_handle: JoinHandle<_>,
+//     func: Box<dyn Fn(Sender<EMILIA>, Receiver<MAJITENSHI>, Listener) -> () + Sync + Send>,
+//     recv: Receiver<MAJITENSHI>,
+//     int_sender: Sender<EMILIA>,
+//     int_recv: Receiver<EMILIA>,
+//     suspend: RefCell<Suspend>,
+//     notfiy: Notifier,
+// }
+//
+// impl ThreadedWorker<EMILIA, MAJITENSHI> {
+//     pub fn new(
+//         func: Box<dyn Fn(Sender<EMILIA>, Receiver<MAJITENSHI>, Listener) -> () + Sync + Send>,
+//         recv: Receiver<MAJITENSHI>,
+//         int_send: Sender<EMILIA>,
+//         int_recv: Receiver<EMILIA>,
+//         thread_name: String,
+//     ) -> Self {
+//         let mut suspend = Suspend::new();
+//         let _notify = suspend.notifier();
+//         let listener = suspend.listen();
+//         let thread_handle = Builder::new().name(thread_name).spawn(func(int_send.clone(), recv.clone(), listener)).unwrap(); // TODO: replace with unwrap else and add a handler
+//         ThreadedWorker {
+//             thread_handle,
+//             func,
+//             recv,
+//             int_sender: int_send,
+//             int_recv,
+//             suspend: RefCell::new(suspend),
+//             notfiy: _notify,
+//         }
+//     }
+//
+//     pub fn send_message(&self)
+// }
 
 // hack us election
 // make trump president

@@ -63,7 +63,7 @@ impl FacialDetector {
                 false,
                 5,
             )
-                .unwrap(),
+            .unwrap(),
             Err(why) => {
                 panic!("{}", why.to_string())
             }

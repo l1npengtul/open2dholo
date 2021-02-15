@@ -936,14 +936,12 @@ impl OpenCVCameraDevice {
             Err(why) => Err(Box::new(why)),
         };
     }
-    
+
     // hide the body
-    // dissolve it in lime, 
+    // dissolve it in lime,
     // all for a crime
     // of saying "pettan"
-    pub fn dispose_of_body(self) {
-        
-    }
+    pub fn dispose_of_body(self) {}
 
     // pub fn set_new_video_capture_index(
     //     &self,
