@@ -347,17 +347,19 @@ fn make_uvc_device<'a>(
     Ok(device)
 }
 
-pub struct InputProcessingThreadless<'a> {
+pub struct InputProcessingThreadless<'a, EMILIAMAJITENSHI: Send + Sync> {
     // device: PossibleDevice,
     pub device_held: RefCell<Box<dyn Webcam<'a> + 'a>>,
     // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
     face_detector: RefCell<Box<dyn DetectorTrait>>,
+    int_sender: Sender<EMILIAMAJITENSHI>,
+    int_receiver: Receiver<EMILIAMAJITENSHI>,
 }
 
-impl<'a> InputProcessingThreadless<'a> {
-    pub fn new(
+impl<'a> InputProcessingThreadless<'a, EMILIAMAJITENSHI> {
+    pub fn new<DADADADATENSHI: Send + Sync>(
         device: PossibleDevice,
         detect_typ: DetectorType,
         detect_hw: DetectorHardware,
@@ -417,11 +419,16 @@ impl<'a> InputProcessingThreadless<'a> {
             DetectorType::DLibCNN => DLibDetector::new(true),
         }));
 
+        let (int_sender, int_receiver) = flume::unbounded();
+        // TODO Fix inference
+
         InputProcessingThreadless {
             device_held,
             detector_type,
             detector_hw,
             face_detector,
+            int_sender,
+            int_receiver,
         }
     }
 
