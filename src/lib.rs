@@ -32,7 +32,8 @@ use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
 use std::cell::RefCell;
 use std::sync::Arc;
-use threadpool::{Builder, ThreadPool};
+use std::time::Duration;
+use rusty_pool::ThreadPool;
 
 pub mod configuration;
 pub mod error;
@@ -56,9 +57,6 @@ lazy_static! {
                 .get_user_data_dir()
                 .to_string(),
         )
-    };
-    static ref THREAD_POOL: Arc<ThreadPool> = {
-        Arc::new(Builder::new().num_threads(4).thread_name("PROCESSING_POOL".to_string()).build()) // TODO: adjustable thread number
     };
 }
 

@@ -50,6 +50,10 @@ use v4l::{
     video::{capture::Parameters, traits::Capture},
     Device, Format, FourCC,
 };
+use crate::util::packet::{ProcessFaceDetectionPacket, RecieveProcessFaceLandmarkPacket};
+use opencv::core::Mat;
+use rusty_pool::ThreadPool;
+use std::alloc::Global;
 
 // pub struct InputProcessing<'a> {
 //     // To Thread
@@ -347,19 +351,20 @@ fn make_uvc_device<'a>(
     Ok(device)
 }
 
-pub struct InputProcessingThreadless<'a, EMILIAMAJITENSHI: Send + Sync> {
+pub struct InputProcessingThreadless<'a> {
     // device: PossibleDevice,
     pub device_held: RefCell<Box<dyn Webcam<'a> + 'a>>,
     // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
     face_detector: RefCell<Box<dyn DetectorTrait>>,
-    int_sender: Sender<EMILIAMAJITENSHI>,
-    int_receiver: Receiver<EMILIAMAJITENSHI>,
+    thread_pool: ThreadPool,
+    int_sender_ft: Sender<RecieveProcessFaceLandmarkPacket>,
+    int_receiver_ft: Receiver<RecieveProcessFaceLandmarkPacket>,
 }
 
-impl<'a> InputProcessingThreadless<'a, EMILIAMAJITENSHI> {
-    pub fn new<DADADADATENSHI: Send + Sync>(
+impl<'a> InputProcessingThreadless<'a> {
+    pub fn new(
         device: PossibleDevice,
         detect_typ: DetectorType,
         detect_hw: DetectorHardware,
@@ -419,16 +424,21 @@ impl<'a> InputProcessingThreadless<'a, EMILIAMAJITENSHI> {
             DetectorType::DLibCNN => DLibDetector::new(true),
         }));
 
-        let (int_sender, int_receiver) = flume::unbounded();
-        // TODO Fix inference
+        // TODO: Adjustable thread pool size
+        let thread_pool = ThreadPool::new_named("INPUT_PROCESSER".to_string(), 4, 8, Duration::from_millis(500));
+
+        let (int_sender_ft, int_receiver_ft) = flume::unbounded();
+
 
         InputProcessingThreadless {
             device_held,
             detector_type,
             detector_hw,
             face_detector,
-            int_sender,
-            int_receiver,
+            thread_pool,
+            ]
+            int_sender_ft,
+            int_receiver_ft,
         }
     }
 
@@ -484,9 +494,25 @@ impl<'a> InputProcessingThreadless<'a, EMILIAMAJITENSHI> {
         self.device_held.replace(device_held);
     }
 
-    pub fn detect_faces(&self, img_height: u32, img_width: u32, img_data: &[u8]) -> Vec<Rect> {
-        let a = &*self.face_detector.borrow();
-        a.detect_face_rects(img_height, img_width, img_data)
+    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Mat) -> Result<(), Box<dyn std::error::Error>> {
+        let a = ProcessFaceDetectionPacket {
+            img_data,
+            img_height,
+            img_width,
+        };
+
+        let send = self.int_sender_ft.clone();
+
+        match self.thread_pool.try_execute(
+            move || {}
+        ) {
+            Ok(_) => {
+                Ok(())
+            }
+            Err(why) => {
+                return Err(Box::new(why));
+            }
+        }
     }
 }
 

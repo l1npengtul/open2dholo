@@ -19,13 +19,16 @@ usb_enumeration = "0.1.0"
 regex = "1.4.2"
 tch = "0.3.1"
 downcast-rs = "1.2.0"
-scheduled-thread-pool = "0.2.5"
+#scheduled-thread-pool = "0.2.5"
 nalgebra = "0.24.0"
 image = "0.23.12"
 windows = "0.3.1"
 pyo3 = "0.13.1"
 suspend = "0.1.3"
-threadpool = "1.8.1"
+
+[dependencies.rusty_pool]
+version = "0.5.0"
+default-features = false
 
 [dependencies.uvc-sys]
 version = "0.2.0"

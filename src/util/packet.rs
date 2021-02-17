@@ -18,6 +18,8 @@ use crate::util::camera::device_utils::PossibleDevice;
 use dlib_face_recognition::Point;
 use opencv::core::Mat;
 use std::sync::atomic::AtomicUsize;
+use crate::processing::face_detector::facial_existance::FaceBox;
+use crate::processing::face_detector::detectors::util::{Point2D, Point3D};
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
@@ -33,15 +35,25 @@ pub enum MessageType {
 pub struct Processed {
     landmarks: Vec<Point>,
 }
+
 impl Processed {
     pub fn new(data: Vec<Point>) -> Self {
         Processed { landmarks: data }
     }
 }
 
+
 #[derive(Clone)]
-pub struct ProcessPacket {
+pub struct ProcessFaceDetectionPacket {
     pub(crate) img_data: Mat,
     pub(crate) img_height: u32,
     pub(crate) img_width: u32,
+}
+
+
+#[derive(Clone)]
+pub enum RecieveProcessFaceLandmarkPacket {
+    ItWorkedPog2D(Vec<Point2D>),
+    ItWorkedPog3D(Vec<Point3D>),
+    ItDidntWorkedBruh(Box<dyn std::error::Error>),
 }
