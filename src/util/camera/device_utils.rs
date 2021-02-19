@@ -43,6 +43,7 @@ pub struct DeviceDesc {
     pub(crate) pid: Option<c_int>,
     pub(crate) ser: Option<String>,
 }
+
 impl DeviceDesc {
     pub fn new(device: &uvc::Device) -> Result<Self, Box<dyn Error>> {
         let device_desc = device.description()?;
@@ -76,6 +77,7 @@ pub struct DeviceHolder {
     pub description: String,
     pub serial: Option<String>,
 }
+
 impl DeviceHolder {
     pub fn new(
         id: String,
@@ -115,7 +117,7 @@ impl DeviceHolder {
                 return Ok(device);
             }
         }
-        Err(Box::new(InvalidDeviceError::CannotFindDevice))
+        Err(Box::new(InvalidDeviceError::CannotFindDevice("noaddr".to_string())))
     }
 }
 
@@ -199,6 +201,7 @@ impl Ord for Resolution {
         selfint.cmp(&otherint)
     }
 }
+
 #[derive(Copy, Clone)]
 pub enum DeviceFormat {
     YUYV,
@@ -235,6 +238,7 @@ pub enum StreamType<'a> {
     V4L2Stream(MmapStream<'a>),
     UVCStream(DeviceHandle<'a>),
 }
+
 #[derive(Clone)]
 pub enum PossibleDevice {
     UVCAM {
@@ -384,6 +388,32 @@ pub enum DeviceContact {
         location: PathIndex,
     },
 }
+
+impl DeviceContact {
+    pub fn from_possible_device(dev: &PossibleDevice) -> Self {
+        match dev.clone() {
+            PossibleDevice::UVCAM {
+                vendor_id,
+                product_id,
+                serial,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
+            } => DeviceContact::UVCAM {
+                vendor_id,
+                product_id,
+                serial,
+            },
+            PossibleDevice::V4L2 {
+                location,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
+            } => DeviceContact::V4L2 { location },
+        }
+    }
+}
+
 impl From<PossibleDevice> for DeviceContact {
     fn from(value: PossibleDevice) -> Self {
         match value {
@@ -586,7 +616,7 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
             // I've been trying way too much to find a way on windows to get the webcam index. The user probably has only one webcam anyway, lol
             // IIYA IIYA IIYA
             // #PortV4L2ForLinuxOrGiveUsAcutalWindowsMediaFoundationBindingsForRustMicrosoft
-            Ok(0)
+            return Ok(0);
         }
         PossibleDevice::V4L2 {
             location,
@@ -606,11 +636,11 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
                     Err(why) => {
                         return Err(Box::new(InvalidDeviceError::CannotFindDevice(
                             why.to_string(),
-                        )))
+                        )));
                     }
                 }
             }
-            PathIndex::Index(i) => Ok(i as u32),
+            PathIndex::Index(i) => return Ok(i as u32)
         },
     }
     Err(Box::new(InvalidDeviceError::CannotFindDevice(

@@ -14,12 +14,12 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::processing::face_detector::detectors::util::{Point2D, Point3D, PointType};
+use crate::processing::face_detector::facial_existance::FaceBox;
 use crate::util::camera::device_utils::PossibleDevice;
 use dlib_face_recognition::Point;
 use opencv::core::Mat;
 use std::sync::atomic::AtomicUsize;
-use crate::processing::face_detector::facial_existance::FaceBox;
-use crate::processing::face_detector::detectors::util::{Point2D, Point3D};
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
@@ -42,18 +42,9 @@ impl Processed {
     }
 }
 
-
 #[derive(Clone)]
 pub struct ProcessFaceDetectionPacket {
     pub(crate) img_data: Mat,
     pub(crate) img_height: u32,
     pub(crate) img_width: u32,
-}
-
-
-#[derive(Clone)]
-pub enum RecieveProcessFaceLandmarkPacket {
-    ItWorkedPog2D(Vec<Point2D>),
-    ItWorkedPog3D(Vec<Point3D>),
-    ItDidntWorkedBruh(Box<dyn std::error::Error>),
 }

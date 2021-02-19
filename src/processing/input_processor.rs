@@ -25,7 +25,7 @@ use crate::{
             device_utils::{DeviceFormat, PathIndex, PossibleDevice, Resolution, StreamType},
             webcam::{Webcam, WebcamType},
         },
-        packet::{MessageType, ProcessPacket, Processed},
+        packet::{MessageType, Processed},
     },
 };
 use dlib_face_recognition::{
@@ -42,18 +42,21 @@ use std::{
     time::Duration,
 };
 
+use crate::processing::face_detector::detectors::util::PointType;
+use crate::util::camera::camera_device::OpenCVCameraDevice;
+use crate::util::camera::device_utils::DeviceContact;
+use crate::util::packet::ProcessFaceDetectionPacket;
+use opencv::core::{Mat, MatTraitManual};
+use parking_lot::Mutex;
+use rusty_pool::ThreadPool;
 use suspend::{Listener, Notifier, Suspend};
 use uvc::Device as UVCDevice;
 use v4l::{
     buffer::Type,
-    io::{io::traits::CaptureStream, mmap::Stream},
+    io::{traits::CaptureStream, mmap::Stream},
     video::{capture::Parameters, traits::Capture},
     Device, Format, FourCC,
 };
-use crate::util::packet::{ProcessFaceDetectionPacket, RecieveProcessFaceLandmarkPacket};
-use opencv::core::Mat;
-use rusty_pool::ThreadPool;
-use std::alloc::Global;
 
 // pub struct InputProcessing<'a> {
 //     // To Thread
@@ -351,171 +354,169 @@ fn make_uvc_device<'a>(
     Ok(device)
 }
 
-pub struct InputProcessingThreadless<'a> {
+pub struct InputProcessingThreadless {
     // device: PossibleDevice,
-    pub device_held: RefCell<Box<dyn Webcam<'a> + 'a>>,
+    pub device_held: RefCell<OpenCVCameraDevice>,
     // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
-    face_detector: RefCell<Box<dyn DetectorTrait>>,
+    face_detector: Arc<Mutex<Box<dyn DetectorTrait>>>,
     thread_pool: ThreadPool,
-    int_sender_ft: Sender<RecieveProcessFaceLandmarkPacket>,
-    int_receiver_ft: Receiver<RecieveProcessFaceLandmarkPacket>,
+    int_sender_ft: Sender<PointType>,
+    int_receiver_ft: Receiver<PointType>,
 }
 
-impl<'a> InputProcessingThreadless<'a> {
+impl InputProcessingThreadless {
     pub fn new(
+        name: Option<String>,
         device: PossibleDevice,
         detect_typ: DetectorType,
         detect_hw: DetectorHardware,
-    ) -> Self {
-        let device_held: RefCell<Box<dyn Webcam>> = match device {
-            PossibleDevice::UVCAM {
-                vendor_id,
-                product_id,
-                serial,
-                res,
-                fps,
-                fmt: _fmt,
-            } => {
-                let dev: UVCameraDevice<'a> = match make_uvc_device(vendor_id, product_id, serial) {
-                    Ok(d) => {
-                        let uvc_dev: UVCameraDevice<'a> = match UVCameraDevice::from_device(d) {
-                            Ok(u) => u,
-                            Err(why) => {
-                                panic!("{}", why.to_string())
-                            }
-                        };
-                        uvc_dev.set_camera_format(DeviceFormat::MJPEG);
-                        uvc_dev.set_framerate(&fps);
-                        uvc_dev.set_resolution(&res);
-                        uvc_dev
-                    }
-                    Err(why) => {
-                        panic!("{}", why.to_string());
-                    }
-                };
-                RefCell::new(Box::new(dev))
-            }
-            PossibleDevice::V4L2 {
-                location,
-                res,
-                fps,
-                fmt: _fmt,
-            } => {
-                let dev = match V4LinuxDevice::new_location(location) {
-                    Ok(d) => d,
-                    Err(_why) => {
-                        panic!("Could not get V4L Device!");
-                    }
-                };
-                dev.set_resolution(&res);
-                dev.set_framerate(&fps);
-                dev.set_camera_format(DeviceFormat::MJPEG);
-                RefCell::new(Box::new(dev))
-            }
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let device_held = match OpenCVCameraDevice::from_possible_device(
+            name.unwrap_or("".to_string()),
+            device,
+        ) {
+            Ok(ocv) => RefCell::new(ocv),
+            Err(why) => return Err(why),
         };
 
         let detector_type = Cell::new(detect_typ);
         let detector_hw = Cell::new(detect_hw);
 
-        let face_detector = RefCell::new(Box::new(match detect_typ {
+        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> = Arc::new(Mutex::new(Box::new(match detect_typ {
             DetectorType::DLibFHOG => DLibDetector::new(false),
             DetectorType::DLibCNN => DLibDetector::new(true),
-        }));
+        })));
 
         // TODO: Adjustable thread pool size
-        let thread_pool = ThreadPool::new_named("INPUT_PROCESSER".to_string(), 4, 8, Duration::from_millis(500));
+        let thread_pool = ThreadPool::new_named(
+            "INPUT_PROCESSER".to_string(),
+            4,
+            8,
+            Duration::from_millis(500),
+        );
 
         let (int_sender_ft, int_receiver_ft) = flume::unbounded();
 
-
-        InputProcessingThreadless {
+        Ok(InputProcessingThreadless {
             device_held,
             detector_type,
             detector_hw,
             face_detector,
             thread_pool,
-            ]
             int_sender_ft,
             int_receiver_ft,
-        }
+        })
     }
 
-    pub fn change_device(&self, new_device: PossibleDevice) {
-        let device_held: Box<dyn Webcam> = match new_device {
-            PossibleDevice::UVCAM {
-                vendor_id,
-                product_id,
-                serial,
-                res,
-                fps,
-                fmt: _fmt,
-            } => {
-                let mut dev: UVCameraDevice<'a> =
-                    match make_uvc_device(vendor_id, product_id, serial) {
-                        Ok(d) => {
-                            let uvc_dev: UVCameraDevice<'a> = match UVCameraDevice::from_device(d) {
-                                Ok(u) => u,
-                                Err(why) => {
-                                    panic!("{}", why.to_string())
-                                }
-                            };
-                            uvc_dev.set_camera_format(DeviceFormat::MJPEG);
-                            uvc_dev.set_framerate(&fps);
-                            uvc_dev.set_resolution(&res);
-                            uvc_dev
-                        }
-                        Err(why) => {
-                            panic!("{}", why.to_string());
-                        }
-                    };
-                Box::new(dev)
-            }
-            PossibleDevice::V4L2 {
-                location,
-                res,
-                fps,
-                fmt: _fmt,
-            } => {
-                let dev = match V4LinuxDevice::new_location(location) {
-                    Ok(d) => d,
-                    Err(_why) => {
-                        panic!("Could not get V4L Device!");
-                    }
-                };
-                dev.set_resolution(&res);
-                dev.set_framerate(&fps);
-                dev.set_camera_format(DeviceFormat::MJPEG);
-                Box::new(dev)
-            }
+    pub fn from_device_contact(
+        name: Option<String>,
+        device_contact: DeviceContact,
+        res: Resolution,
+        fps: u32,
+        detect_typ: DetectorType,
+        detect_hw: DetectorHardware,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let device_held = match OpenCVCameraDevice::from_device_contact(
+            name.unwrap_or("".to_string()),
+            device_contact,
+            res,
+            fps,
+        ) {
+            Ok(ocv) => RefCell::new(ocv),
+            Err(why) => return Err(why),
+        };
+
+        let detector_type = Cell::new(detect_typ);
+        let detector_hw = Cell::new(detect_hw);
+
+        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> = Arc::new(Mutex::new(Box::new(match detect_typ {
+            DetectorType::DLibFHOG => DLibDetector::new(false),
+            DetectorType::DLibCNN => DLibDetector::new(true),
+        })));
+
+        // TODO: Adjustable thread pool size
+        let thread_pool = ThreadPool::new_named(
+            "INPUT_PROCESSER".to_string(),
+            4,
+            8,
+            Duration::from_millis(500),
+        );
+
+        let (int_sender_ft, int_receiver_ft) = flume::unbounded();
+
+        Ok(InputProcessingThreadless {
+            device_held,
+            detector_type,
+            detector_hw,
+            face_detector,
+            thread_pool,
+            int_sender_ft,
+            int_receiver_ft,
+        })
+    }
+
+    pub fn change_device(&self, name: Option<String>, new_device: PossibleDevice) -> Result<(), Box<dyn std::error::Error>> {
+        let device_held = match OpenCVCameraDevice::from_possible_device(name.unwrap_or("".to_string()), new_device) {
+            Ok(h) => h,
+            Err(why) => return Err(why),
         };
 
         self.device_held.replace(device_held);
+        Ok(())
     }
 
-    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Mat) -> Result<(), Box<dyn std::error::Error>> {
-        let a = ProcessFaceDetectionPacket {
-            img_data,
-            img_height,
-            img_width,
-        };
-
+    pub fn add_workload(
+        &self,
+        img_height: u32,
+        img_width: u32,
+        img_data: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let send = self.int_sender_ft.clone();
+        // let owned_data = *img_data;
+        let detector = self.face_detector.clone();
 
-        match self.thread_pool.try_execute(
-            move || {}
-        ) {
-            Ok(_) => {
-                Ok(())
-            }
+        match self.thread_pool.try_execute(move || {
+            let locked = detector.lock();
+            let faces = locked.detect_face_rects(img_height, img_width, img_data);
+            let result =
+                locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, img_data);
+            send.send(result);
+        }) {
+            Ok(_) => Ok(()),
             Err(why) => {
                 return Err(Box::new(why));
             }
         }
     }
-}
 
+    pub fn capture_and_record(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let img_captured = match self.device_held.borrow().get_next_frame() {
+            Ok(frame) => frame,
+            Err(why) => return Err(why),
+        };
+        let img_as_data = match img_captured.data_typed::<u8>() {
+            Ok(d) => d,
+            Err(why) => return Err(Box::new(why))
+        };
+        let res = {
+            self.device_held.borrow().res()
+        };
+        return match self.add_workload(res.y, res.x, img_as_data) {
+            Ok(_) => Ok(()),
+            Err(why) => Err(why)
+        };
+    }
+
+    pub fn query_gotten_results(&self) -> Vec<PointType> {
+        let mut point_vec = Vec::new();
+        for point in self.int_receiver_ft.iter() {
+            point_vec.push(point);
+        }
+        point_vec
+    }
+}
 
 // haha comment out large swathes of code hahahahaahahahahaahaeawuihwauiawuifaiuphehguiergsghsihgpiurshiurHPGIHPI:UG
 // pub struct ThreadedWorker<EMILIA, MAJITENSHI> {

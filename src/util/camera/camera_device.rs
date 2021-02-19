@@ -15,7 +15,7 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::error::invalid_device_error::InvalidDeviceError;
-use crate::util::camera::device_utils::get_os_webcam_index;
+use crate::util::camera::device_utils::{get_os_webcam_index, DeviceContact};
 use crate::util::camera::{
     device_utils::{DeviceFormat, DeviceHolder, PathIndex, PossibleDevice, Resolution, StreamType},
     webcam::{Webcam, WebcamType},
@@ -45,6 +45,7 @@ pub struct V4LinuxDevice {
     device_path: PathIndex,
     pub inner: RefCell<v4l::Device>,
 }
+
 impl V4LinuxDevice {
     pub fn new(index: usize) -> Result<Self, ()> {
         let device = match v4l::Device::new(index) {
@@ -85,6 +86,7 @@ impl V4LinuxDevice {
         }
     }
 }
+
 impl<'a> Webcam<'a> for V4LinuxDevice {
     fn name(&self) -> String {
         let device_name = match self.inner.borrow().query_caps() {
@@ -278,6 +280,7 @@ pub struct UVCameraDevice<'a> {
     device_framerate: Cell<Option<u32>>,
     pub inner: uvc::Device<'a>,
 }
+
 impl<'a> UVCameraDevice<'a> {
     pub fn new(
         vendor_id: Option<i32>,
@@ -304,8 +307,8 @@ impl<'a> UVCameraDevice<'a> {
                 );
                 let device_type = match DeviceHolder::from_devices(usb_dev, &inner) {
                     Ok(_dt) => WebcamType::USBVideo,
-                    Err(_why) => return Err(Box::new(
-                        crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice,
+                    Err(why) => return Err(Box::new(
+                        crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(format!("{},{}:{} {}", why.to_string(), description.vendor_id, description.product_id, description.serial_number.unwrap_or("".to_string())))
                     )),
                 };
                 return Ok(UVCameraDevice {
@@ -319,7 +322,7 @@ impl<'a> UVCameraDevice<'a> {
             }
         }
         Err(Box::new(
-            crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice,
+            crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(format!("i64-{}:i64-{} {}", vendor_id.unwrap_or(-1), product_id.unwrap_or(-1), serial_number.unwrap_or("".to_string())))
         ))
     }
 
@@ -341,8 +344,8 @@ impl<'a> UVCameraDevice<'a> {
                 );
                 let device_type = match DeviceHolder::from_devices(usb_dev, &inner) {
                     Ok(_dt) => WebcamType::USBVideo,
-                    Err(_why) => return Err(Box::new(
-                        crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice,
+                    Err(why) => return Err(Box::new(
+                        crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(format!("noaddr"))
                     )),
                 };
                 return Ok(UVCameraDevice {
@@ -356,12 +359,13 @@ impl<'a> UVCameraDevice<'a> {
             }
         }
         Err(Box::new(
-            crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice,
+            crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(format!("noaddr"))
         ))
     }
 }
 
 unsafe impl Send for V4LinuxDevice {}
+
 unsafe impl Sync for V4LinuxDevice {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `V4LinuxDevice`!!!
 
 impl<'a> Webcam<'a> for UVCameraDevice<'a> {
@@ -568,6 +572,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
 }
 
 unsafe impl<'a> Send for UVCameraDevice<'a> {}
+
 unsafe impl<'a> Sync for UVCameraDevice<'a> {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `UVCameraDevice`!!!
 
 pub struct OpenCVCameraDevice {
@@ -611,7 +616,7 @@ impl OpenCVCameraDevice {
                     &_ => {
                         return Err(Box::new(InvalidDeviceError::InvalidPlatform(
                             "[\"linux\", \"windows\"]".to_string(),
-                        )))
+                        )));
                     }
                 }
             };
@@ -710,7 +715,7 @@ impl OpenCVCameraDevice {
                     &_ => {
                         return Err(Box::new(InvalidDeviceError::InvalidPlatform(
                             "[\"linux\", \"windows\"]".to_string(),
-                        )))
+                        )));
                     }
                 }
             };
@@ -773,6 +778,40 @@ impl OpenCVCameraDevice {
             index: Cell::new(idx),
             video_capture,
         })
+    }
+
+    pub fn from_device_contact(
+        n: String,
+        device_contact: DeviceContact,
+        resolution: Resolution,
+        framerate: u32,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        return match device_contact {
+            DeviceContact::UVCAM {
+                vendor_id,
+                product_id,
+                serial,
+            } => {
+                let pd = PossibleDevice::UVCAM {
+                    vendor_id,
+                    product_id,
+                    serial,
+                    res: resolution,
+                    fps: framerate,
+                    fmt: FrameFormat::MJPEG,
+                };
+                OpenCVCameraDevice::from_possible_device(n, pd)
+            }
+            DeviceContact::V4L2 { location } => {
+                let pd = PossibleDevice::V4L2 {
+                    location,
+                    res: resolution,
+                    fps: framerate,
+                    fmt: FourCC::new(b"MJPG"),
+                };
+                OpenCVCameraDevice::from_possible_device(n, pd)
+            }
+        };
     }
 
     pub fn res(&self) -> Resolution {
@@ -862,14 +901,14 @@ impl OpenCVCameraDevice {
         return match self.video_capture.try_borrow_mut() {
             Ok(vc) => {
                 let v_dev = &mut *vc;
-                if v_dev.is_opened() {
+                if v_dev.is_opened().unwrap_or(false) {
                     Ok(())
                 } else {
                     match std::env::consts::OS {
                         "linux" => {
                             match v_dev.open(self.index.get() as i32, opencv::videoio::CAP_V4L2) {
                                 Ok(o) => {
-                                    if r {
+                                    if o {
                                         Ok(())
                                     } else {
                                         Err(Box::new(InvalidDeviceError::CannotOpenStream(
@@ -883,7 +922,7 @@ impl OpenCVCameraDevice {
                         "windows" => {
                             match v_dev.open(self.index.get() as i32, opencv::videoio::CAP_MSMF) {
                                 Ok(o) => {
-                                    if r {
+                                    if o {
                                         Ok(())
                                     } else {
                                         Err(Box::new(InvalidDeviceError::CannotOpenStream(

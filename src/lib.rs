@@ -30,10 +30,11 @@
 
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
+use rusty_pool::ThreadPool;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
-use rusty_pool::ThreadPool;
 
 pub mod configuration;
 pub mod error;
@@ -61,7 +62,7 @@ lazy_static! {
 }
 
 thread_local! {
-    pub(crate) static CURRENT_DEVICE: RefCell<Option<DeviceContact>> = RefCell::new(None);
+    pub(crate) static CURRENT_DEVICE: Rc<RefCell<Option<DeviceContact>>> = Rc::new(RefCell::new(None));
 }
 
 fn init(handle: InitHandle) {

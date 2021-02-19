@@ -14,6 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::util::camera::device_utils::DeviceContact;
 use crate::{
     nodes::editor_tabs::util::create_custom_editable_item,
     util::camera::device_utils::{
@@ -48,6 +49,7 @@ impl WebcamInputEditor {
     // register the signals to viewport we will need
     fn register_signals(builder: &ClassBuilder<Self>) {
         // we have to do this disgustingness becuase godot signals can only transport variants like why
+        // TODO: deprecate both these signals and replace with our OpenCVCameraDevice abstraction
         builder.add_signal(Signal {
             name: "new_input_processer_uvc",
             args: &[
@@ -65,13 +67,40 @@ impl WebcamInputEditor {
                     export_info: ExportInfo::new(VariantType::I64),
                     usage: PropertyUsage::DEFAULT,
                 },
-                // frameformat
+                // device_name
             ],
         });
 
         builder.add_signal(Signal {
             name: "new_input_processer_v4l",
             args: &[
+                // resolution
+                SignalArgument {
+                    name: "resolution",
+                    default: Variant::from_vector2(&Vector2::new(-1.0, -1.0)),
+                    export_info: ExportInfo::new(VariantType::Vector2),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                // fps
+                SignalArgument {
+                    name: "framerate",
+                    default: Variant::from_i64(-1),
+                    export_info: ExportInfo::new(VariantType::I64),
+                    usage: PropertyUsage::DEFAULT,
+                },
+            ],
+        });
+
+        builder.add_signal(Signal {
+            name: "new_input_processer",
+            args: &[
+                // device name for pretty formatting
+                SignalArgument {
+                    name: "device_name",
+                    default: Variant::from_str(""),
+                    export_info: ExportInfo::new(VariantType::GodotString),
+                    usage: PropertyUsage::DEFAULT,
+                },
                 // resolution
                 SignalArgument {
                     name: "resolution",
@@ -379,7 +408,7 @@ impl WebcamInputEditor {
                                 if let Some(device) = self.device_list.borrow().get(device_name) {
                                     if let Some(res) = *self.resolution_selected.borrow() {
                                         if let Some(framerate_list) =
-                                            device.get_supported_mjpg().get(&res)
+                                        device.get_supported_mjpg().get(&res)
                                         {
                                             let mut id_cnt = 0;
                                             for fps in framerate_list {
@@ -598,46 +627,28 @@ impl WebcamInputEditor {
             None => return,
         };
 
+        let name = match &*self.device_selected.borrow() {
+            Some(n) => n.clone(),
+            None => return,
+        };
+
         let possible = PossibleDevice::from_cached_device(dev, res, framerate, DeviceFormat::MJPEG);
 
-        match possible {
-            crate::util::camera::device_utils::PossibleDevice::UVCAM {
-                vendor_id: _vendor_id,
-                product_id: _product_id,
-                serial: _serial,
-                res,
-                fps,
-                fmt: _fmt,
-            } => {
-                let resolution = Vector2::new(res.x as f32, res.y as f32);
+        let resolution = Vector2::new(res.x as f32, res.y as f32);
 
-                // crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
+        // crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
+        crate::CURRENT_DEVICE.with(|device| {
+            *device.borrow_mut() = Some(DeviceContact::from_possible_device(&possible))
+        });
 
-                owner.emit_signal(
-                    "new_input_processer_uvc",
-                    &[
-                        Variant::from_vector2(&resolution),
-                        Variant::from_i64(i64::from(fps)),
-                    ],
-                );
-            }
-            crate::util::camera::device_utils::PossibleDevice::V4L2 {
-                location: _location,
-                res,
-                fps,
-                fmt: _fmt,
-            } => {
-                let resolution = Vector2::new(res.x as f32, res.y as f32);
-                // crate::CURRENT_DEVICE.with(|device| *device.borrow_mut() = Some(device_contact));
-                owner.emit_signal(
-                    "new_input_processer_v4l",
-                    &[
-                        Variant::from_vector2(&resolution),
-                        Variant::from_i64(i64::from(fps)),
-                    ],
-                );
-            }
-        }
+        owner.emit_signal(
+            "new_input_processer",
+            &[
+                Variant::from_str(name),
+                Variant::from_vector2(&resolution),
+                Variant::from_i64(i64::from(framerate)),
+            ],
+        );
     }
 
     #[export]
