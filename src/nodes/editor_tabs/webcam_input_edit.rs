@@ -336,10 +336,10 @@ impl WebcamInputEditor {
 
                         self.update_device_list();
 
-                        let mut id_cnt = 0;
-                        for (device_name, _device) in self.device_list.borrow_mut().iter() {
-                            camera_popup.add_item(device_name, id_cnt, -1);
-                            id_cnt += 1;
+                        for (id_cnt, (device_name, _device)) in
+                            self.device_list.borrow_mut().iter().enumerate()
+                        {
+                            camera_popup.add_item(device_name, id_cnt as i64, -1);
                         }
 
                         camera_popup.set_position(position, true);
@@ -370,10 +370,10 @@ impl WebcamInputEditor {
                                 None => panic!("The device no longer exists!"),
                             };
 
-                            let mut id_cnt = 0;
-                            for res in selected_cache_dev.get_supported_mjpg().keys() {
-                                resolution_popup.add_item(format!("{}", res), id_cnt, -1);
-                                id_cnt += 1;
+                            for (id_cnt, res) in
+                                selected_cache_dev.get_supported_mjpg().keys().enumerate()
+                            {
+                                resolution_popup.add_item(format!("{}", res), id_cnt as i64, -1);
                             }
 
                             // for selected_cache_dev.
@@ -408,12 +408,14 @@ impl WebcamInputEditor {
                                 if let Some(device) = self.device_list.borrow().get(device_name) {
                                     if let Some(res) = *self.resolution_selected.borrow() {
                                         if let Some(framerate_list) =
-                                        device.get_supported_mjpg().get(&res)
+                                            device.get_supported_mjpg().get(&res)
                                         {
-                                            let mut id_cnt = 0;
-                                            for fps in framerate_list {
-                                                fps_popup.add_item(format!("{}", fps), id_cnt, -1);
-                                                id_cnt += 1;
+                                            for (id_cnt, fps) in framerate_list.iter().enumerate() {
+                                                fps_popup.add_item(
+                                                    format!("{}", fps),
+                                                    id_cnt as i64,
+                                                    -1,
+                                                );
                                             }
                                         }
                                     }

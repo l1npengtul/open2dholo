@@ -14,12 +14,10 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::processing::face_detector::detectors::util::{Point2D, Point3D, PointType};
-use crate::processing::face_detector::facial_existance::FaceBox;
+use crate::processing::face_detector::detectors::util::{Point3D, PointType};
 use crate::util::camera::device_utils::PossibleDevice;
 use dlib_face_recognition::Point;
 use opencv::core::Mat;
-use std::sync::atomic::AtomicUsize;
 
 // TODO: Change to acutal data format
 #[derive(Clone)]

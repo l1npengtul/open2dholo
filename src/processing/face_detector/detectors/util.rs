@@ -33,7 +33,7 @@ pub enum DetectorType {
     // Torch,
 }
 
-pub trait DetectorTrait {
+pub trait DetectorTrait: Send {
     // la la la filler lala
     fn detect_face_rects(&self, img_height: u32, img_width: u32, img_data: &[u8]) -> Vec<Rect>;
     fn detect_landmarks(

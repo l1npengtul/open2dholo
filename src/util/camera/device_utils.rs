@@ -14,27 +14,22 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::error::conversion_error::ConversionError;
+use crate::error::conversion_error::ConversionError::{ConversionFromError, MatchFailedError};
 use crate::error::invalid_device_error::InvalidDeviceError;
 use crate::util::camera::{
     camera_device::{UVCameraDevice, V4LinuxDevice},
     webcam::Webcam,
 };
-use flume::Receiver;
 use gdnative::prelude::*;
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::num::ParseIntError;
+use std::fmt::Formatter;
 use std::{
-    cmp::Ordering,
-    collections::HashMap,
-    convert::TryFrom,
-    error::Error,
-    fmt::Display,
-    os::raw::{c_int, c_void},
+    cmp::Ordering, collections::HashMap, convert::TryFrom, error::Error, fmt::Display,
+    os::raw::c_int,
 };
 use usb_enumeration::USBDevice;
-use uvc::{ActiveStream, DeviceHandle, Frame, FrameFormat, StreamHandle};
-use uvc_sys::{uvc_error_t, uvc_frame_t, uvc_stream_get_frame, uvc_stream_handle_t};
+use uvc::{DeviceHandle, FrameFormat};
 use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -117,7 +112,9 @@ impl DeviceHolder {
                 return Ok(device);
             }
         }
-        Err(Box::new(InvalidDeviceError::CannotFindDevice("noaddr".to_string())))
+        Err(Box::new(InvalidDeviceError::CannotFindDevice(
+            "noaddr".to_string(),
+        )))
     }
 }
 
@@ -141,17 +138,23 @@ pub struct Resolution {
 }
 
 impl Resolution {
-    pub fn from_variant(var: &Variant) -> Result<Self, ()> {
+    pub fn from_variant(var: &Variant) -> Result<Self, Box<dyn std::error::Error>> {
         if let Some(v) = var.try_to_vector2() {
             return if v.x > 0.0 && v.y > 0.0 {
                 let x = v.x as u32;
                 let y = v.y as u32;
                 Ok(Resolution { x, y })
             } else {
-                Err(())
+                Err(Box::new(ConversionFromError {
+                    from: "Variant".to_string(),
+                    to: "u32".to_string(),
+                }))
             };
         }
-        Err(())
+        Err(Box::new(ConversionFromError {
+            from: "Variant".to_string(),
+            to: "Vector2".to_string(),
+        }))
     }
 }
 
@@ -209,15 +212,18 @@ pub enum DeviceFormat {
 }
 
 impl DeviceFormat {
-    pub fn from_variant(var: &Variant) -> Result<Self, ()> {
+    pub fn from_variant(var: &Variant) -> Result<Self, Box<dyn std::error::Error>> {
         if let Some(st) = var.try_to_string() {
             return match &st.to_lowercase()[..] {
                 "yuyv" => Ok(DeviceFormat::YUYV),
                 "mjpg" | "mjpeg" => Ok(DeviceFormat::MJPEG),
-                _ => Err(()),
+                _ => Err(Box::new(MatchFailedError(st))),
             };
         }
-        Err(())
+        Err(Box::new(ConversionFromError {
+            from: "Variant".to_string(),
+            to: "String".to_string(),
+        }))
     }
 }
 
@@ -329,7 +335,7 @@ impl<'a> PossibleDevice {
     }
 
     pub fn res(&self) -> Resolution {
-        return match self {
+        match self {
             PossibleDevice::UVCAM {
                 vendor_id: _vendor_id,
                 product_id: _product_id,
@@ -344,11 +350,11 @@ impl<'a> PossibleDevice {
                 fps: _fps,
                 fmt: _fmt,
             } => *res,
-        };
+        }
     }
 
     pub fn fps(&self) -> u32 {
-        return match self {
+        match self {
             PossibleDevice::UVCAM {
                 vendor_id: _vendor_id,
                 product_id: _product_id,
@@ -363,7 +369,7 @@ impl<'a> PossibleDevice {
                 fps,
                 fmt: _fmt,
             } => *fps,
-        };
+        }
     }
 
     pub fn fmt(&self) -> DeviceFormat {
@@ -375,6 +381,18 @@ impl<'a> PossibleDevice {
 pub enum PathIndex {
     Path(String),
     Index(usize),
+}
+impl Display for PathIndex {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathIndex::Path(p) => {
+                write!(f, "{}", p)
+            }
+            PathIndex::Index(i) => {
+                write!(f, "{}", i)
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -606,9 +624,9 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
 pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::error::Error>> {
     match device {
         PossibleDevice::UVCAM {
-            vendor_id,
-            product_id,
-            serial,
+            vendor_id: _,
+            product_id: _,
+            serial: _,
             res: _res,
             fps: _fps,
             fmt: _fmt,
@@ -616,7 +634,7 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
             // I've been trying way too much to find a way on windows to get the webcam index. The user probably has only one webcam anyway, lol
             // IIYA IIYA IIYA
             // #PortV4L2ForLinuxOrGiveUsAcutalWindowsMediaFoundationBindingsForRustMicrosoft
-            return Ok(0);
+            Ok(0)
         }
         PossibleDevice::V4L2 {
             location,
@@ -625,25 +643,20 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
             fmt: _fmt,
         } => match location {
             PathIndex::Path(p) => {
-                let mut idx = 0u32;
-                let mut p_owned = p.clone();
+                // let mut idx = 0_u32;
+                let mut p_owned = p;
                 for ch in 0..10 {
                     // /dev/video = 10
                     p_owned.remove(ch);
                 }
                 match p_owned.parse::<u32>() {
-                    Ok(i) => return Ok(i),
-                    Err(why) => {
-                        return Err(Box::new(InvalidDeviceError::CannotFindDevice(
-                            why.to_string(),
-                        )));
-                    }
+                    Ok(i) => Ok(i),
+                    Err(why) => Err(Box::new(InvalidDeviceError::CannotFindDevice(
+                        why.to_string(),
+                    ))),
                 }
             }
-            PathIndex::Index(i) => return Ok(i as u32)
+            PathIndex::Index(i) => Ok(i as u32),
         },
     }
-    Err(Box::new(InvalidDeviceError::CannotFindDevice(
-        "No index found".to_string(),
-    )))
 }

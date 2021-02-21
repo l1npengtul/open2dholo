@@ -27,14 +27,14 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
 
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
-use rusty_pool::ThreadPool;
+use pyo3::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Duration;
 
 pub mod configuration;
 pub mod error;
@@ -66,6 +66,37 @@ thread_local! {
 }
 
 fn init(handle: InitHandle) {
+    // try importing cv2 to see if we have it
+    let gil = Python::acquire_gil();
+    let python = gil.python();
+    // print python version
+    match python.import("sys") {
+        Ok(sys) => match sys.get("version") {
+            Ok(ver) => {
+                match ver.extract::<String>() {
+                    Ok(s) => {
+                        godot_print!("{}", s);
+                    }
+                    Err(why) => {
+                        panic!("{}", why);
+                    }
+                };
+            }
+            Err(why) => {
+                panic!("{}", why);
+            }
+        },
+        Err(why) => {
+            panic!("{}", why);
+        }
+    }
+    let _cv2 = match python.import("cv2") {
+        Ok(cv) => cv,
+        Err(why) => {
+            panic!("{}", why);
+        }
+    };
+
     handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
     handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<crate::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();

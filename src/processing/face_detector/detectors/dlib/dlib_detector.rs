@@ -1,9 +1,7 @@
-use crate::processing::face_detector::detectors::util::{
-    DetectorHardware, DetectorTrait, Point2D, PointType, Rect,
-};
+use crate::processing::face_detector::detectors::util::{DetectorTrait, Point2D, PointType, Rect};
 use dlib_face_recognition::{
     FaceDetector, FaceDetectorCnn, FaceDetectorTrait, ImageMatrix, LandmarkPredictor,
-    LandmarkPredictorTrait, Rectangle,
+    LandmarkPredictorTrait,
 };
 use gdnative::prelude::godot_print;
 

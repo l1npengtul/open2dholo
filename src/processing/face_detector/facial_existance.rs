@@ -17,17 +17,12 @@
 // What if it was all a lie, and nothing is real and this is all a dream?
 // What if we don't exist at all?
 
-use cv_convert::TryIntoCv;
-use gdnative::godot_print;
-use image::RgbImage;
-use opencv::core::{Scalar, Vector};
+use opencv::core::Vector;
 use opencv::dnn::blob_from_image;
 use opencv::objdetect::CascadeClassifier;
 use opencv::{
-    core::{Mat, ToInputArray},
-    dnn::{read_net_from_caffe, Net, NetTrait},
-    imgcodecs::{imdecode, imwrite, ImreadModes},
-    Error,
+    dnn::{read_net_from_caffe, Net},
+    imgcodecs::{imdecode, ImreadModes},
 };
 use std::collections::HashMap;
 
@@ -51,9 +46,9 @@ impl FacialDetector {
     pub fn detect_face(&mut self, _img_height: u32, _img_width: u32, img_raw_data: &[u8])
     /*-> HashMap<FaceBox, f32>*/
     {
-        let facebox_hashmap: HashMap<FaceBox, f32> = HashMap::new();
+        let _facebox_hashmap: HashMap<FaceBox, f32> = HashMap::new();
         let img_data_vec: opencv::core::Vector<u8> = Vector::from(img_raw_data.to_vec());
-        let img_mat = match imdecode(&img_data_vec, ImreadModes::IMREAD_GRAYSCALE as i32) {
+        let _img_mat = match imdecode(&img_data_vec, ImreadModes::IMREAD_GRAYSCALE as i32) {
             Ok(i) => blob_from_image(
                 &i,
                 1.0,

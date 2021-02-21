@@ -53,7 +53,7 @@ use suspend::{Listener, Notifier, Suspend};
 use uvc::Device as UVCDevice;
 use v4l::{
     buffer::Type,
-    io::{traits::CaptureStream, mmap::Stream},
+    io::{mmap::Stream, traits::CaptureStream},
     video::{capture::Parameters, traits::Capture},
     Device, Format, FourCC,
 };
@@ -384,10 +384,11 @@ impl InputProcessingThreadless {
         let detector_type = Cell::new(detect_typ);
         let detector_hw = Cell::new(detect_hw);
 
-        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> = Arc::new(Mutex::new(Box::new(match detect_typ {
-            DetectorType::DLibFHOG => DLibDetector::new(false),
-            DetectorType::DLibCNN => DLibDetector::new(true),
-        })));
+        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> =
+            Arc::new(Mutex::new(Box::new(match detect_typ {
+                DetectorType::DLibFHOG => DLibDetector::new(false),
+                DetectorType::DLibCNN => DLibDetector::new(true),
+            })));
 
         // TODO: Adjustable thread pool size
         let thread_pool = ThreadPool::new_named(
@@ -419,7 +420,7 @@ impl InputProcessingThreadless {
         detect_hw: DetectorHardware,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let device_held = match OpenCVCameraDevice::from_device_contact(
-            name.unwrap_or("".to_string()),
+            name.unwrap_or_else(|| "".to_string()),
             device_contact,
             res,
             fps,
@@ -430,13 +431,17 @@ impl InputProcessingThreadless {
 
         let detector_type = Cell::new(detect_typ);
         let detector_hw = Cell::new(detect_hw);
+        godot_print!("detect");
 
-        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> = Arc::new(Mutex::new(Box::new(match detect_typ {
-            DetectorType::DLibFHOG => DLibDetector::new(false),
-            DetectorType::DLibCNN => DLibDetector::new(true),
-        })));
+        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> =
+            Arc::new(Mutex::new(Box::new(match detect_typ {
+                DetectorType::DLibFHOG => DLibDetector::new(false),
+                DetectorType::DLibCNN => DLibDetector::new(true),
+            })));
 
         // TODO: Adjustable thread pool size
+        godot_print!("thread");
+
         let thread_pool = ThreadPool::new_named(
             "INPUT_PROCESSER".to_string(),
             4,
@@ -445,6 +450,7 @@ impl InputProcessingThreadless {
         );
 
         let (int_sender_ft, int_receiver_ft) = flume::unbounded();
+        godot_print!("input_process_ret");
 
         Ok(InputProcessingThreadless {
             device_held,
@@ -457,8 +463,15 @@ impl InputProcessingThreadless {
         })
     }
 
-    pub fn change_device(&self, name: Option<String>, new_device: PossibleDevice) -> Result<(), Box<dyn std::error::Error>> {
-        let device_held = match OpenCVCameraDevice::from_possible_device(name.unwrap_or("".to_string()), new_device) {
+    pub fn change_device(
+        &self,
+        name: Option<String>,
+        new_device: PossibleDevice,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let device_held = match OpenCVCameraDevice::from_possible_device(
+            name.unwrap_or_else(|| "".to_string()),
+            new_device,
+        ) {
             Ok(h) => h,
             Err(why) => return Err(why),
         };
@@ -467,28 +480,20 @@ impl InputProcessingThreadless {
         Ok(())
     }
 
-    pub fn add_workload(
-        &self,
-        img_height: u32,
-        img_width: u32,
-        img_data: &[u8],
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Vec<u8>) {
         let send = self.int_sender_ft.clone();
-        // let owned_data = *img_data;
         let detector = self.face_detector.clone();
 
-        match self.thread_pool.try_execute(move || {
+        self.thread_pool.execute(move || {
             let locked = detector.lock();
-            let faces = locked.detect_face_rects(img_height, img_width, img_data);
+            let i_d = img_data.as_slice();
+            let faces = locked.detect_face_rects(img_height, img_width, i_d);
             let result =
-                locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, img_data);
-            send.send(result);
-        }) {
-            Ok(_) => Ok(()),
-            Err(why) => {
-                return Err(Box::new(why));
+                locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, i_d);
+            if let Err(why) = send.send(result) {
+                godot_print!("Error: {}", why.to_string());
             }
-        }
+        })
     }
 
     pub fn capture_and_record(&self) -> Result<(), Box<dyn std::error::Error>> {
@@ -498,20 +503,17 @@ impl InputProcessingThreadless {
         };
         let img_as_data = match img_captured.data_typed::<u8>() {
             Ok(d) => d,
-            Err(why) => return Err(Box::new(why))
+            Err(why) => return Err(Box::new(why)),
         };
-        let res = {
-            self.device_held.borrow().res()
-        };
-        return match self.add_workload(res.y, res.x, img_as_data) {
-            Ok(_) => Ok(()),
-            Err(why) => Err(why)
-        };
+        let res = { self.device_held.borrow().res() };
+        self.add_workload(res.y, res.x, Vec::from(img_as_data));
+        Ok(())
     }
 
     pub fn query_gotten_results(&self) -> Vec<PointType> {
         let mut point_vec = Vec::new();
-        for point in self.int_receiver_ft.iter() {
+        for point in self.int_receiver_ft.drain() {
+            // lmao imagine using a blocking function in a loop that waits until everything has been dropped, couldn't be me
             point_vec.push(point);
         }
         point_vec

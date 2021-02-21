@@ -14,23 +14,11 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::camera_device::{OpenCVCameraDevice, UVCameraDevice, V4LinuxDevice};
-use crate::util::camera::device_utils::{DeviceContact, PathIndex, PossibleDevice};
-use crate::util::camera::webcam::Webcam;
-use crate::util::{
-    camera::device_utils::{DeviceFormat, Resolution},
-    packet::Processed,
-};
-
 use crate::processing::face_detector::detectors::util::{DetectorHardware, DetectorType};
 use crate::processing::input_processor::InputProcessingThreadless;
-use flume::Receiver;
+use crate::util::camera::device_utils::Resolution;
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
-use std::error::Error;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
-use uvc::ActiveStream;
 
 #[derive(NativeClass)]
 #[inherit(VSplitContainer)]
@@ -98,9 +86,24 @@ impl ViewportHolder {
     // poll the channel to get the data
     #[export]
     pub fn _process(&self, _owner: TRef<VSplitContainer>, _delta: f32) {
+        // godot_print!("proc1");
+
         if let Some(input) = &*self.input_processer.borrow() {
+            godot_print!("proc1");
+            if let Err(why) = input.capture_and_record() {
+                godot_print!("{}", why.to_string());
+            }
+            godot_print!("proc2");
+
+            // I've built abstraction over abstraction and now I am
+            // waddling through my own shit trying to figure out why
+            // this shitty ass method call is freezing the
+            // entire fucking program
+            // EDIT - `Create a blocking iterator over the values received ...`
+            // RTFM kids, it will save you hours of headache.
+
             let a = input.query_gotten_results();
-            godot_print!("{}",a.len());
+            godot_print!("{}", a.len());
             if let Err(why) = input.capture_and_record() {
                 godot_print!("{}", why.to_string());
             }
@@ -287,7 +290,8 @@ impl ViewportHolder {
             None => "".to_string(),
         };
 
-        let device_contact = crate::CURRENT_DEVICE.with(|dev| dev.borrow().unwrap());
+        let device_contact = crate::CURRENT_DEVICE.with(|dev| dev.borrow().clone().unwrap());
+        godot_print!("input_proc");
 
         let input_processer = match InputProcessingThreadless::from_device_contact(
             Some(device_name),
@@ -300,7 +304,10 @@ impl ViewportHolder {
             Ok(return_to_monke) => Some(return_to_monke),
             Err(why) => panic!("Could not generate InputProcesser: {}", why.to_string()),
         };
+        godot_print!("set");
+
         *self.input_processer.borrow_mut() = input_processer;
+        godot_print!("ret void");
     }
 
     fn kill_input_processer(&mut self) {
