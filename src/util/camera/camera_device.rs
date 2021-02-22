@@ -22,11 +22,9 @@ use crate::util::camera::{
 };
 use gdnative::prelude::*;
 use opencv::core::{Mat, CV_8UC3};
-use opencv::videoio::{VideoCapture, VideoCaptureProperties, VideoCaptureTrait, VideoWriter};
+use opencv::videoio::{VideoCapture, VideoCaptureProperties, VideoCaptureTrait, VideoWriter, CAP_MSMF, CAP_V4L2, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_PROP_FPS, CAP_PROP_FORMAT, CAP_PROP_FOURCC};
 use pyo3::prelude::*;
-use pyo3::types::PyModule;
-use pyo3::PyAny;
-use std::alloc::Global;
+use pyo3::types::*;
 use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::thread::sleep;
@@ -39,6 +37,7 @@ use v4l::video::capture::Parameters;
 use v4l::{
     format::Format, fraction::Fraction, framesize::FrameSizeEnum, video::traits::Capture, FourCC,
 };
+use crate::error::invalid_device_error::InvalidDeviceError::{CannotOpenStream, CannotGetDeviceInfo, CannotFindDevice, InvalidPlatform};
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice {
@@ -53,7 +52,7 @@ impl V4LinuxDevice {
         let device = match v4l::Device::new(index) {
             Ok(dev) => dev,
             Err(why) => {
-                return Err(Box::new(InvalidDeviceError::CannotFindDevice(format!(
+                return Err(Box::new(CannotFindDevice(format!(
                     "{}, idx: {}",
                     why.to_string(),
                     index
@@ -73,7 +72,7 @@ impl V4LinuxDevice {
         let device = match v4l::Device::with_path(path.to_string()) {
             Ok(dev) => dev,
             Err(why) => {
-                return Err(Box::new(InvalidDeviceError::CannotFindDevice(format!(
+                return Err(Box::new(CannotFindDevice(format!(
                     "{}, path: {}",
                     why.to_string(),
                     path
@@ -152,7 +151,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice {
                 Ok(ret)
             }
             Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                CannotGetDeviceInfo {
                     prop: "Supported Resolutions".to_string(),
                     msg: why.to_string(),
                 },
@@ -184,7 +183,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice {
                 Ok(dev_format_list)
             }
             Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                CannotGetDeviceInfo {
                     prop: "Supported Format (FourCC)".to_string(),
                     msg: why.to_string(),
                 },
@@ -223,7 +222,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice {
                 Ok(re_t)
             }
             Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                CannotGetDeviceInfo {
                     prop: "Supported Framerates".to_string(),
                     msg: why.to_string(),
                 },
@@ -246,7 +245,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice {
         return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
             Ok(stream) => Ok(StreamType::V4L2Stream(stream)),
             Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotOpenStream(
+                CannotOpenStream(
                     why.to_string(),
                 ),
             )),
@@ -318,7 +317,7 @@ impl<'a> UVCameraDevice<'a> {
                 let device_type = match DeviceHolder::from_devices(usb_dev, &inner) {
                     Ok(_dt) => WebcamType::USBVideo,
                     Err(why) => return Err(Box::new(
-                        crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(
+                        CannotFindDevice(
                             format!(
                                 "{},{}:{} {}",
                                 why.to_string(),
@@ -340,7 +339,7 @@ impl<'a> UVCameraDevice<'a> {
             }
         }
         Err(Box::new(
-            crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(format!(
+            CannotFindDevice(format!(
                 "i64-{}:i64-{} {}",
                 vendor_id.unwrap_or(-1),
                 product_id.unwrap_or(-1),
@@ -368,7 +367,7 @@ impl<'a> UVCameraDevice<'a> {
                 let device_type = match DeviceHolder::from_devices(usb_dev, &inner) {
                     Ok(_dt) => WebcamType::USBVideo,
                     Err(why) => return Err(Box::new(
-                        crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(
+                        CannotFindDevice(
                             format!("noaddr: {}", why.to_string()),
                         ),
                     )),
@@ -384,7 +383,7 @@ impl<'a> UVCameraDevice<'a> {
             }
         }
         Err(Box::new(
-            crate::error::invalid_device_error::InvalidDeviceError::CannotFindDevice(
+            CannotFindDevice(
                 "noaddr".to_string(),
             ),
         ))
@@ -428,7 +427,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 Ok(resolutions)
             }
             Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                CannotGetDeviceInfo {
                     prop: "Supported Resolutions".to_string(),
                     msg: why.to_string(),
                 },
@@ -463,7 +462,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                         }
                     } else {
                         return Err(Box::new(
-                            crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                            CannotGetDeviceInfo {
                                 prop: "Supported Resolutions".to_string(),
                                 msg: "Could not get supported Framerate for UVC device!".to_string(),
                             },
@@ -471,7 +470,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                     }
                 } else {
                     return Err(Box::new(
-                        crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                        CannotGetDeviceInfo {
                             prop: "Supported Resolutions".to_string(),
                             msg: "Could not get supported Framerate for UVC device!".to_string(),
                         },
@@ -481,7 +480,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 Ok(framerates)
             }
             Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                CannotGetDeviceInfo {
                     prop: "Supported Resolutions".to_string(),
                     msg: why.to_string(),
                 },
@@ -511,7 +510,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 Ok(framerates)
             }
             Err(why) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotGetDeviceInfo {
+                CannotGetDeviceInfo {
                     prop: "Supported Resolutions".to_string(),
                     msg: why.to_string(),
                 },
@@ -541,24 +540,24 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 return match self.inner.open() {
                     Ok(handler) => Ok(StreamType::UVCStream(handler)),
                     Err(why) => return Err(Box::new(
-                        crate::error::invalid_device_error::InvalidDeviceError::CannotOpenStream(
+                        CannotOpenStream(
                             why.to_string(),
                         ),
                     )),
                 };
             }
             (Some(_), None) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotOpenStream(
+                CannotOpenStream(
                     "Missing required arguments Framerate".to_string(),
                 ),
             )),
             (None, Some(_)) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotOpenStream(
+                CannotOpenStream(
                     "Missing required arguments Resolution".to_string(),
                 ),
             )),
             (None, None) => Err(Box::new(
-                crate::error::invalid_device_error::InvalidDeviceError::CannotOpenStream(
+                CannotOpenStream(
                     "Missing required arguments Resolution, Framerate".to_string(),
                 ),
             )),
@@ -616,6 +615,17 @@ impl<'a> OpenCVCameraDevice<'a> {
         n: String,
         possible_device: PossibleDevice,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        // set the meta parameters
+        let res = Cell::new(possible_device.res());
+        let fps = Cell::new(possible_device.fps());
+        let name = RefCell::new(n);
+        let index = match get_os_webcam_index(possible_device) {
+            Ok(idx) => Cell::new(idx),
+            Err(why) => {
+                return Err(why);
+            }
+        };
+
         // initialize the python module
         let cv2 = Python::with_gil(|gil| match gil.import("cv2") {
             Ok(gil) => gil,
@@ -624,18 +634,39 @@ impl<'a> OpenCVCameraDevice<'a> {
             }
         });
 
-        // set the meta parameters
-        let res = Cell::new(possible_device.res());
-        let fps = Cell::new(possible_device.fps());
-        let name = RefCell::new(n);
-        let index = match get_os_webcam_index(possible_device) {
-            Ok(idx) => idx,
+        let globals = PyDict::new(python);
+        globals.set_item("cv2", cv2);
+        let cv2_capture = match cv2.call("VideoCapture", (index.get(), ), None) {
+            Ok(ca) => {
+                ca
+            }
             Err(why) => {
-                return Err(why);
+                panic!("{}", why.to_string());
             }
         };
 
-        // set up python function to get this
+        if let Err(why) = set_property_init(cv2_capture) {
+            return Err(why);
+        }
+
+        if let Err(why) = set_property_res(cv2_capture, res.get()) {
+            return Err(why);
+        }
+
+        if let Err(why) = set_property_fps(cv2_capture, fps.get()) {
+            return Err(why);
+        }
+
+        Ok(
+            OpenCVCameraDevice {
+                name,
+                res,
+                fps,
+                index,
+                cv2,
+                cv2_capture,
+            }
+        )
     }
 
     pub fn from_device_contact(
@@ -675,18 +706,27 @@ impl<'a> OpenCVCameraDevice<'a> {
     }
 
     pub fn res(&self) -> Resolution {
-        self.res.get()
+        let res_y: f64 = cv2_cam.call_method("get", (CAP_PROP_FRAME_HEIGHT, ), None).unwrap().extract().unwrap();
+        let res_x: f64 = cv2_cam.call_method("get", (CAP_PROP_FRAME_WIDTH, ), None).unwrap().extract().unwrap();
+        return Resolution::new(res_x as u32, res_y as u32);
     }
 
     pub fn fps(&self) -> u32 {
-        self.fps.get()
+        let fps: f64 = cv2_cam.call_method("get", (CAP_PROP_FPS, ), None).unwrap().extract().unwrap();
+        return fps as u32;
     }
 
     pub fn idx(&self) -> u32 {
         self.index.get()
     }
 
-    pub fn set_res(&self, new_res: Resolution) -> Result<(), Box<dyn std::error::Error>> {}
+    pub fn set_res(&self, new_res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
+        return set_property_res(self.cv2_capture, new_res);
+    }
+
+    pub fn set_fps(&self, new_fps: u32) -> Result<(), Box<dyn std::error::Error>> {
+        return set_property_fps(self.cv2_capture, new_fps);
+    }
 
     pub fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {}
 
@@ -732,9 +772,89 @@ impl<'a> OpenCVCameraDevice<'a> {
 //
 //     println!("{}, {}", res, res1);
 
-fn set_properties_vcap(
-    v_cap: &mut VideoCapture,
-    fps: u32,
-    res: Resolution,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn set_property_init(cv2_capture: &PyAny) -> Result<(), Box<dyn std::error::Error>> {
+    return match cv2_capture.call_method("set", (CAP_PROP_FORMAT as u32, CV_8UC3), None) {
+        Ok(r) => {
+            let ret: bool = r.extract().unwrap_or(false);
+            if ret {
+                let fourcc = VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap();
+                return match cv2_capture.call_method("set", (CAP_PROP_FOURCC as u32, fourcc), None) {
+                    Ok(r) => {
+                        let ret: bool = r.extract().unwrap_or(false);
+                        if ret {
+                            Ok(())
+                        } else {
+                            Err(Box::new(InvalidDeviceError::CannotSetProperty(format!("CAP_PROP_FOURCC: MJPG: {}", fourcc))))
+                        }
+                    }
+                    Err(why) => {
+                        Err(Box::new(why))
+                    }
+                };
+            } else {
+                Err(Box::new(InvalidDeviceError::CannotSetProperty(format!("CAP_PROP_FOURCC: MJPG: {}", fourcc))))
+            }
+        }
+        Err(why) => {
+            return Err(Box::new(why));
+        }
+    };
+}
+
+fn set_property_res(cv2_capture: &PyAny, res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
+    return match cv2_capture.call_method("set", (CAP_PROP_FRAME_WIDTH as u32, res.x), None) {
+        Ok(r) => {
+            let ret: bool = r.extract().unwrap_or(false);
+            if ret {
+                return match cv2_capture.call_method("set", (CAP_PROP_FRAME_HEIGHT as u32, res.y), None) {
+                    Ok(r) => {
+                        let ret: bool = r.extract().unwrap_or(false);
+                        if ret {
+                            Ok(())
+                        } else {
+                            Err(Box::new(InvalidDeviceError::CannotSetProperty(format!("CAP_PROP_FRAME_HEIGHT: {}", res.y))))
+                        }
+                    }
+                    Err(why) => {
+                        Err(Box::new(why))
+                    }
+                };
+            } else {
+                Err(Box::new(InvalidDeviceError::CannotSetProperty(format!("CAP_PROP_FRAME_WIDTH: {}", res.x))))
+            }
+        }
+        Err(why) => {
+            Err(Box::new(why))
+        }
+    };
+}
+
+fn set_property_fps(cv2_capture: &PyAny, fps: u32) -> Result<(), Box<dyn std::error::Error>> {
+    return match cv2_capture.call_method("set", (CAP_PROP_FPS as u32, fps), None) {
+        Ok(r) => {
+            let ret: bool = r.extract().unwrap_or(false);
+            if ret {
+                Ok(())
+            } else {
+                Err(Box::new(InvalidDeviceError::CannotSetProperty(format!("CAP_PROP_FPS: {}", fps))))
+            }
+        }
+        Err(why) => {
+            Err(Box::new(why))
+        }
+    };
+}
+
+fn get_api_pref_int() -> Result<u32, Box<dyn std::error::Error>> {
+    return match std::env::consts::OS {
+        "linux" => {
+            Ok(CAP_V4L2 as u32)
+        }
+        "windows" => {
+            Ok(CAP_MSMF as u32)
+        }
+        &_ => {
+            Err(Box::new(InvalidPlatform("Expected platform [\"linux\", \"windows\"]".to_string())))
+        }
+    };
 }

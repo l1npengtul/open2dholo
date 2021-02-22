@@ -138,6 +138,13 @@ pub struct Resolution {
 }
 
 impl Resolution {
+    pub fn new(x: u32, y: u32) -> Self {
+        Resolution {
+            x,
+            y,
+        }
+    }
+
     pub fn from_variant(var: &Variant) -> Result<Self, Box<dyn std::error::Error>> {
         if let Some(v) = var.try_to_vector2() {
             return if v.x > 0.0 && v.y > 0.0 {
@@ -382,6 +389,7 @@ pub enum PathIndex {
     Path(String),
     Index(usize),
 }
+
 impl Display for PathIndex {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -534,45 +542,6 @@ impl PartialEq for CachedDevice {
         false
     }
 }
-
-// pub fn enumerate_devices() -> Option<HashMap<String, Box<dyn Webcam>>> {
-//     return match std::env::consts::OS {
-//         "linux" => {
-//             let mut known_devices: HashMap<String, Box<dyn Webcam>> = HashMap::new();
-//             // get device list from v4l2
-//             for sys_device in List::new() {
-//                 // get device from v4l2 using the index, getting /dev/video0 if it falis
-//                 let v4l_device = match V4LinuxDevice::new(sys_device.index().unwrap_or(0)) {
-//                     Ok(dev) => Box::new(dev),
-//                     Err(_why) => continue,
-//                 };
-//                 // weed out the repeating
-//                 known_devices.entry(v4l_device.name()).or_insert(v4l_device);
-//             }
-//             Some(known_devices)
-//         }
-//         "macos" | "windows" => {
-//             let mut known_devices: HashMap<String, Box<dyn Webcam>> = HashMap::new();
-//             match crate::UVC.devices() {
-//                 Ok(list) => {
-//                     for uvc_device in list {
-//                         if let Ok(camera_device) = UVCameraDevice::from_device(uvc_device) {
-//                             let camera_name = camera_device.name();
-//                             known_devices
-//                                 .entry(camera_name)
-//                                 .or_insert_with(|| Box::new(camera_device));
-//                         }
-//                     }
-//                 }
-//                 Err(_why) => {
-//                     return None;
-//                 }
-//             }
-//             Some(known_devices)
-//         }
-//         _ => None,
-//     };
-// }
 
 pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
     return match std::env::consts::OS {
