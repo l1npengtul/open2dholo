@@ -44,7 +44,6 @@ pub mod util;
 
 #[macro_use]
 extern crate lazy_static;
-extern crate downcast_rs;
 
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
@@ -91,6 +90,13 @@ fn init(handle: InitHandle) {
         }
     }
     let _cv2 = match python.import("cv2") {
+        Ok(cv) => cv,
+        Err(why) => {
+            panic!("{}", why);
+        }
+    };
+
+    let _np = match python.import("numpy") {
         Ok(cv) => cv,
         Err(why) => {
             panic!("{}", why);

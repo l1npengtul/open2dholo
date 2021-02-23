@@ -57,6 +57,7 @@ use v4l::{
     video::{capture::Parameters, traits::Capture},
     Device, Format, FourCC,
 };
+use std::borrow::Borrow;
 
 fn make_v4l_device(
     location: &PathIndex,
@@ -121,9 +122,9 @@ fn make_uvc_device<'a>(
     Ok(device)
 }
 
-pub struct InputProcessingThreadless {
+pub struct InputProcessingThreadless<'a> {
     // device: PossibleDevice,
-    pub device_held: RefCell<OpenCVCameraDevice>,
+    pub device_held: RefCell<OpenCVCameraDevice<'a>>,
     // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
@@ -133,7 +134,7 @@ pub struct InputProcessingThreadless {
     int_receiver_ft: Receiver<PointType>,
 }
 
-impl InputProcessingThreadless {
+impl<'a> InputProcessingThreadless<'a> {
     pub fn new(
         name: Option<String>,
         device: PossibleDevice,
@@ -247,13 +248,13 @@ impl InputProcessingThreadless {
         Ok(())
     }
 
-    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Vec<u8>) {
+    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Box<[u8]>) {
         let send = self.int_sender_ft.clone();
         let detector = self.face_detector.clone();
 
         self.thread_pool.execute(move || {
             let locked = detector.lock();
-            let i_d = img_data.as_slice();
+            let i_d = img_data.borrow();
             let faces = locked.detect_face_rects(img_height, img_width, i_d);
             let result =
                 locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, i_d);
@@ -268,12 +269,8 @@ impl InputProcessingThreadless {
             Ok(frame) => frame,
             Err(why) => return Err(why),
         };
-        let img_as_data = match img_captured.data_typed::<u8>() {
-            Ok(d) => d,
-            Err(why) => return Err(Box::new(why)),
-        };
         let res = { self.device_held.borrow().res() };
-        self.add_workload(res.y, res.x, Vec::from(img_as_data));
+        self.add_workload(res.y, res.x, img_captured);
         Ok(())
     }
 

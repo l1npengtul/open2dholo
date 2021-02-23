@@ -37,7 +37,8 @@ use v4l::video::capture::Parameters;
 use v4l::{
     format::Format, fraction::Fraction, framesize::FrameSizeEnum, video::traits::Capture, FourCC,
 };
-use crate::error::invalid_device_error::InvalidDeviceError::{CannotOpenStream, CannotGetDeviceInfo, CannotFindDevice, InvalidPlatform};
+use crate::error::invalid_device_error::InvalidDeviceError::{CannotOpenStream, CannotGetDeviceInfo, CannotFindDevice, InvalidPlatform, CannotGetFrame};
+use numpy::{PyArray, PyArray3, NotContiguousError};
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice {
@@ -606,6 +607,8 @@ pub struct OpenCVCameraDevice<'a> {
     res: Cell<Resolution>,
     fps: Cell<u32>,
     index: Cell<u32>,
+    gil: GILGuard,
+    python: Python<'a>,
     cv2: &'a PyModule,
     cv2_capture: &'a PyAny,
 }
@@ -627,16 +630,19 @@ impl<'a> OpenCVCameraDevice<'a> {
         };
 
         // initialize the python module
-        let cv2 = Python::with_gil(|gil| match gil.import("cv2") {
-            Ok(gil) => gil,
+        let gil = Python::acquire_gil();
+        let python = gil.python();
+
+        let cv2 = match python.import("cv2") {
+            Ok(module) => module,
             Err(why) => {
                 panic!("Could not import cv2!: {}", why);
             }
-        });
+        };
 
         let globals = PyDict::new(python);
         globals.set_item("cv2", cv2);
-        let cv2_capture = match cv2.call("VideoCapture", (index.get(), ), None) {
+        let cv2_capture = match cv2.call("VideoCapture", (index.get(), get_api_pref_int()), None) {
             Ok(ca) => {
                 ca
             }
@@ -663,6 +669,8 @@ impl<'a> OpenCVCameraDevice<'a> {
                 res,
                 fps,
                 index,
+                gil,
+                python,
                 cv2,
                 cv2_capture,
             }
@@ -706,13 +714,13 @@ impl<'a> OpenCVCameraDevice<'a> {
     }
 
     pub fn res(&self) -> Resolution {
-        let res_y: f64 = cv2_cam.call_method("get", (CAP_PROP_FRAME_HEIGHT, ), None).unwrap().extract().unwrap();
-        let res_x: f64 = cv2_cam.call_method("get", (CAP_PROP_FRAME_WIDTH, ), None).unwrap().extract().unwrap();
+        let res_y: f64 = self.cv2_capture.call_method("get", (CAP_PROP_FRAME_HEIGHT, ), None).unwrap().extract().unwrap();
+        let res_x: f64 = self.cv2_capture.call_method("get", (CAP_PROP_FRAME_WIDTH, ), None).unwrap().extract().unwrap();
         return Resolution::new(res_x as u32, res_y as u32);
     }
 
     pub fn fps(&self) -> u32 {
-        let fps: f64 = cv2_cam.call_method("get", (CAP_PROP_FPS, ), None).unwrap().extract().unwrap();
+        let fps: f64 = self.cv2_capture.call_method("get", (CAP_PROP_FPS, ), None).unwrap().extract().unwrap();
         return fps as u32;
     }
 
@@ -728,49 +736,73 @@ impl<'a> OpenCVCameraDevice<'a> {
         return set_property_fps(self.cv2_capture, new_fps);
     }
 
-    pub fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {}
+    pub fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
+        return match self.cv2_capture.call_method("open", (self.index.get(), get_api_pref_int()), None) {
+            Ok(b) => {
+                if b.extract().unwrap() {
+                    Ok(())
+                } else {
+                    Err(Box::new(CannotOpenStream("Failed Open Stream OpenCV Refusal".to_string())))
+                }
+            }
+            Err(why) => {
+                Err(Box::new(why))
+            }
+        };
+    }
 
     // This function assumes that `open_stream()` has already been called.
-    pub fn get_next_frame(&self) -> Result<Mat, Box<dyn std::error::Error>> {}
+    pub fn get_next_frame(&self) -> Result<Box<[u8]>, Box<dyn std::error::Error>> {
+        return match self.cv2_capture.call_method("read", (), None) {
+            Ok(tup) => {
+                let tuple: &PyTuple = match tup.downcast() {
+                    Ok(refer) => refer,
+                    Err(why) => {
+                        return Err(Box::new(why));
+                    }
+                };
+                let has_sucessed: bool = tuple.get_item(0).extract().unwrap_or(false);
+                if has_sucessed {
+                    // process numpy ndarray here
+                    let numpyarr: &PyArray3<u8> = match tuple.get_item(1).extract() {
+                        Ok(arr) => {
+                            arr
+                        }
+                        Err(why) => {
+                            return Err(Box::new(CannotGetFrame(format!("Numpy Error: {}", why))));
+                        }
+                    };
+
+                    match unsafe {
+                        numpyarr.as_slice()
+                    } {
+                        Ok(sli) => {
+                            Ok(Box::new(*sli))
+                        }
+                        Err(why) => {
+                            Err(Box::new(why))
+                        }
+                    }
+                } else {
+                    Err(Box::new(CannotGetFrame("OpenCV returned `false`!".to_string())))
+                }
+            }
+            Err(why) => {
+                Err(Box::new(why))
+            }
+        };
+    }
 
     pub fn name(&self) -> String {
         (&*self.name.borrow()).clone()
     }
 
-    // hide the livings
+    // hide the living
     // dissolve them in lime,
     // all for a crime
-    // of saying "cutting-"
+    // of saying "cutting- " *dies*
     pub fn dispose_of_body(self) {}
 }
-
-// some example code
-//     println!("a");
-//     let gil = Python::acquire_gil();
-//     let python = gil.python();
-//
-//     let cv2 = python.import("cv2").unwrap();
-//     let globals = PyDict::new(python);
-//     globals.set_item("cv2", cv2);
-//     let cv2_cam = match cv2.call("VideoCapture", (0, 200), None) {
-//         Ok(ca) => {
-//             ca
-//         }
-//         Err(why) => {
-//             panic!("{}",why.to_string());
-//         }
-//     };
-//     println!("{}", cv2_cam.get_type().to_string());
-//     let args = PyDict::new(python);
-//     let res: f64 = cv2_cam.call_method("get", (3, ), None).unwrap().extract().unwrap();
-//     println!("{}", res);
-//
-//     let bo: bool = cv2_cam.call_method("set", (3, 1920), None).unwrap().extract().unwrap();
-//     let bo1: bool = cv2_cam.call_method("set", (4, 1080), None).unwrap().extract().unwrap();
-//     let res: f64 = cv2_cam.call_method("get", (3, ), None).unwrap().extract().unwrap();
-//     let res1: f64 = cv2_cam.call_method("get", (4, ), None).unwrap().extract().unwrap();
-//
-//     println!("{}, {}", res, res1);
 
 fn set_property_init(cv2_capture: &PyAny) -> Result<(), Box<dyn std::error::Error>> {
     return match cv2_capture.call_method("set", (CAP_PROP_FORMAT as u32, CV_8UC3), None) {
@@ -845,16 +877,16 @@ fn set_property_fps(cv2_capture: &PyAny, fps: u32) -> Result<(), Box<dyn std::er
     };
 }
 
-fn get_api_pref_int() -> Result<u32, Box<dyn std::error::Error>> {
+fn get_api_pref_int() -> u32 {
     return match std::env::consts::OS {
         "linux" => {
-            Ok(CAP_V4L2 as u32)
+            CAP_V4L2 as u32
         }
         "windows" => {
-            Ok(CAP_MSMF as u32)
+            CAP_MSMF as u32
         }
         &_ => {
-            Err(Box::new(InvalidPlatform("Expected platform [\"linux\", \"windows\"]".to_string())))
+            0
         }
     };
 }

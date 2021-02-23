@@ -23,7 +23,7 @@ use std::cell::RefCell;
 #[derive(NativeClass)]
 #[inherit(VSplitContainer)]
 pub struct ViewportHolder {
-    input_processer: RefCell<Option<InputProcessingThreadless>>,
+    input_processer: RefCell<Option<InputProcessingThreadless<'static>>>,
 }
 
 #[methods]
