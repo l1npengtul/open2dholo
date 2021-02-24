@@ -66,42 +66,46 @@ thread_local! {
 
 fn init(handle: InitHandle) {
     // try importing cv2 to see if we have it
-    let gil = Python::acquire_gil();
-    let python = gil.python();
-    // print python version
-    match python.import("sys") {
-        Ok(sys) => match sys.get("version") {
-            Ok(ver) => {
-                match ver.extract::<String>() {
-                    Ok(s) => {
-                        godot_print!("{}", s);
-                    }
-                    Err(why) => {
-                        panic!("{}", why);
-                    }
-                };
-            }
+    // make a block so we can make sure the GIL and Python is dropped when we initialize the nodes
+    {
+        let gil = Python::acquire_gil();
+        let python = gil.python();
+
+        // print python version
+        match python.import("sys") {
+            Ok(sys) => match sys.get("version") {
+                Ok(ver) => {
+                    match ver.extract::<String>() {
+                        Ok(s) => {
+                            godot_print!("{}", s);
+                        }
+                        Err(why) => {
+                            panic!("{}", why);
+                        }
+                    };
+                }
+                Err(why) => {
+                    panic!("{}", why);
+                }
+            },
             Err(why) => {
                 panic!("{}", why);
             }
-        },
-        Err(why) => {
-            panic!("{}", why);
         }
-    }
-    let _cv2 = match python.import("cv2") {
-        Ok(cv) => cv,
-        Err(why) => {
-            panic!("{}", why);
-        }
-    };
+        let _cv2 = match python.import("cv2") {
+            Ok(cv) => cv,
+            Err(why) => {
+                panic!("{}", why);
+            }
+        };
 
-    let _np = match python.import("numpy") {
-        Ok(cv) => cv,
-        Err(why) => {
-            panic!("{}", why);
-        }
-    };
+        let _np = match python.import("numpy") {
+            Ok(cv) => cv,
+            Err(why) => {
+                panic!("{}", why);
+            }
+        };
+    }
 
     handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
     handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();

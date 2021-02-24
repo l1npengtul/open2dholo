@@ -14,50 +14,36 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
-    error::processing_error::ProcessingError,
     processing::face_detector::detectors::{
         dlib::dlib_detector::DLibDetector,
-        util::{DetectorHardware, DetectorTrait, DetectorType, Rect},
+        util::{DetectorHardware, DetectorTrait, DetectorType},
     },
-    util::{
-        camera::{
-            camera_device::{UVCameraDevice, V4LinuxDevice},
-            device_utils::{DeviceFormat, PathIndex, PossibleDevice, Resolution, StreamType},
-            webcam::{Webcam, WebcamType},
-        },
-        packet::{MessageType, Processed},
-    },
+    util::camera::device_utils::{PathIndex, PossibleDevice, Resolution},
 };
-use dlib_face_recognition::{
-    FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
-};
+
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
 use std::{
     cell::{Cell, RefCell},
-    error::Error,
     path::Path,
-    sync::{atomic::AtomicUsize, Arc},
-    thread::{Builder, JoinHandle, Thread},
+    sync::Arc,
     time::Duration,
 };
 
 use crate::processing::face_detector::detectors::util::PointType;
 use crate::util::camera::camera_device::OpenCVCameraDevice;
 use crate::util::camera::device_utils::DeviceContact;
-use crate::util::packet::ProcessFaceDetectionPacket;
-use opencv::core::{Mat, MatTraitManual};
+
 use parking_lot::Mutex;
 use rusty_pool::ThreadPool;
-use suspend::{Listener, Notifier, Suspend};
+use std::borrow::Borrow;
+
 use uvc::Device as UVCDevice;
 use v4l::{
-    buffer::Type,
-    io::{mmap::Stream, traits::CaptureStream},
+    io::traits::CaptureStream,
     video::{capture::Parameters, traits::Capture},
     Device, Format, FourCC,
 };
-use std::borrow::Borrow;
 
 fn make_v4l_device(
     location: &PathIndex,
@@ -122,9 +108,9 @@ fn make_uvc_device<'a>(
     Ok(device)
 }
 
-pub struct InputProcessingThreadless<'a> {
+pub struct InputProcessingThreadless {
     // device: PossibleDevice,
-    pub device_held: RefCell<OpenCVCameraDevice<'a>>,
+    pub device_held: RefCell<OpenCVCameraDevice>,
     // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
@@ -134,7 +120,7 @@ pub struct InputProcessingThreadless<'a> {
     int_receiver_ft: Receiver<PointType>,
 }
 
-impl<'a> InputProcessingThreadless<'a> {
+impl InputProcessingThreadless {
     pub fn new(
         name: Option<String>,
         device: PossibleDevice,
@@ -248,13 +234,13 @@ impl<'a> InputProcessingThreadless<'a> {
         Ok(())
     }
 
-    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Box<[u8]>) {
+    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Vec<u8>) {
         let send = self.int_sender_ft.clone();
         let detector = self.face_detector.clone();
 
         self.thread_pool.execute(move || {
             let locked = detector.lock();
-            let i_d = img_data.borrow();
+            let i_d = img_data.as_slice();
             let faces = locked.detect_face_rects(img_height, img_width, i_d);
             let result =
                 locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, i_d);

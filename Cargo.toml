@@ -25,6 +25,7 @@ image = "0.23.12"
 windows = "0.3.1"
 suspend = "0.1.3"
 numpy = "0.13.0"
+once_cell = "1.6.0"
 
 [dependencies.pyo3]
 version = "0.13.2"
@@ -56,7 +57,7 @@ features = ["v4l2-sys"]
 
 [dependencies.opencv]
 version = "0.49.1"
-#features = ["buildtime-bindgen", "clang-runtime"]
+features = ["buildtime-bindgen", "clang-runtime"]
 
 [dependencies.tensorflow]
 version = "0.16.1"

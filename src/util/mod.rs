@@ -15,5 +15,6 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod camera;
+#[macro_use]
 pub mod macros;
 pub mod packet;
