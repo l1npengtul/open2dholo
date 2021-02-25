@@ -15,7 +15,7 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod config_error;
+pub mod conversion_error;
 pub mod invalid_device_error;
 pub mod processing_error;
 pub mod thread_send_message_error;
-pub mod conversion_error;

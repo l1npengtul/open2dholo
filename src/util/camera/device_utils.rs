@@ -139,10 +139,7 @@ pub struct Resolution {
 
 impl Resolution {
     pub fn new(x: u32, y: u32) -> Self {
-        Resolution {
-            x,
-            y,
-        }
+        Resolution { x, y }
     }
 
     pub fn from_variant(var: &Variant) -> Result<Self, Box<dyn std::error::Error>> {

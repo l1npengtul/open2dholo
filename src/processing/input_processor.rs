@@ -16,97 +16,86 @@
 use crate::{
     processing::face_detector::detectors::{
         dlib::dlib_detector::DLibDetector,
-        util::{DetectorHardware, DetectorTrait, DetectorType},
+        util::{DetectorHardware, DetectorTrait, DetectorType, PointType},
     },
-    util::camera::device_utils::{PathIndex, PossibleDevice, Resolution},
+    util::camera::{
+        camera_device::OpenCVCameraDevice,
+        device_utils::{DeviceContact, PossibleDevice, Resolution},
+    },
 };
-
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
+use parking_lot::Mutex;
+use rusty_pool::ThreadPool;
 use std::{
     cell::{Cell, RefCell},
-    path::Path,
     sync::Arc,
     time::Duration,
 };
 
-use crate::processing::face_detector::detectors::util::PointType;
-use crate::util::camera::camera_device::OpenCVCameraDevice;
-use crate::util::camera::device_utils::DeviceContact;
-
-use parking_lot::Mutex;
-use rusty_pool::ThreadPool;
-use std::borrow::Borrow;
-
-use uvc::Device as UVCDevice;
-use v4l::{
-    io::traits::CaptureStream,
-    video::{capture::Parameters, traits::Capture},
-    Device, Format, FourCC,
-};
-
-fn make_v4l_device(
-    location: &PathIndex,
-    res: Resolution,
-    fps: u32,
-    fmt: FourCC,
-) -> Result<Device, Box<dyn std::error::Error>> {
-    let device = match location {
-        PathIndex::Path(path) => {
-            let dev = match Device::with_path(Path::new(path)) {
-                Ok(d) => d,
-                Err(why) => return Err(Box::new(why)),
-            };
-            dev
-        }
-        PathIndex::Index(idx) => {
-            let dev = match Device::new(*idx) {
-                Ok(d) => d,
-                Err(why) => return Err(Box::new(why)),
-            };
-            dev
-        }
-    };
-
-    let fcc = fmt;
-
-    let format = match device.format() {
-        Ok(mut f) => {
-            f.width = res.x;
-            f.height = res.y;
-            f.fourcc = fcc;
-            f
-        }
-        Err(_) => Format::new(res.x, res.y, fcc),
-    };
-
-    let param = Parameters::with_fps(fps);
-
-    if let Err(why) = device.set_format(&format) {
-        return Err(Box::new(why));
-    }
-    if let Err(why) = device.set_params(&param) {
-        return Err(Box::new(why));
-    }
-
-    Ok(device)
-}
-
-fn make_uvc_device<'a>(
-    vendor_id: Option<u16>,
-    product_id: Option<u16>,
-    serial: Option<String>,
-) -> Result<UVCDevice<'a>, Box<dyn std::error::Error>> {
-    let device = match crate::UVC.find_device(
-        vendor_id.map(i32::from),
-        product_id.map(i32::from),
-        serial.as_deref(),
-    ) {
-        Ok(d) => d,
-        Err(why) => return Err(Box::new(why)),
-    };
-    Ok(device)
-}
+//
+// fn make_v4l_device(
+//     location: &PathIndex,
+//     res: Resolution,
+//     fps: u32,
+//     fmt: FourCC,
+// ) -> Result<Device, Box<dyn std::error::Error>> {
+//     let device = match location {
+//         PathIndex::Path(path) => {
+//             let dev = match Device::with_path(Path::new(path)) {
+//                 Ok(d) => d,
+//                 Err(why) => return Err(Box::new(why)),
+//             };
+//             dev
+//         }
+//         PathIndex::Index(idx) => {
+//             let dev = match Device::new(*idx) {
+//                 Ok(d) => d,
+//                 Err(why) => return Err(Box::new(why)),
+//             };
+//             dev
+//         }
+//     };
+//
+//     let fcc = fmt;
+//
+//     let format = match device.format() {
+//         Ok(mut f) => {
+//             f.width = res.x;
+//             f.height = res.y;
+//             f.fourcc = fcc;
+//             f
+//         }
+//         Err(_) => Format::new(res.x, res.y, fcc),
+//     };
+//
+//     let param = Parameters::with_fps(fps);
+//
+//     if let Err(why) = device.set_format(&format) {
+//         return Err(Box::new(why));
+//     }
+//     if let Err(why) = device.set_params(&param) {
+//         return Err(Box::new(why));
+//     }
+//
+//     Ok(device)
+// }
+//
+// fn make_uvc_device<'a>(
+//     vendor_id: Option<u16>,
+//     product_id: Option<u16>,
+//     serial: Option<String>,
+// ) -> Result<UVCDevice<'a>, Box<dyn std::error::Error>> {
+//     let device = match crate::UVC.find_device(
+//         vendor_id.map(i32::from),
+//         product_id.map(i32::from),
+//         serial.as_deref(),
+//     ) {
+//         Ok(d) => d,
+//         Err(why) => return Err(Box::new(why)),
+//     };
+//     Ok(device)
+// }
 
 pub struct InputProcessingThreadless {
     // device: PossibleDevice,
@@ -128,7 +117,7 @@ impl InputProcessingThreadless {
         detect_hw: DetectorHardware,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let device_held = match OpenCVCameraDevice::from_possible_device(
-            name.unwrap_or("".to_string()),
+            name.unwrap_or_else(|| "".to_string()),
             device,
         ) {
             Ok(ocv) => RefCell::new(ocv),

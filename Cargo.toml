@@ -17,7 +17,7 @@ ron = "0.6.2"
 serde = "1.0.117"
 usb_enumeration = "0.1.0"
 regex = "1.4.2"
-#tch = "0.3.1"
+tch = "0.3.1"
 #downcast-rs = "1.2.0"
 #scheduled-thread-pool = "0.2.5"
 nalgebra = "0.24.0"
@@ -29,7 +29,7 @@ once_cell = "1.6.0"
 
 [dependencies.pyo3]
 version = "0.13.2"
-features = ["auto-initialize"]
+#features = ["auto-initialize"]
 
 [dependencies.rusty_pool]
 version = "0.5.0"
@@ -57,23 +57,17 @@ features = ["v4l2-sys"]
 
 [dependencies.opencv]
 version = "0.49.1"
-features = ["buildtime-bindgen", "clang-runtime"]
+#features = ["buildtime-bindgen", "clang-runtime"]
 
 [dependencies.tensorflow]
 version = "0.16.1"
 features = ["tensorflow_gpu"]
-
-[dependencies.cv-convert]
-version = "0.3"
-default-features = false
-features = ["opencv-4", "opencv-buildtime-bindgen", "nalgebra", "image", "tch"]
-
 
 [build-dependencies]
 windows = "0.3.1"
 
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 
