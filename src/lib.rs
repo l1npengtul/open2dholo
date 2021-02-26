@@ -31,7 +31,8 @@
 
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
-use pyo3::prelude::*;
+use opencv::prelude::VideoCaptureTrait;
+use opencv::videoio::{VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH};
 use std::cell::RefCell;
 use std::process::Command;
 use std::rc::Rc;
@@ -66,6 +67,7 @@ thread_local! {
 }
 
 fn init(handle: InitHandle) {
+
     handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
     handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<crate::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();

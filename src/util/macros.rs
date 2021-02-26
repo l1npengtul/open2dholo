@@ -6,9 +6,6 @@
 // }
 //
 
-use pyo3::prelude::*;
-use pyo3::types::*;
-
 #[macro_export]
 macro_rules! make_dyn {
     ($a:expr,$b:path) => {{

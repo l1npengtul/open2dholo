@@ -29,7 +29,6 @@ use crate::{
     },
 };
 use gdnative::prelude::*;
-use numpy::PyArray3;
 use opencv::core::Mat;
 use opencv::prelude::{MatTraitManual, VideoCaptureTrait};
 use opencv::videoio::{VideoCapture, VideoCaptureProperties};
@@ -40,7 +39,6 @@ use opencv::{
         CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L2,
     },
 };
-use pyo3::{prelude::*, types::PyTuple};
 use std::{
     cell::{Cell, RefCell},
     error::Error,
@@ -625,7 +623,7 @@ impl OpenCVCameraDevice {
 
             match v_cap.set(
                 VideoCaptureProperties::CAP_PROP_FRAME_HEIGHT as i32,
-                resolution.y as f64,
+                f64::from(resolution.y),
             ) {
                 Ok(r) => {
                     if !r {
@@ -641,7 +639,7 @@ impl OpenCVCameraDevice {
 
             match v_cap.set(
                 VideoCaptureProperties::CAP_PROP_FRAME_WIDTH as i32,
-                resolution.x as f64,
+                f64::from(resolution.x),
             ) {
                 Ok(r) => {
                     if !r {
@@ -655,7 +653,10 @@ impl OpenCVCameraDevice {
                 }
             }
 
-            match v_cap.set(VideoCaptureProperties::CAP_PROP_FPS as i32, frame as f64) {
+            match v_cap.set(
+                VideoCaptureProperties::CAP_PROP_FPS as i32,
+                f64::from(frame),
+            ) {
                 Ok(r) => {
                     if !r {
                         return Err(Box::new(CannotSetProperty(String::from("CAP_PROP_FPS"))));
@@ -722,7 +723,7 @@ impl OpenCVCameraDevice {
 
             match v_cap.set(
                 VideoCaptureProperties::CAP_PROP_FRAME_HEIGHT as i32,
-                res.get().y as f64,
+                f64::from(res.get().y),
             ) {
                 Ok(r) => {
                     if !r {
@@ -738,7 +739,7 @@ impl OpenCVCameraDevice {
 
             match v_cap.set(
                 VideoCaptureProperties::CAP_PROP_FRAME_WIDTH as i32,
-                res.get().x as f64,
+                f64::from(res.get().x),
             ) {
                 Ok(r) => {
                     if !r {
@@ -754,7 +755,7 @@ impl OpenCVCameraDevice {
 
             match v_cap.set(
                 VideoCaptureProperties::CAP_PROP_FPS as i32,
-                fps.get() as f64,
+                f64::from(fps.get()),
             ) {
                 Ok(r) => {
                     if !r {
@@ -784,7 +785,7 @@ impl OpenCVCameraDevice {
         resolution: Resolution,
         framerate: u32,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        return match device_contact {
+        match device_contact {
             DeviceContact::UVCAM {
                 vendor_id,
                 product_id,
@@ -809,11 +810,21 @@ impl OpenCVCameraDevice {
                 };
                 OpenCVCameraDevice::from_possible_device(n, pd)
             }
-        };
+        }
     }
 
     pub fn res(&self) -> Resolution {
-        self.res.get()
+        let a = self
+            .video_capture
+            .borrow()
+            .get(CAP_PROP_FRAME_HEIGHT)
+            .unwrap();
+        let b = self
+            .video_capture
+            .borrow()
+            .get(CAP_PROP_FRAME_WIDTH)
+            .unwrap();
+        Resolution::new(a as u32, b as u32)
     }
 
     pub fn fps(&self) -> u32 {
@@ -830,11 +841,11 @@ impl OpenCVCameraDevice {
             self.res.set(new_res);
         }
         match self.video_capture.try_borrow_mut() {
-            Ok(vc) => {
+            Ok(mut vc) => {
                 let v_dev = &mut *vc;
                 match v_dev.set(
                     VideoCaptureProperties::CAP_PROP_FRAME_HEIGHT as i32,
-                    self.res.get().y as f64,
+                    f64::from(self.res.get().y),
                 ) {
                     Ok(r) => {
                         if !r {
@@ -850,7 +861,7 @@ impl OpenCVCameraDevice {
 
                 match v_dev.set(
                     VideoCaptureProperties::CAP_PROP_FRAME_WIDTH as i32,
-                    self.res.get().x as f64,
+                    f64::from(self.res.get().x),
                 ) {
                     Ok(r) => {
                         if !r {
@@ -874,11 +885,11 @@ impl OpenCVCameraDevice {
             self.fps.set(frame);
         }
         match self.video_capture.try_borrow_mut() {
-            Ok(vc) => {
+            Ok(mut vc) => {
                 let v_dev = &mut *vc;
                 match v_dev.set(
                     VideoCaptureProperties::CAP_PROP_FPS as i32,
-                    self.fps.get() as f64,
+                    f64::from(self.fps.get()),
                 ) {
                     Ok(r) => {
                         if !r {
@@ -895,7 +906,7 @@ impl OpenCVCameraDevice {
 
     pub fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
         return match self.video_capture.try_borrow_mut() {
-            Ok(vc) => {
+            Ok(mut vc) => {
                 let v_dev = &mut *vc;
                 if v_dev.is_opened().unwrap_or(false) {
                     Ok(())
@@ -953,7 +964,7 @@ impl OpenCVCameraDevice {
         };
 
         return match self.video_capture.try_borrow_mut() {
-            Ok(vc) => {
+            Ok(mut vc) => {
                 let v = &mut *vc;
                 match v.read(&mut read_frame) {
                     Ok(r) => {

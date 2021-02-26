@@ -240,12 +240,15 @@ impl InputProcessingThreadless {
     }
 
     pub fn capture_and_record(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let img_captured = match self.device_held.borrow().get_next_frame() {
-            Ok(frame) => frame,
-            Err(why) => return Err(why),
-        };
-        let res = { self.device_held.borrow().res() };
-        self.add_workload(res.y, res.x, img_captured);
+        // let img_captured = match self.device_held.borrow().get_next_frame() {
+        //     Ok(frame) => frame,
+        //     Err(why) => return Err(why),
+        // };
+        // let res = { self.device_held.borrow().res() };
+        // self.add_workload(res.y, res.x, img_captured);
+        // Ok(())
+        // unimplemented!()
+        godot_print!("{}", self.device_held.borrow().res());
         Ok(())
     }
 
