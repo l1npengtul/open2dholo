@@ -25,6 +25,7 @@ use crate::{
 };
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
+use nalgebra::DMatrix;
 use parking_lot::Mutex;
 use rusty_pool::ThreadPool;
 use std::{
@@ -223,7 +224,7 @@ impl InputProcessingThreadless {
         Ok(())
     }
 
-    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Vec<u8>) {
+    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: DMatrix<u8>) {
         let send = self.int_sender_ft.clone();
         let detector = self.face_detector.clone();
 
@@ -240,15 +241,12 @@ impl InputProcessingThreadless {
     }
 
     pub fn capture_and_record(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // let img_captured = match self.device_held.borrow().get_next_frame() {
-        //     Ok(frame) => frame,
-        //     Err(why) => return Err(why),
-        // };
-        // let res = { self.device_held.borrow().res() };
-        // self.add_workload(res.y, res.x, img_captured);
-        // Ok(())
-        // unimplemented!()
-        godot_print!("{}", self.device_held.borrow().res());
+        let img_captured = match self.device_held.borrow().get_next_frame() {
+            Ok(frame) => frame,
+            Err(why) => return Err(why),
+        };
+        let res = { self.device_held.borrow().res() };
+        self.add_workload(res.y, res.x, img_captured);
         Ok(())
     }
 

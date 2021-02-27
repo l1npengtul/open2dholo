@@ -51,6 +51,11 @@ git = "https://github.com/l1npengtul/dlib-face-recognition.git"
 version = "0.1.8"
 features = ["embed-all", "embed-any"]
 
+[dependencies.cv-convert]
+version = "0.3.0"
+default-features = false
+features = ["opencv-4", "opencv-buildtime-bindgen", "nalgebra"]
+
 [dependencies.v4l]
 version = "0.12.0"
 features = ["v4l2-sys"]
