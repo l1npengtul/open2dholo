@@ -224,7 +224,7 @@ impl InputProcessingThreadless {
         Ok(())
     }
 
-    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: DMatrix<u8>) {
+    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Vec<u8>) {
         let send = self.int_sender_ft.clone();
         let detector = self.face_detector.clone();
 

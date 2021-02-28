@@ -14,7 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::invalid_device_error::InvalidDeviceError::InvalidPlatform;
+use crate::error::invalid_device_error::InvalidDeviceError::{CannotGetFrame, InvalidPlatform};
 use crate::{
     error::invalid_device_error::InvalidDeviceError::{
         CannotFindDevice, CannotGetDeviceInfo, CannotOpenStream, CannotSetProperty,
@@ -29,9 +29,10 @@ use crate::{
     },
 };
 use cv_convert::{TryFromCv, TryIntoCv};
-use nalgebra::{DMatrix, MatrixMN};
-use opencv::core::{Mat, CV_8UC1};
-use opencv::prelude::VideoCaptureTrait;
+use gdnative::prelude::*;
+use nalgebra::{DMatrix, Dynamic, MatrixMN};
+use opencv::core::{Mat, MatConstIterator, CV_8UC1};
+use opencv::prelude::{MatTrait, MatTraitManual, VideoCaptureTrait};
 use opencv::videoio::{VideoCapture, VideoCaptureProperties};
 use opencv::{
     core::CV_8UC3,
@@ -39,7 +40,9 @@ use opencv::{
         VideoWriter, CAP_MSMF, CAP_PROP_FORMAT, CAP_PROP_FOURCC, CAP_PROP_FPS,
         CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L2,
     },
+    Error,
 };
+use std::borrow::Borrow;
 use std::cell::{BorrowMutError, Cell, RefCell, RefMut};
 use usb_enumeration::{enumerate, Filters};
 use uvc::{FormatDescriptor, FrameFormat};
@@ -739,58 +742,77 @@ impl OpenCVCameraDevice {
     }
 
     pub fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
-        match self.video_capture.try_borrow_mut() {
-            Ok(mut vc) => {
-                let v_dev = &mut *vc;
-                if v_dev.is_opened().unwrap_or(false) {
-                    return Ok(());
-                }
-                match std::env::consts::OS {
-                    "linux" => match v_dev.open(self.index.get() as i32, CAP_V4L2) {
-                        Ok(o) => {
-                            if o {
-                                return Ok(());
-                            }
-                            ret_boxerr!(CannotOpenStream("Failed to open V4L2 Stream".to_string(),))
-                        }
-                        Err(why) => ret_boxerr!(why),
-                    },
-                    "windows" => match v_dev.open(self.index.get() as i32, CAP_MSMF) {
-                        Ok(o) => {
-                            if o {
-                                return Ok(());
-                            }
-                            ret_boxerr!(CannotOpenStream(
-                                "Failed to open MS Media Foundation Stream".to_string(),
-                            ))
-                        }
-                        Err(why) => ret_boxerr!(why),
-                    },
-                    &_ => ret_boxerr!(InvalidPlatform("[\"linux\", \"windows\"]".to_string(),)),
-                }
-            }
-            Err(why) => ret_boxerr!(why),
-        };
+        if self.video_capture.borrow().is_opened().unwrap_or(false) {
+            ret_boxerr!(CannotOpenStream("Cannot Open OPENCV stream!".to_string()))
+        }
+        Ok(())
     }
 
-    // This function assumes that `open_stream()` has already been called.
-    pub fn get_next_frame(&self) -> Result<DMatrix<u8>, Box<dyn std::error::Error>> {
+    pub fn get_next_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let res = self.res.get();
-        let mut mat = match unsafe { Mat::new_rows_cols(res.y as i32, res.x as i32, CV_8UC3) } {
-            Ok(m) => m,
-            Err(why) => {
-                ret_boxerr!(why)
-            }
-        };
-        match self.video_capture.try_borrow_mut() {
-            Ok(mut vc) => {
-                let video = &mut *vc;
-                video.read(&mut mat);
-            }
-            Err(why) => {
-                ret_boxerr!(why);
+        // match self.video_capture.try_borrow_mut() {
+        //     Ok(mut vc) => {
+        //         let video = &mut *vc;
+        //         video.read(&mut mat);
+        //         if !mat.empty().unwrap_or(false) {
+        //             if mat.is_continuous().unwrap_or(false) {
+        //                 match mat.data_typed::<u8>() {
+        //                     Ok(data) => {
+        //                         return Ok(data.to_vec());
+        //                     }
+        //                     Err(why) => {
+        //                         ret_boxerr!(why)
+        //                     }
+        //                 }
+        //             }
+        //             // just die if it isnt cont lmao
+        //             ret_boxerr!(CannotGetFrame("Mat returned is not coninuous".to_string()))
+        //         } else {
+        //             let ret_vec: Vec<u8> = Vec::new();
+        //             return Ok(ret_vec);
+        //         }
+        //     }
+        //     Err(why) => {
+        //         ret_boxerr!(why)
+        //     }
+        // }
+
+        let vc = &mut *self.video_capture.borrow_mut();
+        {
+            let mut frame = Mat::default().unwrap();
+            vc.read(&mut frame);
+            if frame.size().unwrap().width > 0 {
+                if frame.is_continuous().unwrap_or(false) {
+                    match frame.data_typed::<u8>() {
+                        Ok(data) => {
+                            return Ok(data.to_vec());
+                        }
+                        Err(why) => {
+                            ret_boxerr!(why)
+                        }
+                    }
+                }
+                // non continuous mat
+                let mut ret_vec: Vec<u8> = Vec::new();
+                ret_vec.reserve_exact(
+                    (frame.rows() * frame.cols() * frame.channels().unwrap_or(3)) as usize,
+                );
+                for row in 0..(frame.rows() - 1) {
+                    let mat_rw = match frame.row(row) {
+                        Ok(m) => m,
+                        Err(why) => ret_boxerr!(why),
+                    };
+                    let slice = match mat_rw.data_typed::<u8>() {
+                        Ok(sl) => sl,
+                        Err(why) => ret_boxerr!(why),
+                    };
+                    ret_vec.append(&mut slice.to_vec());
+                }
+                return Ok(ret_vec);
             }
         }
+        ret_boxerr!(CannotGetFrame("Unsatisfied Conditions".to_string()))
+
         // TODO: convert Mat to array/slice/nalgebra matrix
     }
 
@@ -800,36 +822,37 @@ impl OpenCVCameraDevice {
     // of saying "pettan"
     pub fn dispose_of_body(self) {}
 }
-// fn set_property_init(vc: &mut VideoCapture) -> Result<(), Box<dyn std::error::Error>> {
-//     // set the format to CV 8UC3
-//     // match vc.set(CAP_PROP_FORMAT, f64::from(CV_8UC3)) {
-//     //     Ok(r) => {
-//     //         if r {
-//     //             return match vc.set(
-//     //                 CAP_PROP_FOURCC,
-//     //                 f64::from(
-//     //                     VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap(),
-//     //                 ),
-//     //             ) {
-//     //                 Ok(r) => {
-//     //                     if r {
-//     //                         return Ok(());
-//     //                     }
-//     //                     ret_boxerr!(CannotSetProperty(
-//     //                         "OpenCV returned `false` for CAP_PROP_FOURCC!".to_string()
-//     //                     ))
-//     //                 }
-//     //                 Err(why) => Err(Box::new(why)),
-//     //             };
-//     //         }
-//     //         ret_boxerr!(CannotSetProperty(
-//     //             "OpenCV returned `false` for CAP_PROP_FORMAT!".to_string()
-//     //         ))
-//     //     }
-//     //     Err(why) => ret_boxerr!(why),
-//     // };
-//     Ok(())
-// }
+
+fn set_property_init(vc: &mut VideoCapture) -> Result<(), Box<dyn std::error::Error>> {
+    // set the format to CV 8UC3
+    // SHIT IS FUCKIN USELESS
+    // match vc.set(
+    //     CAP_PROP_FOURCC,
+    //     f64::from(VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap()),
+    // ) {
+    //     Ok(r) => {
+    //         if !r {
+    //             ret_boxerr!(CannotSetProperty(
+    //                 "OpenCV returned `false` for CAP_PROP_FOURCC!".to_string()
+    //             ))
+    //         }
+    //     }
+    //     Err(why) => ret_boxerr!(why),
+    // }
+    // match vc.set(CAP_PROP_FORMAT, f64::from(16)) {
+    //     // 8UC3
+    //     Ok(r) => {
+    //         if r {
+    //             return Ok(());
+    //         }
+    //         ret_boxerr!(CannotSetProperty(
+    //             "OpenCV returned `false` for CAP_PROP_FORMAT!".to_string()
+    //         ))
+    //     }
+    //     Err(why) => ret_boxerr!(why),
+    // }
+    Ok(())
+}
 
 fn set_property_res(
     vc: &mut VideoCapture,
