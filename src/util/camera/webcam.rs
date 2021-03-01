@@ -32,7 +32,8 @@ pub trait Webcam<'a> {
     fn get_camera_format(&self) -> DeviceFormat;
     fn set_camera_format(&self, format: DeviceFormat);
     fn get_camera_type(&self) -> WebcamType;
-    fn open_stream(&'a self) -> Result<StreamType<'a>, Box<dyn std::error::Error + 'a>>;
+    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>>;
+    fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>>;
     fn get_inner(&self) -> PossibleDevice;
     // fn as_any(&self) -> &dyn Any;
 }
