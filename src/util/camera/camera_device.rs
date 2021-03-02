@@ -14,50 +14,58 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::invalid_device_error::InvalidDeviceError::CannotGetFrame;
 use crate::{
     error::invalid_device_error::InvalidDeviceError::{
-        CannotFindDevice, CannotGetDeviceInfo, CannotOpenStream, CannotSetProperty,
+        CannotFindDevice, CannotGetDeviceInfo, CannotGetFrame, CannotOpenStream, CannotSetProperty,
     },
     ret_boxerr,
     util::camera::{
         device_utils::{
             get_os_webcam_index, DeviceContact, DeviceFormat, DeviceHolder, PathIndex,
-            PossibleDevice, Resolution, StreamType,
+            PossibleDevice, Resolution,
         },
         webcam::{Webcam, WebcamType},
     },
 };
-use flume::{Receiver, Sender};
-use opencv::core::{Mat, MatTrait, MatTraitManual, Mat_, Vec3, Vec3b};
-use opencv::videoio::{VideoCapture, VideoCaptureProperties};
-use opencv::videoio::{
-    VideoCaptureTrait, CAP_MSMF, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH,
-    CAP_V4L2,
+use flume::{Receiver, Sender, TryRecvError};
+use opencv::{
+    core::{Mat, MatTrait, MatTraitManual},
+    videoio::{
+        VideoCapture, VideoCaptureProperties, VideoCaptureTrait, CAP_MSMF, CAP_PROP_FPS,
+        CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L2,
+    },
 };
-use std::cell::{Cell, RefCell};
-use std::mem::size_of;
-use std::ops::Deref;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::time::Instant;
+use std::{
+    cell::{Cell, RefCell},
+    mem::size_of,
+    sync::atomic::AtomicUsize,
+    sync::Arc,
+    time::Instant,
+};
+use tch::Device;
 use usb_enumeration::{enumerate, Filters};
-use uvc::{ActiveStream, FormatDescriptor, FrameFormat};
+use uvc::{ActiveStream, DeviceHandle, Error, FormatDescriptor, FrameFormat, StreamHandle};
 use v4l::{
-    buffer::Type, format::Format, fraction::Fraction, framesize::FrameSizeEnum, io::mmap::Stream,
-    video::capture::Parameters, video::traits::Capture, FourCC,
+    buffer::Type,
+    format::Format,
+    fraction::Fraction,
+    framesize::FrameSizeEnum,
+    io::mmap::Stream,
+    io::traits::CaptureStream,
+    video::{capture::Parameters, traits::Capture},
+    FourCC,
 };
 
 // USE set_format for v4l2 device
-pub struct V4LinuxDevice {
+pub struct V4LinuxDevice<'a> {
     device_type: WebcamType,
     device_format: Cell<DeviceFormat>,
     device_path: PathIndex,
+    device_stream: RefCell<Option<RefCell<Stream<'a>>>>, // why do i have to wrap this in 2 refcells please option give an option for a mutable reference PLEASE
     pub inner: RefCell<v4l::Device>,
 }
 
-impl V4LinuxDevice {
+impl<'a> V4LinuxDevice<'a> {
     pub fn new(index: usize) -> Result<Self, Box<dyn std::error::Error>> {
         let device = match v4l::Device::new(index) {
             Ok(dev) => dev,
@@ -75,6 +83,7 @@ impl V4LinuxDevice {
             device_type,
             device_format: Cell::new(DeviceFormat::MJPEG),
             device_path,
+            device_stream: RefCell::new(None),
             inner: RefCell::new(device),
         })
     }
@@ -95,6 +104,7 @@ impl V4LinuxDevice {
             device_type,
             device_format: Cell::new(DeviceFormat::MJPEG),
             device_path,
+            device_stream: RefCell::new(None),
             inner: RefCell::new(device),
         })
     }
@@ -106,7 +116,7 @@ impl V4LinuxDevice {
     }
 }
 
-impl<'a> Webcam<'a> for V4LinuxDevice {
+impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     fn name(&self) -> String {
         let device_name = match self.inner.borrow().query_caps() {
             Ok(capability) => capability.card,
@@ -245,15 +255,38 @@ impl<'a> Webcam<'a> for V4LinuxDevice {
         self.device_type
     }
 
-    fn open_stream(&self) -> Result<StreamType, Box<dyn std::error::Error>> {
+    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
         return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
-            Ok(stream) => Ok(StreamType::V4L2Stream(stream)),
+            Ok(stream) => {
+                *self.device_stream.borrow_mut() = Some(RefCell::new(stream));
+                Ok(())
+            }
             Err(why) => Err(Box::new(CannotOpenStream(why.to_string()))),
         };
     }
 
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        unimplemented!()
+        match self.device_stream.try_borrow_mut() {
+            Ok(m) => match &*m {
+                Some(stream) => {
+                    let a = &mut *stream.borrow_mut();
+                    match a.next() {
+                        Ok(fr) => Ok(fr.0.to_vec()),
+                        Err(why) => {
+                            ret_boxerr!(why)
+                        }
+                    }
+                }
+                None => {
+                    ret_boxerr!(CannotGetFrame(
+                        "Uninitialized stream! Please call `open_stream` first!".to_string()
+                    ))
+                }
+            },
+            Err(why) => {
+                ret_boxerr!(why);
+            }
+        }
     }
 
     fn get_inner(&self) -> PossibleDevice {
@@ -291,6 +324,7 @@ pub struct UVCameraDevice<'a> {
     device_format: Cell<DeviceFormat>,
     device_resolution: Cell<Option<Resolution>>,
     device_framerate: Cell<Option<u32>>,
+    device_handle: RefCell<Option<RefCell<DeviceHandle<'a>>>>,
     inner_thread: RefCell<Option<ActiveStream<'a, Arc<AtomicUsize>>>>,
     inner_channel: RefCell<Option<Receiver<Vec<u8>>>>,
     inner_thread_die_sig: RefCell<Option<Sender<u8>>>,
@@ -339,6 +373,7 @@ impl<'a> UVCameraDevice<'a> {
                     device_format: Cell::new(DeviceFormat::MJPEG),
                     device_resolution: Cell::new(None),
                     device_framerate: Cell::new(None),
+                    device_handle: RefCell::new(None),
                     inner_thread: RefCell::new(None),
                     inner_channel: RefCell::new(None),
                     inner_thread_die_sig: RefCell::new(None),
@@ -385,6 +420,7 @@ impl<'a> UVCameraDevice<'a> {
                     device_format: Cell::new(DeviceFormat::YUYV),
                     device_resolution: Cell::new(None),
                     device_framerate: Cell::new(None),
+                    device_handle: RefCell::new(None),
                     inner_thread: RefCell::new(None),
                     inner_channel: RefCell::new(None),
                     inner_thread_die_sig: RefCell::new(None),
@@ -395,10 +431,6 @@ impl<'a> UVCameraDevice<'a> {
         Err(Box::new(CannotFindDevice("noaddr".to_string())))
     }
 }
-
-unsafe impl Send for V4LinuxDevice {}
-
-unsafe impl Sync for V4LinuxDevice {} // NEVER MUTATE BETWEEN THREADS!!! NEVER SEND A MUTABLE `V4LinuxDevice`!!!
 
 impl<'a> Webcam<'a> for UVCameraDevice<'a> {
     fn name(&self) -> String {
@@ -526,13 +558,59 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
         self.device_type
     }
 
-    fn open_stream(&'a self) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
         return match (self.device_resolution.get(), self.device_framerate.get()) {
-            (Some(_res), Some(_fps)) => {
-                let _format = match self.device_format.get() {
-                    DeviceFormat::YUYV => FrameFormat::YUYV,
-                    DeviceFormat::MJPEG => FrameFormat::MJPEG,
+            (Some(res), Some(fps)) => {
+                let format = FrameFormat::MJPEG; // disregard everything MJPEG king
+                let dev_handle: DeviceHandle<'a> = match self.inner.open() {
+                    Ok(dh) => dh,
+                    Err(why) => {
+                        ret_boxerr!(why);
+                    }
                 };
+                let (inner_thread_die_sig_tx, inner_thread_die_sig_rx) = flume::unbounded::<u8>();
+                let (inner_channel_tx, inner_channel_rx) = flume::unbounded::<Vec<u8>>();
+
+                let cnt = Arc::new(AtomicUsize::new(0));
+                let mut stream_handle = match dev_handle
+                    .get_stream_handle_with_format_size_and_fps(format, res.x, res.y, fps)
+                {
+                    Ok(sh) => sh,
+                    Err(why) => {
+                        ret_boxerr!(why);
+                    }
+                };
+                let inner_thread = match stream_handle.start_stream(
+                    move |frame, count| {
+                        if inner_thread_die_sig_rx.is_disconnected() {
+                            return;
+                        }
+                        match inner_thread_die_sig_rx.try_recv() {
+                            Ok(recv) => {
+                                if recv == 255 {
+                                    return;
+                                }
+                            }
+                            Err(_why) => {
+                                // do nothing
+                            }
+                        }
+                        if !inner_channel_tx.is_disconnected() && !inner_channel_tx.is_full() {
+                            inner_channel_tx.send(frame.to_rgb().unwrap().to_bytes().to_vec());
+                        } else {
+                            return;
+                        }
+                    },
+                    cnt,
+                ) {
+                    Ok(stream) => stream,
+                    Err(why) => ret_boxerr!(why),
+                };
+
+                *self.device_handle.borrow_mut() = Some(RefCell::new(dev_handle));
+                *self.inner_thread_die_sig.borrow_mut() = Some(inner_thread_die_sig_tx);
+                *self.inner_channel.borrow_mut() = Some(inner_channel_rx);
+                *self.inner_thread.borrow_mut() = Some(inner_thread);
 
                 Ok(())
             }
@@ -787,7 +865,7 @@ impl OpenCVCameraDevice {
                         libc::memcpy(
                             vec_ptr,
                             mat_ptr,
-                            size_of::<u8>() * frame.rows() * frame.cols() * 3,
+                            (size_of::<u8>() as i32 * frame.rows() * frame.cols() * 3) as usize,
                         );
                     }
                     let elapsed = current_time.elapsed();
@@ -876,7 +954,7 @@ impl<'a> Webcam<'a> for OpenCVCameraDevice {
         unimplemented!()
     }
 
-    fn open_stream(self) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
         unimplemented!()
     }
 

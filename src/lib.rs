@@ -32,12 +32,7 @@
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
 use opencv::core::CV_8UC3;
-use opencv::prelude::VideoCaptureTrait;
-use opencv::videoio::{VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH};
-use std::cell::RefCell;
-use std::process::Command;
-use std::rc::Rc;
-use std::sync::Arc;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 pub mod configuration;
 pub mod error;
@@ -47,6 +42,7 @@ pub mod util;
 
 #[macro_use]
 extern crate lazy_static;
+extern crate rental;
 
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
