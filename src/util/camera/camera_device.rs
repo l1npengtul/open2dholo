@@ -28,6 +28,7 @@ use crate::{
         webcam::{Webcam, WebcamType},
     },
 };
+use flume::{Receiver, Sender};
 use opencv::core::{Mat, MatTrait, MatTraitManual, Mat_, Vec3, Vec3b};
 use opencv::videoio::{VideoCapture, VideoCaptureProperties};
 use opencv::videoio::{
@@ -35,16 +36,18 @@ use opencv::videoio::{
     CAP_V4L2,
 };
 use std::cell::{Cell, RefCell};
+use std::mem::size_of;
 use std::ops::Deref;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::time::Instant;
 use usb_enumeration::{enumerate, Filters};
-use uvc::{FormatDescriptor, FrameFormat};
+use uvc::{ActiveStream, FormatDescriptor, FrameFormat};
 use v4l::{
     buffer::Type, format::Format, fraction::Fraction, framesize::FrameSizeEnum, io::mmap::Stream,
     video::capture::Parameters, video::traits::Capture, FourCC,
 };
-use std::thread::JoinHandle;
-use flume::Receiver;
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice {
@@ -288,8 +291,9 @@ pub struct UVCameraDevice<'a> {
     device_format: Cell<DeviceFormat>,
     device_resolution: Cell<Option<Resolution>>,
     device_framerate: Cell<Option<u32>>,
-    inner_thread: JoinHandle<()>,
-    inner_channel: Receiver<>
+    inner_thread: RefCell<Option<ActiveStream<'a, Arc<AtomicUsize>>>>,
+    inner_channel: RefCell<Option<Receiver<Vec<u8>>>>,
+    inner_thread_die_sig: RefCell<Option<Sender<u8>>>,
     pub inner: uvc::Device<'a>,
 }
 
@@ -335,6 +339,9 @@ impl<'a> UVCameraDevice<'a> {
                     device_format: Cell::new(DeviceFormat::MJPEG),
                     device_resolution: Cell::new(None),
                     device_framerate: Cell::new(None),
+                    inner_thread: RefCell::new(None),
+                    inner_channel: RefCell::new(None),
+                    inner_thread_die_sig: RefCell::new(None),
                     inner,
                 });
             }
@@ -378,8 +385,9 @@ impl<'a> UVCameraDevice<'a> {
                     device_format: Cell::new(DeviceFormat::YUYV),
                     device_resolution: Cell::new(None),
                     device_framerate: Cell::new(None),
-                    inner_thread: (),
-                    inner_channel: (),
+                    inner_thread: RefCell::new(None),
+                    inner_channel: RefCell::new(None),
+                    inner_thread_die_sig: RefCell::new(None),
                     inner,
                 });
             }
@@ -518,17 +526,15 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
         self.device_type
     }
 
-    fn open_stream(&'a self) -> Result<StreamType, Box<dyn std::error::Error>> {
+    fn open_stream(&'a self) -> Result<(), Box<dyn std::error::Error>> {
         return match (self.device_resolution.get(), self.device_framerate.get()) {
             (Some(_res), Some(_fps)) => {
                 let _format = match self.device_format.get() {
                     DeviceFormat::YUYV => FrameFormat::YUYV,
                     DeviceFormat::MJPEG => FrameFormat::MJPEG,
                 };
-                return match self.inner.open() {
-                    Ok(handler) => Ok(StreamType::UVCStream(handler)),
-                    Err(why) => return Err(Box::new(CannotOpenStream(why.to_string()))),
-                };
+
+                Ok(())
             }
             (Some(_), None) => Err(Box::new(CannotOpenStream(
                 "Missing required arguments Framerate".to_string(),
@@ -756,33 +762,6 @@ impl OpenCVCameraDevice {
     }
 
     pub fn get_next_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        // match self.video_capture.try_borrow_mut() {
-        //     Ok(mut vc) => {
-        //         let video = &mut *vc;
-        //         video.read(&mut mat);
-        //         if !mat.empty().unwrap_or(false) {
-        //             if mat.is_continuous().unwrap_or(false) {
-        //                 match mat.data_typed::<u8>() {
-        //                     Ok(data) => {
-        //                         return Ok(data.to_vec());
-        //                     }
-        //                     Err(why) => {
-        //                         ret_boxerr!(why)
-        //                     }
-        //                 }
-        //             }
-        //             // just die if it isnt cont lmao
-        //             ret_boxerr!(CannotGetFrame("Mat returned is not coninuous".to_string()))
-        //         } else {
-        //             let ret_vec: Vec<u8> = Vec::new();
-        //             return Ok(ret_vec);
-        //         }
-        //     }
-        //     Err(why) => {
-        //         ret_boxerr!(why)
-        //     }
-        // }
-
         let vc = &mut *self.video_capture.borrow_mut();
         {
             let mut frame = Mat::default().unwrap();
@@ -796,22 +775,20 @@ impl OpenCVCameraDevice {
             if frame.size().unwrap().width > 0 {
                 if frame.is_continuous().unwrap() {
                     let current_time = Instant::now();
-                    let img_data_vec = match Mat::data_typed::<Vec3b>(&frame) {
-                        Ok(data) => data,
-                        Err(why) => {
-                            dbg!("{}", why.to_string());
-                            ret_boxerr!(why)
-                        }
-                    };
+                    // use a memcpy - we about to get f u n k y
                     let mut ret_vec: Vec<u8> = Vec::new();
                     ret_vec.reserve_exact(
                         (frame.rows() * frame.cols() * frame.channels().unwrap_or(3)) as usize,
                     );
-                    for px in img_data_vec.iter() {
-                        let pixel_arr: &[u8; 3] = Vec3::deref(&px);
-                        ret_vec.push(pixel_arr[0]);
-                        ret_vec.push(pixel_arr[1]);
-                        ret_vec.push(pixel_arr[2]);
+                    // make a scope so the vec outlives the pointer 100%
+                    unsafe {
+                        let vec_ptr = ret_vec.as_mut_ptr().cast(); // this looks, feels, and is probably a sin.
+                        let mat_ptr = frame.as_raw_Mat();
+                        libc::memcpy(
+                            vec_ptr,
+                            mat_ptr,
+                            size_of::<u8>() * frame.rows() * frame.cols() * 3,
+                        );
                     }
                     let elapsed = current_time.elapsed();
                     dbg!("Millis: {}", elapsed.as_millis());
@@ -873,11 +850,17 @@ impl<'a> Webcam<'a> for OpenCVCameraDevice {
         unimplemented!()
     }
 
-    fn get_supported_formats(&self, res: Resolution) -> Result<Vec<DeviceFormat>, Box<dyn std::error::Error>> {
+    fn get_supported_formats(
+        &self,
+        res: Resolution,
+    ) -> Result<Vec<DeviceFormat>, Box<dyn std::error::Error>> {
         unimplemented!()
     }
 
-    fn get_supported_framerate(&self, res: Resolution) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
+    fn get_supported_framerate(
+        &self,
+        res: Resolution,
+    ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
         unimplemented!()
     }
 
