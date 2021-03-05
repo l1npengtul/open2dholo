@@ -431,45 +431,6 @@ impl WebcamInputEditor {
                         godot_print!("No Camera!");
                     }
                 },
-                // // TODO: remove, just only support MJPG
-                // "Webcam Video Format:" => match self.device_selected.borrow().as_deref() {
-                //     Some(device) => {
-                //         let format_popup = unsafe {
-                //             owner
-                //                 .get_node("../FormatPopup")
-                //                 .unwrap()
-                //                 .assume_safe()
-                //                 .cast::<PopupMenu>()
-                //                 .unwrap()
-                //         };
-                //         format_popup.clear();
-                //         if format_popup.is_visible() {
-                //             format_popup.set_visible(false);
-                //         } else {
-                //             if let Ok(resolutions) = device.get_supported_resolutions() {
-                //                 if let Some(res) = resolutions.get(0) {
-                //                     let rect = owner.get_custom_popup_rect();
-                //                     let size = rect.size.to_vector();
-                //                     let position = rect.origin.to_vector();
-                //                     let mut counter = 0;
-                //                     if let Ok(dev_fmt) = device.get_supported_formats(res.clone()) {
-                //                         for fourcc in dev_fmt {
-                //                             format_popup.add_item(fourcc.to_string(), counter, 1);
-                //                             counter += 1;
-                //                         }
-                //                     }
-
-                //                     format_popup.set_size(size, true);
-                //                     format_popup.set_position(position, true);
-                //                     format_popup.set_visible(true);
-                //                 }
-                //             }
-                //         }
-                //     }
-                //     None => {
-                //         godot_print!("No Camera!");
-                //     }
-                // },
                 _ => (),
             }
         }
@@ -564,44 +525,6 @@ impl WebcamInputEditor {
         clicked_item.set_text(1, clicked_popup);
         self.check_button_eligibility(owner);
     }
-
-    // #[export]
-    // pub fn on_format_popup_menu_clicked(&self, owner: TRef<Tree>, id: i32) {
-    //     self.clear_other_fields(owner, "format");
-    //     let format_popup = unsafe {
-    //         owner
-    //             .get_node("../FormatPopup")
-    //             .unwrap()
-    //             .assume_safe()
-    //             .cast::<PopupMenu>()
-    //             .unwrap()
-    //     };
-    //     // TODO: Get USB device from thing and open device
-    //     let clicked_item = unsafe {
-    //         owner
-    //             .assume_shared()
-    //             .assume_safe()
-    //             .get_edited()
-    //             .unwrap()
-    //             .assume_safe()
-    //     };
-    //     let clicked_popup = format_popup
-    //         .get_item_text(format_popup.get_item_index(id as i64))
-    //         .to_string();
-    //     match &clicked_popup.clone().to_ascii_lowercase().to_owned()[..] {
-    //         "yuyv" => {
-    //             *self.format_selected.borrow_mut() = Some(DeviceFormat::YUYV);
-    //             clicked_item.set_text(1, clicked_popup);
-    //             self.check_button_eligibility(owner);
-    //         }
-    //         "mjpg" | "mjpeg" => {
-    //             *self.format_selected.borrow_mut() = Some(DeviceFormat::MJPEG);
-    //             clicked_item.set_text(1, clicked_popup);
-    //             self.check_button_eligibility(owner);
-    //         }
-    //         _ => {}
-    //     }
-    // }
 
     #[export]
     pub fn on_start_button_pressed(&self, owner: TRef<Tree>) {

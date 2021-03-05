@@ -15,7 +15,7 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::processing::face_detector::detectors::util::{DetectorHardware, DetectorType};
-use crate::processing::input_processor::InputProcessingThreadless;
+use crate::processing::input_processor::InputProcesser;
 use crate::util::camera::device_utils::Resolution;
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
@@ -23,7 +23,7 @@ use std::cell::RefCell;
 #[derive(NativeClass)]
 #[inherit(VSplitContainer)]
 pub struct ViewportHolder {
-    input_processer: RefCell<Option<InputProcessingThreadless>>,
+    input_processer: RefCell<Option<InputProcesser>>,
 }
 
 #[methods]
@@ -293,7 +293,7 @@ impl ViewportHolder {
         let device_contact = crate::CURRENT_DEVICE.with(|dev| dev.borrow().clone().unwrap());
         godot_print!("input_proc");
 
-        let input_processer = match InputProcessingThreadless::from_device_contact(
+        let input_processer = match InputProcesser::from_device_contact(
             Some(device_name),
             device_contact,
             device_res,

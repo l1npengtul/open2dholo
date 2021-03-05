@@ -42,14 +42,12 @@ pub mod util;
 
 #[macro_use]
 extern crate lazy_static;
+extern crate ouroboros;
 extern crate rental;
+extern crate rental_impl;
 
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
-    static ref UVC: Arc<uvc::Context<'static>> = {
-        let ctx = uvc::Context::new();
-        Arc::new(ctx.expect("Could not get UVC Context! Aborting!"))
-    };
     static ref USER_DIR: Arc<String> = {
         Arc::new(
             gdnative::api::OS::godot_singleton()

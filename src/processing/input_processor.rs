@@ -34,71 +34,7 @@ use std::{
     time::Duration,
 };
 
-//
-// fn make_v4l_device(
-//     location: &PathIndex,
-//     res: Resolution,
-//     fps: u32,
-//     fmt: FourCC,
-// ) -> Result<Device, Box<dyn std::error::Error>> {
-//     let device = match location {
-//         PathIndex::Path(path) => {
-//             let dev = match Device::with_path(Path::new(path)) {
-//                 Ok(d) => d,
-//                 Err(why) => return Err(Box::new(why)),
-//             };
-//             dev
-//         }
-//         PathIndex::Index(idx) => {
-//             let dev = match Device::new(*idx) {
-//                 Ok(d) => d,
-//                 Err(why) => return Err(Box::new(why)),
-//             };
-//             dev
-//         }
-//     };
-//
-//     let fcc = fmt;
-//
-//     let format = match device.format() {
-//         Ok(mut f) => {
-//             f.width = res.x;
-//             f.height = res.y;
-//             f.fourcc = fcc;
-//             f
-//         }
-//         Err(_) => Format::new(res.x, res.y, fcc),
-//     };
-//
-//     let param = Parameters::with_fps(fps);
-//
-//     if let Err(why) = device.set_format(&format) {
-//         return Err(Box::new(why));
-//     }
-//     if let Err(why) = device.set_params(&param) {
-//         return Err(Box::new(why));
-//     }
-//
-//     Ok(device)
-// }
-//
-// fn make_uvc_device<'a>(
-//     vendor_id: Option<u16>,
-//     product_id: Option<u16>,
-//     serial: Option<String>,
-// ) -> Result<UVCDevice<'a>, Box<dyn std::error::Error>> {
-//     let device = match crate::UVC.find_device(
-//         vendor_id.map(i32::from),
-//         product_id.map(i32::from),
-//         serial.as_deref(),
-//     ) {
-//         Ok(d) => d,
-//         Err(why) => return Err(Box::new(why)),
-//     };
-//     Ok(device)
-// }
-
-pub struct InputProcessingThreadless {
+pub struct InputProcesser {
     // device: PossibleDevice,
     pub device_held: RefCell<OpenCVCameraDevice>,
     // bruh wtf
@@ -110,7 +46,7 @@ pub struct InputProcessingThreadless {
     int_receiver_ft: Receiver<PointType>,
 }
 
-impl InputProcessingThreadless {
+impl InputProcesser {
     pub fn new(
         name: Option<String>,
         device: PossibleDevice,
@@ -144,7 +80,7 @@ impl InputProcessingThreadless {
 
         let (int_sender_ft, int_receiver_ft) = flume::unbounded();
 
-        Ok(InputProcessingThreadless {
+        Ok(InputProcesser {
             device_held,
             detector_type,
             detector_hw,
@@ -196,7 +132,7 @@ impl InputProcessingThreadless {
         let (int_sender_ft, int_receiver_ft) = flume::unbounded();
         godot_print!("input_process_ret");
 
-        Ok(InputProcessingThreadless {
+        Ok(InputProcesser {
             device_held,
             detector_type,
             detector_hw,

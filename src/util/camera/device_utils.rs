@@ -18,7 +18,7 @@ use crate::error::conversion_error::ConversionError;
 use crate::error::conversion_error::ConversionError::{ConversionFromError, MatchFailedError};
 use crate::error::invalid_device_error::InvalidDeviceError;
 use crate::util::camera::{
-    camera_device::{UVCameraDevice, V4LinuxDevice},
+    camera_device::{uvcam::UVCameraDevice, V4LinuxDevice},
     webcam::Webcam,
 };
 use gdnative::prelude::*;
@@ -131,7 +131,7 @@ impl PartialEq for DeviceHolder {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Resolution {
     pub x: u32,
     pub y: u32,
@@ -209,7 +209,7 @@ impl Ord for Resolution {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum DeviceFormat {
     YUYV,
     MJPEG,

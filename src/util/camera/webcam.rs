@@ -21,10 +21,6 @@ pub trait Webcam<'a> {
     fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>>;
     fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>>;
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>>;
-    fn get_supported_formats(
-        &self,
-        res: Resolution,
-    ) -> Result<Vec<DeviceFormat>, Box<dyn std::error::Error>>;
     fn get_supported_framerate(
         &self,
         res: Resolution,
@@ -38,7 +34,7 @@ pub trait Webcam<'a> {
     // fn as_any(&self) -> &dyn Any;
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum WebcamType {
     V4linux2,
     USBVideo,
