@@ -17,15 +17,13 @@ ron = "0.6.2"
 serde = "1.0.117"
 usb_enumeration = "0.1.0"
 regex = "1.4.2"
-tch = "0.3.1"
+#tch = "0.3.1"
 nalgebra = "0.24.0"
 image = "0.23.12"
 windows = "0.3.1"
 suspend = "0.1.3"
 once_cell = "1.6.0"
 libc = "0.2.86"
-rental = "0.5.5"
-rental-impl = "0.5.5"
 
 #[dependencies.pyo3]
 #version = "0.13.2"
@@ -76,6 +74,9 @@ features = ["tensorflow_gpu"]
 [build-dependencies]
 windows = "0.3.1"
 
+[unstable]
+maybe_uninit_ref = 'yes'
+maybe_uninit_extra = 'yes'
 
 [lib]
 crate-type = ["cdylib"]

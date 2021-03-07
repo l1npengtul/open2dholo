@@ -18,7 +18,7 @@ use crate::error::conversion_error::ConversionError;
 use crate::error::conversion_error::ConversionError::{ConversionFromError, MatchFailedError};
 use crate::error::invalid_device_error::InvalidDeviceError;
 use crate::util::camera::{
-    camera_device::{uvcam::UVCameraDevice, V4LinuxDevice},
+    camera_device::{UVCameraDevice, V4LinuxDevice},
     webcam::Webcam,
 };
 use gdnative::prelude::*;
@@ -29,7 +29,7 @@ use std::{
     os::raw::c_int,
 };
 use usb_enumeration::USBDevice;
-use uvc::{DeviceHandle, FrameFormat};
+use uvc::{Context, DeviceHandle, FrameFormat};
 use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -472,7 +472,7 @@ pub struct CachedDevice {
 
 impl CachedDevice {
     // DO NOT REMOVE THE `&`
-    pub fn from_webcam(camera: Box<dyn Webcam>) -> Result<Self, ()> {
+    pub fn from_webcam(camera: &Box<dyn Webcam>) -> Result<Self, ()> {
         let device_name = camera.name();
         let device_location = DeviceContact::from(camera.get_inner());
         let mut resolutions = match camera.get_supported_resolutions() {
@@ -486,30 +486,16 @@ impl CachedDevice {
         resolutions.sort();
 
         let mut fmt_res_mjpg: HashMap<Resolution, Vec<u32>> = HashMap::new();
-        let mut fmt_res_yuyv: HashMap<Resolution, Vec<u32>> = HashMap::new();
 
         for res in resolutions {
-            if let Ok(fmt) = camera.get_supported_formats(res) {
-                for dev_fmt in fmt {
-                    match dev_fmt {
-                        DeviceFormat::YUYV => {
-                            if let Ok(framerates) = camera.get_supported_framerate(res) {
-                                fmt_res_yuyv.insert(res, framerates.clone());
-                            }
-                        }
-                        DeviceFormat::MJPEG => {
-                            if let Ok(framerates) = camera.get_supported_framerate(res) {
-                                fmt_res_mjpg.insert(res, framerates.clone());
-                            }
-                        }
-                    }
-                }
+            if let Ok(framerates) = camera.get_supported_framerate(res) {
+                fmt_res_mjpg.insert(res, framerates.clone());
             }
         }
         Ok(Self {
             device_name,
             device_location,
-            device_format_yuyv: Box::new(fmt_res_yuyv),
+            device_format_yuyv: Box::new(fmt_res_mjpg.clone()),
             device_format_mjpg: Box::new(fmt_res_mjpg),
         })
     }
@@ -548,7 +534,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
             for dev in v4l::context::enum_devices() {
                 if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
                     let b: Box<dyn Webcam> = Box::new(v4l_dev);
-                    if let Ok(c_dev) = CachedDevice::from_webcam(b) {
+                    if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
                         known_devices.insert(
                             dev.name()
                                 .unwrap_or(format!("/dev/video{}", dev.index()))
@@ -569,7 +555,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
                         if let Ok(camera_device) = {
                             let b: Box<dyn Webcam> =
                                 Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
-                            CachedDevice::from_webcam(b)
+                            CachedDevice::from_webcam(&b)
                         } {
                             let dev_name = camera_device.get_name();
                             // weed out the repeating

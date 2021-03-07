@@ -13,7 +13,8 @@
 //
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
+#![feature(maybe_uninit_ref)]
+#![feature(maybe_uninit_extra)]
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
 // NO MATTER WHAT LINT COMES THROUGH THAT GATE
@@ -33,6 +34,7 @@ use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
 use opencv::core::CV_8UC3;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
+use uvc::Context;
 
 pub mod configuration;
 pub mod error;
@@ -43,11 +45,10 @@ pub mod util;
 #[macro_use]
 extern crate lazy_static;
 extern crate ouroboros;
-extern crate rental;
-extern crate rental_impl;
 
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
+    static ref UVC: Arc<Context<'static>> = { Arc::new(Context::new().unwrap()) };
     static ref USER_DIR: Arc<String> = {
         Arc::new(
             gdnative::api::OS::godot_singleton()

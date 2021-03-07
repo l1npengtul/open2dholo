@@ -27,7 +27,7 @@ use crate::{
         webcam::{Webcam, WebcamType},
     },
 };
-use flume::{Receiver, Sender, TryRecvError};
+use flume::{Receiver, Sender};
 use opencv::{
     core::{Mat, MatTrait, MatTraitManual},
     videoio::{
@@ -36,11 +36,11 @@ use opencv::{
     },
 };
 use ouroboros::self_referencing;
+use std::mem::MaybeUninit;
 use std::{
     cell::{Cell, RefCell},
     mem::size_of,
-    sync::atomic::AtomicUsize,
-    sync::Arc,
+    sync::{atomic::AtomicUsize, Arc},
     time::Instant,
 };
 use usb_enumeration::{enumerate, Filters};
@@ -53,11 +53,12 @@ use v4l::{
     format::Format,
     fraction::Fraction,
     framesize::FrameSizeEnum,
-    io::mmap::Stream,
-    io::traits::CaptureStream,
+    io::{mmap::Stream, traits::CaptureStream},
     video::{capture::Parameters, traits::Capture},
     FourCC,
 };
+
+type RefCellOption<T> = RefCell<Option<RefCell<T>>>;
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice<'a> {
@@ -292,47 +293,31 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     }
 }
 
-use rental::rental;
-
-rental! {
-    pub mod uvcam {
-        use uvc::{Context, Device, DeviceHandle, FrameFormat, StreamFormat, StreamHandle, ActiveStream};
-        use std::{
-            cell::{Cell, RefCell},
-            mem::size_of,
-            sync::atomic::AtomicUsize,
-            sync::Arc,
-            time::Instant,
-        };
-        use crate::{
-            error::invalid_device_error::InvalidDeviceError::{
-                CannotFindDevice, CannotGetDeviceInfo, CannotGetFrame, CannotOpenStream, CannotSetProperty,
-            },
-            ret_boxerr,
-            util::camera::{
-                device_utils::{
-                    get_os_webcam_index, DeviceContact, DeviceFormat, DeviceHolder, PathIndex,
-                    PossibleDevice, Resolution,
-                },
-                webcam::{Webcam, WebcamType},
-            },
-        };
-        #[rental]
-        pub struct UVCameraDevice<'a> {
-            device_type: Box<WebcamType>,
-            device_desc: Box<String>,
-            device_format: Box<Cell<DeviceFormat>>,
-            device_resolution: Box<Cell<Option<Resolution>>>,
-            device_framerate: Box<Cell<Option<u32>>>,
-            ctx: Box<Context<'a> + 'a>,
-            device: Box<uvc::Device<'ctx> + 'ctx>,
-            device_handle: Box<DeviceHandle<'device> + 'device>,
-            stream_handle: Box<Option<RefCell<StreamHandle<'device_handle>>> + 'device_handle>,
-            active_stream: Box<Option<RefCell<ActiveStream<'stream_handle, Arc<AtomicUsize>>>> + 'stream_handle>,
-        }
-    }
+// If you are getting linter errors about how `'this` isn't defined/a valid lifetime,
+// ignore it, the macro expansion isn't working properly.
+#[self_referencing(chain_hack, pub_extras)]
+pub struct UVCameraDevice<'a> {
+    device_type: Box<WebcamType>,
+    device_desc: Box<String>,
+    device_format: Box<Cell<DeviceFormat>>,
+    device_resolution: Box<Cell<Option<Resolution>>>,
+    device_framerate: Box<Cell<Option<u32>>>,
+    device_receiver: Box<Receiver<Vec<u8>>>,
+    device_sender: Box<Sender<Vec<u8>>>,
+    ctx: Box<Context<'a>>,
+    #[borrows(ctx)]
+    #[not_covariant]
+    device: Box<uvc::Device<'this>>,
+    #[borrows(device)]
+    #[not_covariant]
+    device_handle: Box<DeviceHandle<'this>>,
+    #[borrows(device_handle)]
+    #[not_covariant]
+    stream_handle: Box<RefCell<MaybeUninit<StreamHandle<'this>>>>,
+    #[borrows(stream_handle)]
+    #[not_covariant]
+    active_stream: Box<RefCell<MaybeUninit<ActiveStream<'this, Arc<AtomicUsize>>>>>,
 }
-use crate::util::camera::camera_device::uvcam::UVCameraDevice;
 
 impl<'a> UVCameraDevice<'a> {
     pub fn new_camera(
@@ -340,150 +325,164 @@ impl<'a> UVCameraDevice<'a> {
         product_id: Option<i32>,
         serial_number: Option<String>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let ctx = match Context::new() {
-            Ok(c) => Box::new(c),
-            Err(why) => ret_boxerr!(why),
-        };
-        let device = match ctx.find_device(vendor_id, product_id, serial_number.as_deref()) {
-            Ok(dev) => dev,
-            Err(why) => ret_boxerr!(why),
-        };
-        if let Ok(description) = device.description() {
+        let device_name = {
+            let ctx = match Context::new() {
+                Ok(c) => Box::new(c),
+                Err(why) => ret_boxerr!(why),
+            };
+            let device = match ctx.find_device(vendor_id, product_id, serial_number.as_deref()) {
+                Ok(dev) => dev,
+                Err(why) => ret_boxerr!(why),
+            };
+            let description = device.description().unwrap();
             let devices_list = enumerate()
                 .with_vendor_id(description.vendor_id)
                 .with_product_id(description.product_id);
-            if let Some(usb_dev) = devices_list.get(0) {
-                let device_name = format!(
-                    "{}:{} {}",
-                    description.vendor_id,
-                    description.product_id,
-                    usb_dev
-                        .description
-                        .clone()
-                        .unwrap_or_else(|| String::from(""))
-                );
-                let device_type = match DeviceHolder::from_devices(usb_dev, &device) {
-                    Ok(_dt) => WebcamType::USBVideo,
-                    Err(why) => {
-                        ret_boxerr!(CannotFindDevice(format!(
-                            "{},{}:{} {}",
-                            why.to_string(),
-                            description.vendor_id,
-                            description.product_id,
-                            description.serial_number.unwrap_or_else(|| "".to_string())
-                        )))
-                    }
-                };
-                let device_handle = match device.open() {
-                    Ok(dh) => Box::new(dh),
-                    Err(why) => ret_boxerr!(why),
-                };
+            let usb_dev = devices_list.get(0).unwrap();
+            let device_name = format!(
+                "{}:{} {}",
+                description.vendor_id,
+                description.product_id,
+                usb_dev
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| String::from(""))
+            );
+            device_name
+        };
 
-                return Ok(UVCameraDevice {
-                    device_type: Box::new(device_type),
-                    device_desc: Box::new(device_name),
-                    device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
-                    device_resolution: Box::new(Cell::new(None)),
-                    device_framerate: Box::new(Cell::new(None)),
-                    ctx,
-                    device: Box::new(device),
-                    device_handle,
-                    stream_handle: Box::new(None),
-                    active_stream: Box::new(None),
-                });
+        let result: std::thread::Result<UVCameraDevice> = std::panic::catch_unwind(|| {
+            let (send, recv) = {
+                let (s, r) = flume::unbounded();
+                let send: Box<Sender<Vec<u8>>> = Box::new(s);
+                let recv: Box<Receiver<Vec<u8>>> = Box::new(r);
+                (send, recv)
+            };
+            UVCameraDeviceBuilder {
+                device_type: Box::new(WebcamType::USBVideo),
+                device_desc: Box::new(device_name),
+                device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
+                device_resolution: Box::new(Cell::new(None)),
+                device_framerate: Box::new(Cell::new(None)),
+                device_receiver: recv,
+                device_sender: send,
+                ctx: Box::new(Context::new().unwrap()),
+                device_builder: |ctx| {
+                    Box::new(
+                        ctx.find_device(vendor_id, product_id, serial_number.as_deref())
+                            .unwrap(),
+                    )
+                },
+                device_handle_builder: |device_builder| Box::new(device_builder.open().unwrap()),
+                stream_handle_builder: |_device_handle_builder| {
+                    Box::new(RefCell::new(MaybeUninit::uninit()))
+                },
+                active_stream_builder: |_stream_handle_builder| {
+                    Box::new(RefCell::new(MaybeUninit::uninit()))
+                },
+            }
+            .build()
+        });
+        match result {
+            Ok(uvcam) => Ok(uvcam),
+            Err(_) => {
+                ret_boxerr!(CannotFindDevice(
+                    "Failed to build final UVCameraStruct from builder!".to_string()
+                ))
             }
         }
-        Err(Box::new(CannotFindDevice(format!(
-            "i64-{}:i64-{} {}",
-            vendor_id.unwrap_or(-1),
-            product_id.unwrap_or(-1),
-            serial_number.unwrap_or_else(|| "".to_string())
-        ))))
     }
 
     pub fn from_device(uvc_dev: uvc::Device<'a>) -> Result<Self, Box<dyn std::error::Error>> {
-        let (vendor, product, serial) = {
+        let description = {
             // block so we make sure parameter is drop
             let a = match uvc_dev.description() {
-                Ok(desc) => (desc.vendor_id, desc.product_id, desc.serial_number.clone()),
+                Ok(desc) => desc,
                 Err(why) => ret_boxerr!(why),
             };
             std::mem::drop(uvc_dev);
             a
         };
+        let devices_list = enumerate()
+            .with_vendor_id(description.vendor_id)
+            .with_product_id(description.product_id);
 
-        let ctx = match Context::new() {
-            Ok(c) => Box::new(c),
-            Err(why) => ret_boxerr!(why),
-        };
-        let device =
-            match ctx.find_device(Some(vendor as i32), Some(product as i32), serial.as_deref()) {
-                Ok(dev) => dev,
-                Err(why) => ret_boxerr!(why),
+        let device_name = format!(
+            "{}:{} {}",
+            description.vendor_id,
+            description.product_id,
+            devices_list
+                .get(0)
+                .unwrap()
+                .description
+                .clone()
+                .unwrap_or_else(|| String::from(""))
+        );
+
+        let result: std::thread::Result<UVCameraDevice> = std::panic::catch_unwind(|| {
+            let (send, recv) = {
+                let (s, r) = flume::unbounded();
+                let send: Box<Sender<Vec<u8>>> = Box::new(s);
+                let recv: Box<Receiver<Vec<u8>>> = Box::new(r);
+                (send, recv)
             };
-        if let Ok(description) = device.description() {
-            let devices_list = enumerate()
-                .with_vendor_id(description.vendor_id)
-                .with_product_id(description.product_id);
-            if let Some(usb_dev) = devices_list.get(0) {
-                let device_name = format!(
-                    "{}:{} {}",
-                    description.vendor_id,
-                    description.product_id,
-                    usb_dev
-                        .description
-                        .clone()
-                        .unwrap_or_else(|| String::from(""))
-                );
-                let device_type = match DeviceHolder::from_devices(usb_dev, &device) {
-                    Ok(_dt) => WebcamType::USBVideo,
-                    Err(why) => {
-                        return Err(Box::new(CannotFindDevice(format!(
-                            "noaddr: {}",
-                            why.to_string()
-                        ))));
-                    }
-                };
-                let device_handle = match device.open() {
-                    Ok(dh) => Box::new(dh),
-                    Err(why) => ret_boxerr!(why),
-                };
-
-                return Ok(UVCameraDevice {
-                    device_type: Box::new(device_type),
-                    device_desc: Box::new(device_name),
-                    device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
-                    device_resolution: Box::new(Cell::new(None)),
-                    device_framerate: Box::new(Cell::new(None)),
-                    ctx,
-                    device: Box::new(device),
-                    device_handle,
-                    stream_handle: Box::new(None),
-                    active_stream: Box::new(None),
-                });
+            UVCameraDeviceBuilder {
+                device_type: Box::new(WebcamType::USBVideo),
+                device_desc: Box::new(device_name),
+                device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
+                device_resolution: Box::new(Cell::new(None)),
+                device_framerate: Box::new(Cell::new(None)),
+                device_receiver: recv,
+                device_sender: send,
+                ctx: Box::new(Context::new().unwrap()),
+                device_builder: |ctx| {
+                    Box::new(
+                        ctx.find_device(
+                            Some(i32::from(description.vendor_id)),
+                            Some(i32::from(description.product_id)),
+                            description.serial_number.as_deref(),
+                        )
+                        .unwrap(),
+                    )
+                },
+                device_handle_builder: |device_builder| Box::new(device_builder.open().unwrap()),
+                stream_handle_builder: |_device_handle_builder| {
+                    Box::new(RefCell::new(MaybeUninit::uninit()))
+                },
+                active_stream_builder: |_stream_handle_builder| {
+                    Box::new(RefCell::new(MaybeUninit::uninit()))
+                },
+            }
+            .build()
+        });
+        match result {
+            Ok(uvcam) => Ok(uvcam),
+            Err(_) => {
+                ret_boxerr!(CannotFindDevice(
+                    "Failed to build final UVCameraStruct from builder!".to_string()
+                ))
             }
         }
-        Err(Box::new(CannotFindDevice("noaddr".to_string())))
     }
 }
 
 impl<'a> Webcam<'a> for UVCameraDevice<'a> {
     fn name(&self) -> String {
-        return self.device_desc.clone().to_string();
+        self.with_device_desc(|name| name).to_string()
     }
 
     fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>> {
-        self.device_resolution.set(Some(*res));
+        self.with_device_resolution(|set| set.set(Some(*res)));
         Ok(())
     }
 
     fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>> {
-        self.device_framerate.set(Some(*fps));
+        self.with_device_framerate(|set| set.set(Some(*fps)));
         Ok(())
     }
 
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
-        match self.device.open() {
+        self.with_device(|device| match device.open() {
             Ok(handler) => {
                 let mut resolutions: Vec<Resolution> = Vec::new();
                 for format in handler.supported_formats() {
@@ -499,18 +498,21 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 }
                 Ok(resolutions)
             }
-            Err(why) => Err(Box::new(CannotGetDeviceInfo {
-                prop: "Supported Resolutions".to_string(),
-                msg: why.to_string(),
-            })),
-        }
+            Err(why) => {
+                let a: Box<dyn std::error::Error> = Box::new(CannotGetDeviceInfo {
+                    prop: "Supported Resolutions".to_string(),
+                    msg: why.to_string(),
+                });
+                Err(a)
+            }
+        })
     }
 
     fn get_supported_framerate(
         &self,
         _res: Resolution,
     ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
-        match self.device.open() {
+        self.with_device(|device| match device.open() {
             Ok(handler) => {
                 let formats: Vec<FormatDescriptor> =
                     handler.supported_formats().into_iter().collect();
@@ -527,27 +529,105 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 }
                 Ok(framerates)
             }
-            Err(why) => Err(Box::new(CannotGetDeviceInfo {
-                prop: "Supported Resolutions".to_string(),
-                msg: why.to_string(),
-            })),
-        }
+            Err(why) => {
+                let a: Box<dyn std::error::Error> = Box::new(CannotGetDeviceInfo {
+                    prop: "Supported Framerates".to_string(),
+                    msg: why.to_string(),
+                });
+                Err(a)
+            }
+        })
     }
 
     fn get_camera_format(&self) -> DeviceFormat {
-        self.device_format.get()
+        self.with_device_format(|fmt| fmt).get()
     }
 
     fn set_camera_format(&self, format: DeviceFormat) {
-        self.device_format.set(format);
+        self.with_device_format(|fmt| fmt.set(format));
     }
 
     fn get_camera_type(&self) -> WebcamType {
-        self.device_type
+        **self.with_device_type(|dev_type| dev_type)
     }
 
     fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!()
+        // drop active stream
+        self.with_active_stream(|astream| unsafe {
+            (&mut *astream.borrow_mut()).assume_init_drop();
+        });
+
+        self.with(|fields| {
+            let resolution: Resolution = self.with_device_resolution(|res| res).get().unwrap();
+            let fps: u32 = self.with_device_framerate(|f| f).get().unwrap();
+            let devh = fields.device_handle;
+            let stream_handle = devh
+                .get_stream_handle_with_format_size_and_fps(
+                    FrameFormat::MJPEG,
+                    resolution.x,
+                    resolution.y,
+                    fps,
+                )
+                .unwrap();
+            let mut streamhandle_init = MaybeUninit::<StreamHandle>::uninit();
+            *fields.stream_handle.borrow_mut() = unsafe {
+                streamhandle_init.as_mut_ptr().write(stream_handle);
+                streamhandle_init
+            }
+        });
+
+        // this is cursed and forever will be cursed with lifetime errors
+        // transmute time?
+        self.with_stream_handle(|streamh| {
+            let cnt = Arc::new(AtomicUsize::new(0));
+            let sender: Sender<Vec<u8>> = *(self.with_device_sender(|send| send)).clone();
+            let mut streamh_ref = &mut *(streamh.borrow_mut());
+            let mut streamh_init = unsafe { streamh_ref.assume_init_mut() };
+
+            self.with_active_stream(|astream| {
+                let act_stream = streamh_init
+                    .start_stream(
+                        move |frame, _count| {
+                            let vec_frame: Vec<u8> = frame.to_rgb().unwrap().to_bytes().to_vec();
+                            sender.send(vec_frame);
+                        },
+                        cnt,
+                    )
+                    .unwrap();
+                let mut activestream_init = MaybeUninit::<ActiveStream<Arc<AtomicUsize>>>::uninit();
+                *astream.borrow_mut() = unsafe {
+                    activestream_init.as_mut_ptr().write(act_stream);
+                    activestream_init
+                }
+            });
+        });
+
+        // self.with_device_handle(|devh| {
+        //     self.with_stream_handle(|streamh| {
+        //         let resolution: Resolution = self.with_device_resolution(|res| res).get().unwrap();
+        //         let fps: u32 = self.with_device_framerate(|f| f).get().unwrap();
+        //         let stream_handle = devh
+        //             .get_stream_handle_with_format_size_and_fps(
+        //                 FrameFormat::MJPEG,
+        //                 resolution.x,
+        //                 resolution.y,
+        //                 fps,
+        //             )
+        //             .unwrap();
+        //         *streamh.borrow_mut() = Some(RefCell::new(stream_handle));
+        //     });
+        //     // make sure active stream is dropped
+        //     self.with_active_stream(|astream| {
+        //         *astream.borrow_mut() = None;
+        //     });
+        //     self.with_stream_handle(|streamh| {
+        //         let cnt = Arc::new(AtomicUsize::new(0));
+        //         let sender: Sender<Vec<u8>> = (**self.with_device_sender(|sender| sender)).clone();
+        //         let stream_handle = &*(*streamh.borrow_mut()).unwrap().borrow_mut();
+        //         let active_stream = stream_handle.start_stream(move |frame, count| {}, cnt);
+        //     });
+        // });
+        Ok(())
     }
 
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -555,7 +635,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
     }
 
     fn get_inner(&self) -> PossibleDevice {
-        let (vendor_id, product_id, serial) = match self.device.description() {
+        let (vendor_id, product_id, serial) = match self.with_device(|dev| dev).description() {
             Ok(desc) => (
                 Some(desc.vendor_id),
                 Some(desc.product_id),
@@ -564,14 +644,14 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
             Err(_) => (None, None, None),
         };
 
-        let res = match self.device_resolution.get() {
+        let res = match self.with_device_resolution(|d_res| d_res).get() {
             Some(r) => r,
             None => Resolution { x: 640, y: 480 },
         };
 
-        let fps = self.device_framerate.get().unwrap_or(5);
+        let fps = self.with_device_framerate(|d_fps| d_fps).get().unwrap_or(5);
 
-        let fmt = match self.device_format.get() {
+        let fmt = match self.with_device_format(|d_fmt| d_fmt).get() {
             DeviceFormat::YUYV => FrameFormat::YUYV,
             DeviceFormat::MJPEG => FrameFormat::MJPEG,
         };
@@ -609,7 +689,6 @@ impl OpenCVCameraDevice {
                 Err(why) => ret_boxerr!(why),
             };
 
-            set_property_init(&mut v_cap);
             if let Err(why) = set_property_res(&mut v_cap, resolution) {
                 return Err(why);
             }
@@ -649,7 +728,6 @@ impl OpenCVCameraDevice {
                 Err(why) => ret_boxerr!(why),
             };
 
-            set_property_init(&mut v_cap);
             if let Err(why) = set_property_res(&mut v_cap, res.get()) {
                 return Err(why);
             }
@@ -879,37 +957,6 @@ impl<'a> Webcam<'a> for OpenCVCameraDevice {
     fn get_inner(&self) -> PossibleDevice {
         unimplemented!()
     }
-}
-
-fn set_property_init(_vc: &mut VideoCapture) -> Result<(), Box<dyn std::error::Error>> {
-    // set the format to CV 8UC3
-    // SHIT IS FUCKIN USELESS
-    // match vc.set(
-    //     CAP_PROP_FOURCC,
-    //     f64::from(VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap()),
-    // ) {
-    //     Ok(r) => {
-    //         if !r {
-    //             ret_boxerr!(CannotSetProperty(
-    //                 "OpenCV returned `false` for CAP_PROP_FOURCC!".to_string()
-    //             ))
-    //         }
-    //     }
-    //     Err(why) => ret_boxerr!(why),
-    // }
-    // match vc.set(CAP_PROP_FORMAT, f64::from(16)) {
-    //     // 8UC3
-    //     Ok(r) => {
-    //         if r {
-    //             return Ok(());
-    //         }
-    //         ret_boxerr!(CannotSetProperty(
-    //             "OpenCV returned `false` for CAP_PROP_FORMAT!".to_string()
-    //         ))
-    //     }
-    //     Err(why) => ret_boxerr!(why),
-    // }
-    Ok(())
 }
 
 fn set_property_res(
