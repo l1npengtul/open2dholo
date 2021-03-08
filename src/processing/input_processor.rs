@@ -25,7 +25,6 @@ use crate::{
 };
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
-use nalgebra::DMatrix;
 use parking_lot::Mutex;
 use rusty_pool::ThreadPool;
 use std::{

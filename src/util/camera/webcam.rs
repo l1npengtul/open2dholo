@@ -20,24 +20,25 @@ pub trait Webcam<'a> {
     fn name(&self) -> String;
     fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>>;
     fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>>;
+    fn get_camera_type(&self) -> WebcamType;
+    fn open_stream(&'a self) -> Result<(), Box<dyn std::error::Error>>;
+    fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>>;
+    // fn as_any(&self) -> &dyn Any;
+}
+
+pub trait QueryCamera<'a> {
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>>;
     fn get_supported_framerate(
         &self,
         res: Resolution,
     ) -> Result<Vec<u32>, Box<dyn std::error::Error>>;
-    fn get_camera_format(&self) -> DeviceFormat;
-    fn set_camera_format(&self, format: DeviceFormat);
-    fn get_camera_type(&self) -> WebcamType;
-    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>>;
-    fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>>;
-    fn get_inner(&self) -> PossibleDevice;
-    // fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Copy, Clone, Debug)]
 pub enum WebcamType {
     V4linux2,
     USBVideo,
+    OpenCVCapture,
 }
 
 impl WebcamType {
@@ -45,6 +46,7 @@ impl WebcamType {
         return match pd {
             PossibleDevice::UVCAM { .. } => WebcamType::USBVideo,
             PossibleDevice::V4L2 { .. } => WebcamType::V4linux2,
+            PossibleDevice::OPENCV { .. } => WebcamType::OpenCVCapture,
         };
     }
 }

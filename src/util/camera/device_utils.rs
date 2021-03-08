@@ -265,6 +265,12 @@ pub enum PossibleDevice {
         fps: u32,
         fmt: FourCC,
     },
+    OPENCV {
+        index: u32,
+        res: Resolution,
+        fps: u32,
+        fmt: FrameFormat,
+    }
 }
 
 impl<'a> PossibleDevice {
@@ -410,6 +416,9 @@ pub enum DeviceContact {
     V4L2 {
         location: PathIndex,
     },
+    OPENCV {
+        index: u32,
+    }
 }
 
 impl DeviceContact {

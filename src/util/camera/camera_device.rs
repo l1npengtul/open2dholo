@@ -27,7 +27,7 @@ use crate::{
         webcam::{Webcam, WebcamType},
     },
 };
-use flume::{Receiver, Sender};
+use flume::{Receiver, Sender, TryRecvError};
 use opencv::{
     core::{Mat, MatTrait, MatTraitManual},
     videoio::{
@@ -36,6 +36,7 @@ use opencv::{
     },
 };
 use ouroboros::self_referencing;
+use std::alloc::Global;
 use std::mem::MaybeUninit;
 use std::{
     cell::{Cell, RefCell},
@@ -304,7 +305,8 @@ pub struct UVCameraDevice<'a> {
     device_framerate: Box<Cell<Option<u32>>>,
     device_receiver: Box<Receiver<Vec<u8>>>,
     device_sender: Box<Sender<Vec<u8>>>,
-    ctx: Box<Context<'a>>,
+    str: Box<&'a str>,
+    ctx: Box<Context<'static>>,
     #[borrows(ctx)]
     #[not_covariant]
     device: Box<uvc::Device<'this>>,
@@ -366,6 +368,7 @@ impl<'a> UVCameraDevice<'a> {
                 device_framerate: Box::new(Cell::new(None)),
                 device_receiver: recv,
                 device_sender: send,
+                str: Box::new("a"),
                 ctx: Box::new(Context::new().unwrap()),
                 device_builder: |ctx| {
                     Box::new(
@@ -434,6 +437,7 @@ impl<'a> UVCameraDevice<'a> {
                 device_framerate: Box::new(Cell::new(None)),
                 device_receiver: recv,
                 device_sender: send,
+                str: Box::new("a"),
                 ctx: Box::new(Context::new().unwrap()),
                 device_builder: |ctx| {
                     Box::new(
@@ -551,7 +555,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
         **self.with_device_type(|dev_type| dev_type)
     }
 
-    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_stream(&'a self) -> Result<(), Box<dyn std::error::Error>> {
         // drop active stream
         self.with_active_stream(|astream| unsafe {
             (&mut *astream.borrow_mut()).assume_init_drop();
@@ -576,62 +580,49 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
             }
         });
 
-        // this is cursed and forever will be cursed with lifetime errors
-        // transmute time?
-        self.with_stream_handle(|streamh| {
+        // this is cursedstr: Box::new("a"); and forever will be cursed with lifetime errors
+        self.with(|fields| {
             let cnt = Arc::new(AtomicUsize::new(0));
             let sender: Sender<Vec<u8>> = *(self.with_device_sender(|send| send)).clone();
-            let mut streamh_ref = &mut *(streamh.borrow_mut());
+            let mut streamh_ref = unsafe {
+                let raw_ptr =
+                    (*fields.stream_handle.borrow_mut()).as_ptr() as *mut MaybeUninit<StreamHandle>;
+                let assume_inited: *mut MaybeUninit<StreamHandle<'static>> =
+                    raw_ptr as *mut MaybeUninit<StreamHandle<'static>>;
+                &mut *assume_inited
+            };
             let mut streamh_init = unsafe { streamh_ref.assume_init_mut() };
 
-            self.with_active_stream(|astream| {
-                let act_stream = streamh_init
-                    .start_stream(
-                        move |frame, _count| {
-                            let vec_frame: Vec<u8> = frame.to_rgb().unwrap().to_bytes().to_vec();
-                            sender.send(vec_frame);
-                        },
-                        cnt,
-                    )
-                    .unwrap();
-                let mut activestream_init = MaybeUninit::<ActiveStream<Arc<AtomicUsize>>>::uninit();
-                *astream.borrow_mut() = unsafe {
-                    activestream_init.as_mut_ptr().write(act_stream);
-                    activestream_init
-                }
-            });
+            let act_stream = streamh_init
+                .start_stream(
+                    move |frame, _count| {
+                        let vec_frame: Vec<u8> = frame.to_rgb().unwrap().to_bytes().to_vec();
+                        sender.send(vec_frame);
+                    },
+                    cnt,
+                )
+                .unwrap();
+            let mut activestream_init = MaybeUninit::<ActiveStream<Arc<AtomicUsize>>>::uninit();
+            *fields.active_stream.borrow_mut() = unsafe {
+                activestream_init.as_mut_ptr().write(act_stream);
+                activestream_init
+            }
         });
-
-        // self.with_device_handle(|devh| {
-        //     self.with_stream_handle(|streamh| {
-        //         let resolution: Resolution = self.with_device_resolution(|res| res).get().unwrap();
-        //         let fps: u32 = self.with_device_framerate(|f| f).get().unwrap();
-        //         let stream_handle = devh
-        //             .get_stream_handle_with_format_size_and_fps(
-        //                 FrameFormat::MJPEG,
-        //                 resolution.x,
-        //                 resolution.y,
-        //                 fps,
-        //             )
-        //             .unwrap();
-        //         *streamh.borrow_mut() = Some(RefCell::new(stream_handle));
-        //     });
-        //     // make sure active stream is dropped
-        //     self.with_active_stream(|astream| {
-        //         *astream.borrow_mut() = None;
-        //     });
-        //     self.with_stream_handle(|streamh| {
-        //         let cnt = Arc::new(AtomicUsize::new(0));
-        //         let sender: Sender<Vec<u8>> = (**self.with_device_sender(|sender| sender)).clone();
-        //         let stream_handle = &*(*streamh.borrow_mut()).unwrap().borrow_mut();
-        //         let active_stream = stream_handle.start_stream(move |frame, count| {}, cnt);
-        //     });
-        // });
         Ok(())
     }
 
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        unimplemented!()
+        let frame: Result<Vec<u8>, TryRecvError> =
+            self.with_device_receiver(|recv| match recv.try_recv() {
+                Ok(v) => Ok(v),
+                Err(why) => Err(why),
+            });
+        match frame {
+            Ok(v) => Ok(v),
+            Err(why) => {
+                ret_boxerr!(why)
+            }
+        }
     }
 
     fn get_inner(&self) -> PossibleDevice {
@@ -831,7 +822,7 @@ impl OpenCVCameraDevice {
         };
     }
 
-    pub fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn open_stream_inner(&self) -> Result<(), Box<dyn std::error::Error>> {
         if self.video_capture.borrow().is_opened().unwrap_or(false) {
             ret_boxerr!(CannotOpenStream("Cannot Open OPENCV stream!".to_string()))
         }
@@ -912,15 +903,15 @@ impl OpenCVCameraDevice {
 
 impl<'a> Webcam<'a> for OpenCVCameraDevice {
     fn name(&self) -> String {
-        unimplemented!()
+        (*self.name.borrow()).clone()
     }
 
     fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!()
+        self.set_res(*res)
     }
 
     fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!()
+        self.set_fps(*fps)
     }
 
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
@@ -935,27 +926,27 @@ impl<'a> Webcam<'a> for OpenCVCameraDevice {
     }
 
     fn get_camera_format(&self) -> DeviceFormat {
-        unimplemented!()
+        DeviceFormat::MJPEG
     }
 
-    fn set_camera_format(&self, format: DeviceFormat) {
-        unimplemented!()
+    fn set_camera_format(&self, _format: DeviceFormat) {
+        // do nothing
     }
 
     fn get_camera_type(&self) -> WebcamType {
-        unimplemented!()
+        WebcamType::OpenCVCapture
     }
 
     fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
-        unimplemented!()
+        self.open_stream_inner()
     }
 
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        unimplemented!()
+        self.get_next_frame()
     }
 
     fn get_inner(&self) -> PossibleDevice {
-        unimplemented!()
+        PossibleDevice::OPENCV { index: self.idx() }
     }
 }
 
