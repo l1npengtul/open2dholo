@@ -14,6 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::error::invalid_device_error::InvalidDeviceError::CannotGetProperty;
 use crate::{
     error::invalid_device_error::InvalidDeviceError::{
         CannotFindDevice, CannotGetDeviceInfo, CannotGetFrame, CannotOpenStream, CannotSetProperty,
@@ -21,10 +22,9 @@ use crate::{
     ret_boxerr,
     util::camera::{
         device_utils::{
-            get_os_webcam_index, DeviceContact, DeviceFormat, DeviceHolder, PathIndex,
-            PossibleDevice, Resolution,
+            get_os_webcam_index, DeviceContact, DeviceFormat, PathIndex, PossibleDevice, Resolution,
         },
-        webcam::{Webcam, WebcamType},
+        webcam::{QueryCamera, Webcam, WebcamType},
     },
 };
 use flume::{Receiver, Sender, TryRecvError};
@@ -36,18 +36,18 @@ use opencv::{
     },
 };
 use ouroboros::self_referencing;
-use std::alloc::Global;
-use std::mem::MaybeUninit;
 use std::{
     cell::{Cell, RefCell},
+    error::Error,
     mem::size_of,
+    mem::MaybeUninit,
     sync::{atomic::AtomicUsize, Arc},
     time::Instant,
 };
 use usb_enumeration::{enumerate, Filters};
 use uvc::{
-    ActiveStream, Context, Device, DeviceDescription, DeviceHandle, Error, FormatDescriptor,
-    FrameFormat, StreamHandle,
+    ActiveStream, Context, DeviceDescription, DeviceHandle, FormatDescriptor, FrameFormat,
+    StreamHandle,
 };
 use v4l::{
     buffer::Type,
@@ -150,6 +150,66 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
         Ok(())
     }
 
+    fn get_resolution(&self) -> Result<Resolution, Box<dyn std::error::Error>> {
+        let device = &*self.inner.borrow();
+        match device.format() {
+            Ok(fmt) => Ok(Resolution::new(fmt.width, fmt.height)),
+            Err(why) => {
+                ret_boxerr!(why)
+            }
+        }
+    }
+
+    fn get_framerate(&self) -> Result<u32, Box<dyn std::error::Error>> {
+        let device = &*self.inner.borrow();
+        match device.params() {
+            Ok(param) => Ok((param.interval.numerator / param.interval.denominator) as u32),
+            Err(why) => {
+                ret_boxerr!(why)
+            }
+        }
+    }
+
+    fn get_camera_type(&self) -> WebcamType {
+        self.device_type
+    }
+
+    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
+        return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
+            Ok(stream) => {
+                *self.device_stream.borrow_mut() = Some(RefCell::new(stream));
+                Ok(())
+            }
+            Err(why) => Err(Box::new(CannotOpenStream(why.to_string()))),
+        };
+    }
+
+    fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        match self.device_stream.try_borrow_mut() {
+            Ok(m) => match &*m {
+                Some(stream) => {
+                    let a = &mut *stream.borrow_mut();
+                    match a.next() {
+                        Ok(fr) => Ok(fr.0.to_vec()),
+                        Err(why) => {
+                            ret_boxerr!(why)
+                        }
+                    }
+                }
+                None => {
+                    ret_boxerr!(CannotGetFrame(
+                        "Uninitialized stream! Please call `open_stream` first!".to_string()
+                    ))
+                }
+            },
+            Err(why) => {
+                ret_boxerr!(why);
+            }
+        }
+    }
+}
+
+impl<'a> QueryCamera<'a> for V4LinuxDevice<'a> {
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
         let mut v4l2_format = FourCC::new(b"YUYV");
         match self.device_format.get() {
@@ -219,77 +279,10 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
             })),
         };
     }
-    fn get_camera_format(&self) -> DeviceFormat {
-        self.device_format.get()
-    }
 
-    fn set_camera_format(&self, format: DeviceFormat) {
-        self.device_format.set(format);
-    }
-
-    fn get_camera_type(&self) -> WebcamType {
-        self.device_type
-    }
-
-    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
-        return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
-            Ok(stream) => {
-                *self.device_stream.borrow_mut() = Some(RefCell::new(stream));
-                Ok(())
-            }
-            Err(why) => Err(Box::new(CannotOpenStream(why.to_string()))),
-        };
-    }
-
-    fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        match self.device_stream.try_borrow_mut() {
-            Ok(m) => match &*m {
-                Some(stream) => {
-                    let a = &mut *stream.borrow_mut();
-                    match a.next() {
-                        Ok(fr) => Ok(fr.0.to_vec()),
-                        Err(why) => {
-                            ret_boxerr!(why)
-                        }
-                    }
-                }
-                None => {
-                    ret_boxerr!(CannotGetFrame(
-                        "Uninitialized stream! Please call `open_stream` first!".to_string()
-                    ))
-                }
-            },
-            Err(why) => {
-                ret_boxerr!(why);
-            }
-        }
-    }
-
-    fn get_inner(&self) -> PossibleDevice {
-        let current_format = match self.inner.borrow().format() {
-            Ok(format) => format,
-            Err(_) => {
-                Format::new(640, 480, FourCC::new(b"MJPG")) // TODO: proper error handling
-            }
-        };
-
-        let res = Resolution {
-            x: current_format.width,
-            y: current_format.height,
-        };
-
-        let fps = match self.inner.borrow().params() {
-            Ok(param) => param.interval.denominator as u32,
-            Err(_) => 5,
-        };
-
-        let fmt = current_format.fourcc;
-
-        PossibleDevice::V4L2 {
-            location: self.device_path.clone(),
-            res,
-            fps,
-            fmt,
+    fn get_location(&self) -> DeviceContact {
+        DeviceContact::V4L2 {
+            location: (self.device_path).clone(),
         }
     }
 }
@@ -305,7 +298,7 @@ pub struct UVCameraDevice<'a> {
     device_framerate: Box<Cell<Option<u32>>>,
     device_receiver: Box<Receiver<Vec<u8>>>,
     device_sender: Box<Sender<Vec<u8>>>,
-    str: Box<&'a str>,
+    str: Box<&'a str>, // Im too lazy to use PhantomData, so here is a lifetime box &str.
     ctx: Box<Context<'static>>,
     #[borrows(ctx)]
     #[not_covariant]
@@ -485,70 +478,20 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
         Ok(())
     }
 
-    fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
-        self.with_device(|device| match device.open() {
-            Ok(handler) => {
-                let mut resolutions: Vec<Resolution> = Vec::new();
-                for format in handler.supported_formats() {
-                    for frame in format.supported_formats() {
-                        let resolution_string = Resolution {
-                            x: u32::from(frame.width()),
-                            y: u32::from(frame.height()),
-                        };
-                        if !resolutions.contains(&resolution_string) {
-                            resolutions.push(resolution_string);
-                        }
-                    }
-                }
-                Ok(resolutions)
-            }
-            Err(why) => {
-                let a: Box<dyn std::error::Error> = Box::new(CannotGetDeviceInfo {
-                    prop: "Supported Resolutions".to_string(),
-                    msg: why.to_string(),
-                });
-                Err(a)
-            }
-        })
+    fn get_resolution(&self) -> Result<Resolution, Box<dyn Error>> {
+        match self.with_device_resolution(|res| res.get()) {
+            Some(r) => Ok(r),
+            None => ret_boxerr!(CannotGetProperty(
+                "Resolution of UVCameraDevice".to_string()
+            )),
+        }
     }
 
-    fn get_supported_framerate(
-        &self,
-        _res: Resolution,
-    ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
-        self.with_device(|device| match device.open() {
-            Ok(handler) => {
-                let formats: Vec<FormatDescriptor> =
-                    handler.supported_formats().into_iter().collect();
-                let mut framerates: Vec<u32> = Vec::new();
-                for fmt_desc in formats {
-                    for frame_desc in fmt_desc.supported_formats() {
-                        let mut fps_from_arr: Vec<u32> = frame_desc
-                            .intervals_duration()
-                            .into_iter()
-                            .map(|duration| (1000 / duration.as_millis()) as u32)
-                            .collect();
-                        framerates.append(&mut fps_from_arr);
-                    }
-                }
-                Ok(framerates)
-            }
-            Err(why) => {
-                let a: Box<dyn std::error::Error> = Box::new(CannotGetDeviceInfo {
-                    prop: "Supported Framerates".to_string(),
-                    msg: why.to_string(),
-                });
-                Err(a)
-            }
-        })
-    }
-
-    fn get_camera_format(&self) -> DeviceFormat {
-        self.with_device_format(|fmt| fmt).get()
-    }
-
-    fn set_camera_format(&self, format: DeviceFormat) {
-        self.with_device_format(|fmt| fmt.set(format));
+    fn get_framerate(&self) -> Result<u32, Box<dyn Error>> {
+        match self.with_device_framerate(|fps| fps.get()) {
+            Some(r) => Ok(r),
+            None => ret_boxerr!(CannotGetProperty("Framerate of UVCameraDevice".to_string())),
+        }
     }
 
     fn get_camera_type(&self) -> WebcamType {
@@ -624,36 +567,81 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
             }
         }
     }
+}
 
-    fn get_inner(&self) -> PossibleDevice {
-        let (vendor_id, product_id, serial) = match self.with_device(|dev| dev).description() {
-            Ok(desc) => (
-                Some(desc.vendor_id),
-                Some(desc.product_id),
-                desc.serial_number,
-            ),
-            Err(_) => (None, None, None),
-        };
+impl<'a> QueryCamera<'a> for UVCameraDevice<'a> {
+    fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
+        self.with_device(|device| match device.open() {
+            Ok(handler) => {
+                let mut resolutions: Vec<Resolution> = Vec::new();
+                for format in handler.supported_formats() {
+                    for frame in format.supported_formats() {
+                        let resolution_string = Resolution {
+                            x: u32::from(frame.width()),
+                            y: u32::from(frame.height()),
+                        };
+                        if !resolutions.contains(&resolution_string) {
+                            resolutions.push(resolution_string);
+                        }
+                    }
+                }
+                Ok(resolutions)
+            }
+            Err(why) => {
+                let a: Box<dyn std::error::Error> = Box::new(CannotGetDeviceInfo {
+                    prop: "Supported Resolutions".to_string(),
+                    msg: why.to_string(),
+                });
+                Err(a)
+            }
+        })
+    }
 
-        let res = match self.with_device_resolution(|d_res| d_res).get() {
-            Some(r) => r,
-            None => Resolution { x: 640, y: 480 },
-        };
+    fn get_supported_framerate(
+        &self,
+        _res: Resolution,
+    ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
+        self.with_device(|device| match device.open() {
+            Ok(handler) => {
+                let formats: Vec<FormatDescriptor> =
+                    handler.supported_formats().into_iter().collect();
+                let mut framerates: Vec<u32> = Vec::new();
+                for fmt_desc in formats {
+                    for frame_desc in fmt_desc.supported_formats() {
+                        let mut fps_from_arr: Vec<u32> = frame_desc
+                            .intervals_duration()
+                            .into_iter()
+                            .map(|duration| (1000 / duration.as_millis()) as u32)
+                            .collect();
+                        framerates.append(&mut fps_from_arr);
+                    }
+                }
+                Ok(framerates)
+            }
+            Err(why) => {
+                let a: Box<dyn std::error::Error> = Box::new(CannotGetDeviceInfo {
+                    prop: "Supported Framerates".to_string(),
+                    msg: why.to_string(),
+                });
+                Err(a)
+            }
+        })
+    }
 
-        let fps = self.with_device_framerate(|d_fps| d_fps).get().unwrap_or(5);
+    fn get_location(&self) -> DeviceContact {
+        let desc: uvc::Result<DeviceDescription> = self.with_device(|dev| dev.description());
 
-        let fmt = match self.with_device_format(|d_fmt| d_fmt).get() {
-            DeviceFormat::YUYV => FrameFormat::YUYV,
-            DeviceFormat::MJPEG => FrameFormat::MJPEG,
-        };
-
-        PossibleDevice::UVCAM {
-            vendor_id,
-            product_id,
-            serial,
-            res,
-            fps,
-            fmt,
+        match desc {
+            Ok(description) => DeviceContact::UVCAM {
+                vendor_id: Some(description.vendor_id),
+                product_id: Some(description.product_id),
+                serial: description.serial_number,
+            },
+            Err(_why) => DeviceContact::UVCAM {
+                vendor_id: None,
+                product_id: None,
+                serial: None,
+            },
         }
     }
 }
@@ -769,10 +757,13 @@ impl OpenCVCameraDevice {
                 };
                 OpenCVCameraDevice::from_possible_device(n, pd)
             }
+            DeviceContact::OPENCV { index } => {
+                OpenCVCameraDevice::new("OpenCVCamera".to_string(), index, framerate, resolution)
+            }
         }
     }
 
-    pub fn res(&self) -> Resolution {
+    fn res(&self) -> Resolution {
         let a = self
             .video_capture
             .borrow()
@@ -786,7 +777,7 @@ impl OpenCVCameraDevice {
         Resolution::new(a as u32, b as u32)
     }
 
-    pub fn fps(&self) -> u32 {
+    fn fps(&self) -> u32 {
         let fps = self.video_capture.borrow().get(CAP_PROP_FPS).unwrap();
         fps as u32
     }
@@ -795,7 +786,7 @@ impl OpenCVCameraDevice {
         self.index.get()
     }
 
-    pub fn set_res(&self, new_res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
+    fn set_res(&self, new_res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
         {
             // make sure we drop the edit lock
             self.res.set(new_res);
@@ -809,7 +800,7 @@ impl OpenCVCameraDevice {
         };
     }
 
-    pub fn set_fps(&self, frame: u32) -> Result<(), Box<dyn std::error::Error>> {
+    fn set_fps(&self, frame: u32) -> Result<(), Box<dyn std::error::Error>> {
         {
             self.fps.set(frame);
         }
@@ -822,14 +813,14 @@ impl OpenCVCameraDevice {
         };
     }
 
-    pub fn open_stream_inner(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_stream_inner(&self) -> Result<(), Box<dyn std::error::Error>> {
         if self.video_capture.borrow().is_opened().unwrap_or(false) {
             ret_boxerr!(CannotOpenStream("Cannot Open OPENCV stream!".to_string()))
         }
         Ok(())
     }
 
-    pub fn get_next_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    fn get_next_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let vc = &mut *self.video_capture.borrow_mut();
         {
             let mut frame = Mat::default().unwrap();
@@ -852,9 +843,8 @@ impl OpenCVCameraDevice {
                     unsafe {
                         let vec_ptr = ret_vec.as_mut_ptr().cast(); // this looks, feels, and is probably a sin.
                         let mat_ptr = frame.as_raw_Mat();
-                        libc::memcpy(
+                        mat_ptr.copy_to_nonoverlapping(
                             vec_ptr,
-                            mat_ptr,
                             (size_of::<u8>() as i32 * frame.rows() * frame.cols() * 3) as usize,
                         );
                     }
@@ -914,23 +904,12 @@ impl<'a> Webcam<'a> for OpenCVCameraDevice {
         self.set_fps(*fps)
     }
 
-    fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
-        unimplemented!()
+    fn get_resolution(&self) -> Result<Resolution, Box<dyn Error>> {
+        Ok(self.res())
     }
 
-    fn get_supported_framerate(
-        &self,
-        res: Resolution,
-    ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
-        unimplemented!()
-    }
-
-    fn get_camera_format(&self) -> DeviceFormat {
-        DeviceFormat::MJPEG
-    }
-
-    fn set_camera_format(&self, _format: DeviceFormat) {
-        // do nothing
+    fn get_framerate(&self) -> Result<u32, Box<dyn Error>> {
+        Ok(self.fps())
     }
 
     fn get_camera_type(&self) -> WebcamType {
@@ -943,10 +922,6 @@ impl<'a> Webcam<'a> for OpenCVCameraDevice {
 
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         self.get_next_frame()
-    }
-
-    fn get_inner(&self) -> PossibleDevice {
-        PossibleDevice::OPENCV { index: self.idx() }
     }
 }
 

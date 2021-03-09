@@ -13,6 +13,9 @@
 //
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+use crate::util::camera::camera_device::{UVCameraDevice, V4LinuxDevice};
+use crate::util::camera::device_utils::DeviceFormat;
+use crate::util::camera::webcam::Webcam;
 use crate::{
     processing::face_detector::detectors::{
         dlib::dlib_detector::DLibDetector,
@@ -27,15 +30,16 @@ use flume::{Receiver, Sender};
 use gdnative::godot_print;
 use parking_lot::Mutex;
 use rusty_pool::ThreadPool;
+use std::error::Error;
 use std::{
     cell::{Cell, RefCell},
     sync::Arc,
     time::Duration,
 };
 
-pub struct InputProcesser {
+pub struct InputProcesser<'a> {
     // device: PossibleDevice,
-    pub device_held: RefCell<OpenCVCameraDevice>,
+    pub device_held: RefCell<Box<dyn Webcam<'a> + 'a>>,
     // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
@@ -45,18 +49,15 @@ pub struct InputProcesser {
     int_receiver_ft: Receiver<PointType>,
 }
 
-impl InputProcesser {
+impl<'a> InputProcesser<'a> {
     pub fn new(
         name: Option<String>,
         device: PossibleDevice,
         detect_typ: DetectorType,
         detect_hw: DetectorHardware,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let device_held = match OpenCVCameraDevice::from_possible_device(
-            name.unwrap_or_else(|| "".to_string()),
-            device,
-        ) {
-            Ok(ocv) => RefCell::new(ocv),
+        let device_held: RefCell<Box<dyn Webcam<'a>>> = match get_dyn_webcam(name, device) {
+            Ok(webcam) => RefCell::new(webcam),
             Err(why) => return Err(why),
         };
 
@@ -98,48 +99,9 @@ impl InputProcesser {
         detect_typ: DetectorType,
         detect_hw: DetectorHardware,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let device_held = match OpenCVCameraDevice::from_device_contact(
-            name.unwrap_or_else(|| "".to_string()),
-            device_contact,
-            res,
-            fps,
-        ) {
-            Ok(ocv) => RefCell::new(ocv),
-            Err(why) => return Err(why),
-        };
-
-        let detector_type = Cell::new(detect_typ);
-        let detector_hw = Cell::new(detect_hw);
-        godot_print!("detect");
-
-        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> =
-            Arc::new(Mutex::new(Box::new(match detect_typ {
-                DetectorType::DLibFHOG => DLibDetector::new(false),
-                DetectorType::DLibCNN => DLibDetector::new(true),
-            })));
-
-        // TODO: Adjustable thread pool size
-        godot_print!("thread");
-
-        let thread_pool = ThreadPool::new_named(
-            "INPUT_PROCESSER".to_string(),
-            4,
-            8,
-            Duration::from_millis(500),
-        );
-
-        let (int_sender_ft, int_receiver_ft) = flume::unbounded();
-        godot_print!("input_process_ret");
-
-        Ok(InputProcesser {
-            device_held,
-            detector_type,
-            detector_hw,
-            face_detector,
-            thread_pool,
-            int_sender_ft,
-            int_receiver_ft,
-        })
+        let device =
+            PossibleDevice::from_device_contact(device_contact, res, fps, DeviceFormat::MJPEG);
+        InputProcesser::new(name, device, detect_typ, detect_hw)
     }
 
     pub fn change_device(
@@ -147,11 +109,8 @@ impl InputProcesser {
         name: Option<String>,
         new_device: PossibleDevice,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let device_held = match OpenCVCameraDevice::from_possible_device(
-            name.unwrap_or_else(|| "".to_string()),
-            new_device,
-        ) {
-            Ok(h) => h,
+        let device_held: Box<dyn Webcam<'a>> = match get_dyn_webcam(name, new_device) {
+            Ok(webcam) => webcam,
             Err(why) => return Err(why),
         };
 
@@ -180,7 +139,7 @@ impl InputProcesser {
             Ok(frame) => frame,
             Err(why) => return Err(why),
         };
-        let res = { self.device_held.borrow().res() };
+        let res = { self.device_held.borrow().get() };
         self.add_workload(res.y, res.x, img_captured);
         Ok(())
     }
@@ -193,6 +152,73 @@ impl InputProcesser {
         }
         point_vec
     }
+}
+
+fn get_dyn_webcam<'a>(
+    name: Option<String>,
+    device: PossibleDevice,
+) -> Result<Box<dyn Webcam<'a> + 'a>, Box<dyn std::error::Error>> {
+    let device_held: Box<dyn Webcam<'a>> = match device {
+        PossibleDevice::UVCAM {
+            vendor_id,
+            product_id,
+            serial,
+            res,
+            fps,
+            fmt: _fmt,
+        } => {
+            let uvcam: UVCameraDevice<'a> = match UVCameraDevice::new_camera(
+                vendor_id.map(|v| v as i32),
+                product_id.map(|v| v as i32),
+                serial,
+            ) {
+                Ok(camera) => camera,
+                Err(why) => {
+                    return Err(why);
+                }
+            };
+            uvcam.set_framerate(&fps);
+            uvcam.set_resolution(&res);
+            Box::new(uvcam)
+        }
+        PossibleDevice::V4L2 {
+            location,
+            res,
+            fps,
+            fmt: _fmt,
+        } => {
+            let v4lcam = match V4LinuxDevice::new_location(location) {
+                Ok(device) => device,
+                Err(why) => {
+                    return Err(why);
+                }
+            };
+            v4lcam.set_resolution(&res);
+            v4lcam.set_framerate(&fps);
+            Box::new(v4lcam)
+        }
+        PossibleDevice::OPENCV {
+            index: _index,
+            res,
+            fps,
+            fmt: _fmt,
+        } => {
+            let ocvcam = match OpenCVCameraDevice::from_possible_device(
+                name.unwrap_or("OpenCV Camera".to_string()),
+                device,
+            ) {
+                Ok(device) => device,
+                Err(why) => {
+                    return Err(why);
+                }
+            };
+            ocvcam.set_resolution(&res);
+            ocvcam.set_framerate(&fps);
+            Box::new(ocvcam)
+        }
+    };
+
+    Ok(device_held)
 }
 
 // hack us election

@@ -32,6 +32,8 @@ pub enum InvalidDeviceError {
     CannotOpenStream(String),
     #[error("Cannot set camera property: {0}")]
     CannotSetProperty(String),
+    #[error("Cannot get camera property: {0}")]
+    CannotGetProperty(String),
     #[error("Expected platform {0}")]
     InvalidPlatform(String),
     #[error("Cannot get frame from camera: {0}")]

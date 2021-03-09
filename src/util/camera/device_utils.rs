@@ -17,6 +17,7 @@
 use crate::error::conversion_error::ConversionError;
 use crate::error::conversion_error::ConversionError::{ConversionFromError, MatchFailedError};
 use crate::error::invalid_device_error::InvalidDeviceError;
+use crate::util::camera::webcam::QueryCamera;
 use crate::util::camera::{
     camera_device::{UVCameraDevice, V4LinuxDevice},
     webcam::Webcam,
@@ -270,7 +271,7 @@ pub enum PossibleDevice {
         res: Resolution,
         fps: u32,
         fmt: FrameFormat,
-    }
+    },
 }
 
 impl<'a> PossibleDevice {
@@ -316,6 +317,63 @@ impl<'a> PossibleDevice {
                     fmt: dev_format,
                 }
             }
+            DeviceContact::OPENCV { index } => PossibleDevice::OPENCV {
+                index: *index,
+                res,
+                fps,
+                fmt: FrameFormat::MJPEG,
+            },
+        }
+    }
+
+    pub fn from_device_contact(
+        contact: DeviceContact,
+        res: Resolution,
+        fps: u32,
+        fmt: DeviceFormat,
+    ) -> Self {
+        match contact {
+            DeviceContact::UVCAM {
+                vendor_id,
+                product_id,
+                serial,
+            } => {
+                let dev_format = match fmt {
+                    DeviceFormat::YUYV => FrameFormat::YUYV,
+                    DeviceFormat::MJPEG => FrameFormat::MJPEG,
+                };
+
+                PossibleDevice::UVCAM {
+                    vendor_id: vendor_id.to_owned(),
+                    product_id: product_id.to_owned(),
+                    serial: serial.clone(),
+                    res,
+                    fps,
+                    fmt: dev_format,
+                }
+            }
+            DeviceContact::V4L2 { location } => {
+                let dev_format = match fmt {
+                    DeviceFormat::YUYV => FourCC::new(b"MJPG"),
+                    DeviceFormat::MJPEG => FourCC::new(b"YUYV"),
+                };
+                let lc: PathIndex = match location {
+                    PathIndex::Path(p) => PathIndex::Path(p.clone()),
+                    PathIndex::Index(i) => PathIndex::Index(i),
+                };
+                PossibleDevice::V4L2 {
+                    location: lc,
+                    res,
+                    fps,
+                    fmt: dev_format,
+                }
+            }
+            DeviceContact::OPENCV { index } => PossibleDevice::OPENCV {
+                index,
+                res,
+                fps,
+                fmt: FrameFormat::MJPEG,
+            },
         }
     }
 
@@ -341,6 +399,12 @@ impl<'a> PossibleDevice {
             } => DeviceContact::V4L2 {
                 location: location.clone(),
             },
+            PossibleDevice::OPENCV {
+                index,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
+            } => DeviceContact::OPENCV { index: *index },
         }
     }
 
@@ -360,6 +424,12 @@ impl<'a> PossibleDevice {
                 fps: _fps,
                 fmt: _fmt,
             } => *res,
+            PossibleDevice::OPENCV {
+                index: _index,
+                res,
+                fps: _fps,
+                fmt: _fmt,
+            } => *res,
         }
     }
 
@@ -375,6 +445,12 @@ impl<'a> PossibleDevice {
             } => *fps,
             PossibleDevice::V4L2 {
                 location: _location,
+                res: _res,
+                fps,
+                fmt: _fmt,
+            } => *fps,
+            PossibleDevice::OPENCV {
+                index: _index,
                 res: _res,
                 fps,
                 fmt: _fmt,
@@ -418,7 +494,7 @@ pub enum DeviceContact {
     },
     OPENCV {
         index: u32,
-    }
+    },
 }
 
 impl DeviceContact {
@@ -442,32 +518,19 @@ impl DeviceContact {
                 fps: _fps,
                 fmt: _fmt,
             } => DeviceContact::V4L2 { location },
+            PossibleDevice::OPENCV {
+                index,
+                res: _res,
+                fps: _fps,
+                fmt: _fmt,
+            } => DeviceContact::OPENCV { index },
         }
     }
 }
 
 impl From<PossibleDevice> for DeviceContact {
     fn from(value: PossibleDevice) -> Self {
-        match value {
-            PossibleDevice::UVCAM {
-                vendor_id,
-                product_id,
-                serial,
-                res: _res,
-                fps: _fps,
-                fmt: _fmt,
-            } => DeviceContact::UVCAM {
-                vendor_id,
-                product_id,
-                serial,
-            },
-            PossibleDevice::V4L2 {
-                location,
-                res: _res,
-                fps: _fps,
-                fmt: _fmt,
-            } => DeviceContact::V4L2 { location },
-        }
+        DeviceContact::from_possible_device(&value)
     }
 }
 
@@ -481,9 +544,9 @@ pub struct CachedDevice {
 
 impl CachedDevice {
     // DO NOT REMOVE THE `&`
-    pub fn from_webcam(camera: &Box<dyn Webcam>) -> Result<Self, ()> {
+    pub fn from_webcam(camera: &Box<dyn QueryCamera>) -> Result<Self, ()> {
         let device_name = camera.name();
-        let device_location = DeviceContact::from(camera.get_inner());
+        let device_location = camera.get_location();
         let mut resolutions = match camera.get_supported_resolutions() {
             Ok(res) => res,
             Err(why) => {
@@ -542,7 +605,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
             // get device list from v4l2
             for dev in v4l::context::enum_devices() {
                 if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
-                    let b: Box<dyn Webcam> = Box::new(v4l_dev);
+                    let b: Box<dyn QueryCamera> = Box::new(v4l_dev);
                     if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
                         known_devices.insert(
                             dev.name()
@@ -562,7 +625,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
                 Ok(list) => {
                     for uvc_device in list {
                         if let Ok(camera_device) = {
-                            let b: Box<dyn Webcam> =
+                            let b: Box<dyn QueryCamera> =
                                 Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
                             CachedDevice::from_webcam(&b)
                         } {
@@ -619,5 +682,11 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
             }
             PathIndex::Index(i) => Ok(i as u32),
         },
+        PossibleDevice::OPENCV {
+            index,
+            res: _res,
+            fps: _fps,
+            fmt: _fmt,
+        } => Ok(index),
     }
 }

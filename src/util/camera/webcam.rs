@@ -14,24 +14,29 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::device_utils::{DeviceFormat, PossibleDevice, Resolution, StreamType};
+use crate::util::camera::device_utils::{
+    DeviceContact, DeviceFormat, PossibleDevice, Resolution, StreamType,
+};
 
 pub trait Webcam<'a> {
     fn name(&self) -> String;
     fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>>;
     fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>>;
+    fn get_resolution(&self) -> Result<Resolution, Box<dyn std::error::Error>>;
+    fn get_framerate(&self) -> Result<u32, Box<dyn std::error::Error>>;
     fn get_camera_type(&self) -> WebcamType;
     fn open_stream(&'a self) -> Result<(), Box<dyn std::error::Error>>;
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>>;
     // fn as_any(&self) -> &dyn Any;
 }
 
-pub trait QueryCamera<'a> {
+pub trait QueryCamera<'a>: Webcam<'a> {
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>>;
     fn get_supported_framerate(
         &self,
         res: Resolution,
     ) -> Result<Vec<u32>, Box<dyn std::error::Error>>;
+    fn get_location(&self) -> DeviceContact;
 }
 
 #[derive(Copy, Clone, Debug)]
