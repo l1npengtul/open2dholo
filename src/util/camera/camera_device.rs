@@ -28,6 +28,7 @@ use crate::{
     },
 };
 use flume::{Receiver, Sender, TryRecvError};
+use opencv::videoio::VideoCaptureAPIs::CAP_ANY;
 use opencv::{
     core::{Mat, MatTrait, MatTraitManual},
     videoio::{
@@ -976,6 +977,6 @@ fn get_api_pref_int() -> u32 {
     match std::env::consts::OS {
         "linux" => CAP_V4L2 as u32,
         "windows" => CAP_MSMF as u32,
-        &_ => 0,
+        &_ => CAP_ANY as u32,
     }
 }
