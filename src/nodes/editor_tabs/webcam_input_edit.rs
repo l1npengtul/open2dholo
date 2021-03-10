@@ -40,7 +40,6 @@ pub struct WebcamInputEditor {
     device_list: RefCell<HashMap<String, CachedDevice>>,
     device_selected: RefCell<Option<String>>,
     resolution_selected: RefCell<Option<Resolution>>,
-    //format_selected: RefCell<Option<DeviceFormat>>,
     fps_selected: RefCell<Option<i32>>,
 }
 
@@ -50,47 +49,6 @@ impl WebcamInputEditor {
     fn register_signals(builder: &ClassBuilder<Self>) {
         // we have to do this disgustingness becuase godot signals can only transport variants like why
         // TODO: deprecate both these signals and replace with our OpenCVCameraDevice abstraction
-        builder.add_signal(Signal {
-            name: "new_input_processer_uvc",
-            args: &[
-                // resolution
-                SignalArgument {
-                    name: "resolution",
-                    default: Variant::from_vector2(&Vector2::new(-1.0, -1.0)),
-                    export_info: ExportInfo::new(VariantType::Vector2),
-                    usage: PropertyUsage::DEFAULT,
-                },
-                // fps
-                SignalArgument {
-                    name: "framerate",
-                    default: Variant::from_i64(-1),
-                    export_info: ExportInfo::new(VariantType::I64),
-                    usage: PropertyUsage::DEFAULT,
-                },
-                // device_name
-            ],
-        });
-
-        builder.add_signal(Signal {
-            name: "new_input_processer_v4l",
-            args: &[
-                // resolution
-                SignalArgument {
-                    name: "resolution",
-                    default: Variant::from_vector2(&Vector2::new(-1.0, -1.0)),
-                    export_info: ExportInfo::new(VariantType::Vector2),
-                    usage: PropertyUsage::DEFAULT,
-                },
-                // fps
-                SignalArgument {
-                    name: "framerate",
-                    default: Variant::from_i64(-1),
-                    export_info: ExportInfo::new(VariantType::I64),
-                    usage: PropertyUsage::DEFAULT,
-                },
-            ],
-        });
-
         builder.add_signal(Signal {
             name: "new_input_processer",
             args: &[
@@ -175,25 +133,6 @@ impl WebcamInputEditor {
         ) {
             panic!("Failed to initialise UI!");
         }
-
-        // let format_popup = unsafe {
-        //     owner
-        //         .get_node("../FormatPopup")
-        //         .unwrap()
-        //         .assume_safe()
-        //         .cast::<PopupMenu>()
-        //         .unwrap()
-        // };
-        // format_popup.set_visible(false);
-        // if let Err(_why) = format_popup.connect(
-        //     "id_pressed",
-        //     owner,
-        //     "on_format_popup_menu_clicked",
-        //     VariantArray::new_shared(),
-        //     0,
-        // ) {
-        //     panic!("Failed to initialise UI!");
-        // }
 
         let resolution_popup = unsafe {
             owner
@@ -369,10 +308,12 @@ impl WebcamInputEditor {
                                 Some(dev) => dev.to_owned(),
                                 None => panic!("The device no longer exists!"),
                             };
-
-                            for (id_cnt, res) in
-                                selected_cache_dev.get_supported_mjpg().keys().enumerate()
-                            {
+                            let mut res_vec_sorted: Vec<Resolution> = Vec::new();
+                            for res in selected_cache_dev.get_supported_mjpg().keys() {
+                                res_vec_sorted.push(*res)
+                            }
+                            res_vec_sorted.sort();
+                            for (id_cnt, res) in res_vec_sorted.into_iter().enumerate() {
                                 resolution_popup.add_item(format!("{}", res), id_cnt as i64, -1);
                             }
 
@@ -642,37 +583,6 @@ impl WebcamInputEditor {
                     }
                 }
             }
-            // "format" => {
-            //     self.update_device_list();
-            //     *self.resolution_selected.borrow_mut() = None;
-            //     *self.fps_selected.borrow_mut() = None;
-            //     let mut child = unsafe {
-            //         owner
-            //             .get_root()
-            //             .unwrap()
-            //             .assume_safe()
-            //             .get_children()
-            //             .unwrap()
-            //             .assume_safe()
-            //     };
-            //     let mut clearable = false;
-            //     loop {
-            //         // see if the child is a custom tree item
-            //         if child.get_text(0).to_string() != *"Webcam Video Format:"
-            //             && child.get_cell_mode(1) == TreeCellMode::CUSTOM
-            //             && clearable
-            //         {
-            //             child.set_text(1, "");
-            //         } else if child.get_text(0).to_string() == *"Webcam Video Format:" {
-            //             clearable = true;
-            //         }
-            //         if let Some(a) = child.get_next() {
-            //             child = unsafe { a.assume_safe() };
-            //         } else {
-            //             break;
-            //         }
-            //     }
-            // }
             "res" => {
                 self.update_device_list();
                 *self.fps_selected.borrow_mut() = None;

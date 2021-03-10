@@ -29,6 +29,7 @@ use crate::{
 };
 use flume::{Receiver, Sender, TryRecvError};
 use opencv::videoio::VideoCaptureAPIs::CAP_ANY;
+use opencv::videoio::{VideoWriter, CAP_PROP_FOURCC};
 use opencv::{
     core::{Mat, MatTrait, MatTraitManual},
     videoio::{
@@ -70,6 +71,7 @@ pub struct V4LinuxDevice<'a> {
     device_stream: RefCell<Option<RefCell<Stream<'a>>>>,
     // why do i have to wrap this in 2 refcells please option give an option for a mutable reference PLEASE
     pub inner: RefCell<v4l::Device>,
+    opened: Cell<bool>,
 }
 
 impl<'a> V4LinuxDevice<'a> {
@@ -92,6 +94,7 @@ impl<'a> V4LinuxDevice<'a> {
             device_path,
             device_stream: RefCell::new(None),
             inner: RefCell::new(device),
+            opened: Cell::new(false),
         })
     }
     pub fn new_path(path: String) -> Result<Self, Box<dyn std::error::Error>> {
@@ -113,6 +116,7 @@ impl<'a> V4LinuxDevice<'a> {
             device_path,
             device_stream: RefCell::new(None),
             inner: RefCell::new(device),
+            opened: Cell::new(false),
         })
     }
     pub fn new_location(location: PathIndex) -> Result<Self, Box<dyn std::error::Error>> {
@@ -146,7 +150,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     }
 
     fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>> {
-        let parameter = Parameters::new(Fraction::new(*fps, 1));
+        let parameter = Parameters::with_fps(*fps);
         self.inner.borrow_mut().set_params(&parameter)?;
         Ok(())
     }
@@ -164,7 +168,14 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     fn get_framerate(&self) -> Result<u32, Box<dyn std::error::Error>> {
         let device = &*self.inner.borrow();
         match device.params() {
-            Ok(param) => Ok((param.interval.numerator / param.interval.denominator) as u32),
+            Ok(param) => {
+                dbg!(
+                    "num: {}, denom: {}",
+                    param.interval.numerator,
+                    param.interval.denominator
+                );
+                Ok((param.interval.numerator) as u32)
+            }
             Err(why) => {
                 ret_boxerr!(why)
             }
@@ -176,13 +187,17 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     }
 
     fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
-        return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
-            Ok(stream) => {
-                *self.device_stream.borrow_mut() = Some(RefCell::new(stream));
-                Ok(())
-            }
-            Err(why) => Err(Box::new(CannotOpenStream(why.to_string()))),
-        };
+        if self.opened.get() == false {
+            return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
+                Ok(stream) => {
+                    *self.device_stream.borrow_mut() = Some(RefCell::new(stream));
+                    self.opened.set(true);
+                    Ok(())
+                }
+                Err(why) => Err(Box::new(CannotOpenStream(why.to_string()))),
+            };
+        }
+        Ok(())
     }
 
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -299,6 +314,7 @@ pub struct UVCameraDevice<'a> {
     device_framerate: Box<Cell<Option<u32>>>,
     device_receiver: Box<Receiver<Vec<u8>>>,
     device_sender: Box<Sender<Vec<u8>>>,
+    opened: Box<Cell<bool>>,
     str: Box<&'a str>, // Im too lazy to use PhantomData, so here is a lifetime box &str.
     ctx: Box<Context<'static>>,
     #[borrows(ctx)]
@@ -362,6 +378,7 @@ impl<'a> UVCameraDevice<'a> {
                 device_framerate: Box::new(Cell::new(None)),
                 device_receiver: recv,
                 device_sender: send,
+                opened: Box::new(Cell::new(false)),
                 str: Box::new("a"),
                 ctx: Box::new(Context::new().unwrap()),
                 device_builder: |ctx| {
@@ -431,6 +448,7 @@ impl<'a> UVCameraDevice<'a> {
                 device_framerate: Box::new(Cell::new(None)),
                 device_receiver: recv,
                 device_sender: send,
+                opened: Box::new(Cell::new(false)),
                 str: Box::new("a"),
                 ctx: Box::new(Context::new().unwrap()),
                 device_builder: |ctx| {
@@ -499,7 +517,12 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
         **self.with_device_type(|dev_type| dev_type)
     }
 
-    fn open_stream(&'a self) -> Result<(), Box<dyn std::error::Error>> {
+    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // check if we already did this
+        let opened: bool = self.with_opened(|o| o.get());
+        if opened == true {
+            return Ok(());
+        }
         // drop active stream
         self.with_active_stream(|astream| unsafe {
             (&mut *astream.borrow_mut()).assume_init_drop();
@@ -552,6 +575,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 activestream_init
             }
         });
+        self.with_opened(|o| o.set(true));
         Ok(())
     }
 
@@ -780,6 +804,7 @@ impl OpenCVCameraDevice {
 
     fn fps(&self) -> u32 {
         let fps = self.video_capture.borrow().get(CAP_PROP_FPS).unwrap();
+        dbg!("{}", fps);
         fps as u32
     }
 
@@ -962,6 +987,10 @@ fn set_property_res(
 }
 
 fn set_property_fps(vc: &mut VideoCapture, fps: u32) -> Result<(), Box<dyn std::error::Error>> {
+    vc.set(
+        CAP_PROP_FOURCC,
+        VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap() as f64,
+    );
     match vc.set(VideoCaptureProperties::CAP_PROP_FPS as i32, f64::from(fps)) {
         Ok(r) => {
             if !r {

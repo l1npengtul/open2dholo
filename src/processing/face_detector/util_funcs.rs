@@ -14,7 +14,6 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use nalgebra::{Matrix2, Matrix2x4, Matrix4, RowVector2, RowVector4};
 use opencv::{
     core::{Mat, CV_32F},
     prelude::*,

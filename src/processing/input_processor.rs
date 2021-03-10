@@ -17,9 +17,8 @@ use crate::util::camera::camera_device::{UVCameraDevice, V4LinuxDevice};
 use crate::util::camera::device_utils::DeviceFormat;
 use crate::util::camera::webcam::Webcam;
 use crate::{
-    processing::face_detector::detectors::{
-        dlib::dlib_detector::DLibDetector,
-        util::{DetectorHardware, DetectorTrait, DetectorType, PointType},
+    processing::face_detector::detectors::util::{
+        DetectorHardware, DetectorTrait, DetectorType, PointType,
     },
     util::camera::{
         camera_device::OpenCVCameraDevice,
@@ -43,7 +42,7 @@ pub struct InputProcesser<'a> {
     // bruh wtf
     detector_type: Cell<DetectorType>,
     detector_hw: Cell<DetectorHardware>,
-    face_detector: Arc<Mutex<Box<dyn DetectorTrait>>>,
+    // face_detector: Arc<Mutex<Box<dyn DetectorTrait>>>,
     thread_pool: ThreadPool,
     int_sender_ft: Sender<PointType>,
     int_receiver_ft: Receiver<PointType>,
@@ -56,19 +55,19 @@ impl<'a> InputProcesser<'a> {
         detect_typ: DetectorType,
         detect_hw: DetectorHardware,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let device_held: RefCell<Box<dyn Webcam<'a>>> = match get_dyn_webcam(name, device) {
-            Ok(webcam) => RefCell::new(webcam),
+        let device_held: Box<dyn Webcam<'a> + 'a> = match get_dyn_webcam(name, device) {
+            Ok(webcam) => webcam,
             Err(why) => return Err(why),
         };
-
+        device_held.open_stream();
         let detector_type = Cell::new(detect_typ);
         let detector_hw = Cell::new(detect_hw);
 
-        let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> =
-            Arc::new(Mutex::new(Box::new(match detect_typ {
-                DetectorType::DLibFHOG => DLibDetector::new(false),
-                DetectorType::DLibCNN => DLibDetector::new(true),
-            })));
+        // let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> =
+        //     Arc::new(Mutex::new(Box::new(match detect_typ {
+        //         DetectorType::DLibFHOG => DLibDetector::new(false),
+        //         DetectorType::DLibCNN => DLibDetector::new(true),
+        //     })));
 
         // TODO: Adjustable thread pool size
         let thread_pool = ThreadPool::new_named(
@@ -81,10 +80,9 @@ impl<'a> InputProcesser<'a> {
         let (int_sender_ft, int_receiver_ft) = flume::unbounded();
 
         Ok(InputProcesser {
-            device_held,
+            device_held: RefCell::new(device_held),
             detector_type,
             detector_hw,
-            face_detector,
             thread_pool,
             int_sender_ft,
             int_receiver_ft,
@@ -109,37 +107,43 @@ impl<'a> InputProcesser<'a> {
         name: Option<String>,
         new_device: PossibleDevice,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let device_held: Box<dyn Webcam<'a>> = match get_dyn_webcam(name, new_device) {
+        let device_held: Box<dyn Webcam<'a> + 'a> = match get_dyn_webcam(name, new_device) {
             Ok(webcam) => webcam,
             Err(why) => return Err(why),
         };
+
+        device_held.open_stream();
 
         self.device_held.replace(device_held);
         Ok(())
     }
 
-    pub fn add_workload(&self, img_height: u32, img_width: u32, img_data: Vec<u8>) {
-        let send = self.int_sender_ft.clone();
-        let detector = self.face_detector.clone();
+    pub fn add_workload(&self, _img_height: u32, _img_width: u32, _img_data: Vec<u8>) {
+        // let send = self.int_sender_ft.clone();
+        // let detector = self.face_detector.clone();
+        //
+        // self.thread_pool.execute(move || {
+        //     let locked = detector.lock();
+        //     let i_d = img_data.as_slice();
+        //     let faces = locked.detect_face_rects(img_height, img_width, i_d);
+        //     let result =
+        //         locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, i_d);
+        //     if let Err(why) = send.send(result) {
+        //         godot_print!("Error: {}", why.to_string());
+        //     }
+        // })
+    }
 
-        self.thread_pool.execute(move || {
-            let locked = detector.lock();
-            let i_d = img_data.as_slice();
-            let faces = locked.detect_face_rects(img_height, img_width, i_d);
-            let result =
-                locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, i_d);
-            if let Err(why) = send.send(result) {
-                godot_print!("Error: {}", why.to_string());
-            }
-        })
+    pub fn capture_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        self.device_held.borrow().get_frame()
     }
 
     pub fn capture_and_record(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let img_captured = match self.device_held.borrow().get_next_frame() {
+        let img_captured = match self.device_held.borrow().get_frame() {
             Ok(frame) => frame,
             Err(why) => return Err(why),
         };
-        let res = { self.device_held.borrow().get() };
+        let res = { self.device_held.borrow().get_resolution().unwrap() };
         self.add_workload(res.y, res.x, img_captured);
         Ok(())
     }

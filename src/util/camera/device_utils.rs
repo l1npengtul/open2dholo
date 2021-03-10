@@ -202,11 +202,16 @@ impl PartialOrd for Resolution {
 }
 
 impl Ord for Resolution {
+    // Flip around the order to make it seem the way the user would expect.
+    // The user would expect a descending list of resolutions (aka highest -> lowest)
     fn cmp(&self, other: &Self) -> Ordering {
-        let selfint = format!("{}{}", self.x, self.y).parse::<i64>().unwrap();
-        let otherint = format!("{}{}", other.x, other.y).parse::<i64>().unwrap();
-
-        selfint.cmp(&otherint)
+        if self.x > other.x {
+            Ordering::Less
+        } else if self.x == other.x {
+            Ordering::Equal
+        } else {
+            Ordering::Greater
+        }
     }
 }
 

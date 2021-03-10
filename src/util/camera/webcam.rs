@@ -25,7 +25,7 @@ pub trait Webcam<'a> {
     fn get_resolution(&self) -> Result<Resolution, Box<dyn std::error::Error>>;
     fn get_framerate(&self) -> Result<u32, Box<dyn std::error::Error>>;
     fn get_camera_type(&self) -> WebcamType;
-    fn open_stream(&'a self) -> Result<(), Box<dyn std::error::Error>>;
+    fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>>;
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>>;
     // fn as_any(&self) -> &dyn Any;
 }
