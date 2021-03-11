@@ -305,6 +305,7 @@ impl<'a> QueryCamera<'a> for V4LinuxDevice<'a> {
 
 // If you are getting linter errors about how `'this` isn't defined/a valid lifetime,
 // ignore it, the macro expansion isn't working properly.
+// This crashes. Just use OpenCV
 #[self_referencing(chain_hack, pub_extras)]
 pub struct UVCameraDevice<'a> {
     device_type: Box<WebcamType>,
@@ -699,6 +700,9 @@ impl OpenCVCameraDevice {
             if let Err(why) = set_property_fps(&mut v_cap, frame) {
                 return Err(why);
             }
+            if let Err(why) = set_property_fourcc(&mut v_cap) {
+                return Err(why);
+            }
 
             RefCell::new(v_cap)
         };
@@ -736,6 +740,9 @@ impl OpenCVCameraDevice {
                 return Err(why);
             }
             if let Err(why) = set_property_fps(&mut v_cap, fps.get()) {
+                return Err(why);
+            }
+            if let Err(why) = set_property_fourcc(&mut v_cap) {
                 return Err(why);
             }
 
@@ -853,13 +860,12 @@ impl OpenCVCameraDevice {
             match vc.read(&mut frame) {
                 Ok(_) => {}
                 Err(why) => {
-                    dbg!("{}", why.to_string());
+                    ret_boxerr!(why);
                 }
             }
 
             if frame.size().unwrap().width > 0 {
                 if frame.is_continuous().unwrap() {
-                    let current_time = Instant::now();
                     // use a memcpy - we about to get f u n k y
                     let mut ret_vec: Vec<u8> = Vec::new();
                     ret_vec.reserve_exact(
@@ -874,8 +880,6 @@ impl OpenCVCameraDevice {
                             (size_of::<u8>() as i32 * frame.rows() * frame.cols() * 3) as usize,
                         );
                     }
-                    let elapsed = current_time.elapsed();
-                    dbg!("Millis: {}", elapsed.as_millis());
                     return Ok(ret_vec);
                 }
                 // non continuous mat
@@ -987,10 +991,6 @@ fn set_property_res(
 }
 
 fn set_property_fps(vc: &mut VideoCapture, fps: u32) -> Result<(), Box<dyn std::error::Error>> {
-    vc.set(
-        CAP_PROP_FOURCC,
-        VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap() as f64,
-    );
     match vc.set(VideoCaptureProperties::CAP_PROP_FPS as i32, f64::from(fps)) {
         Ok(r) => {
             if !r {
@@ -998,6 +998,23 @@ fn set_property_fps(vc: &mut VideoCapture, fps: u32) -> Result<(), Box<dyn std::
             }
         }
         Err(why) => ret_boxerr!(why),
+    }
+    Ok(())
+}
+
+fn set_property_fourcc(vc: &mut VideoCapture) -> Result<(), Box<dyn std::error::Error>> {
+    match vc.set(
+        CAP_PROP_FOURCC as i32,
+        VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap() as f64,
+    ) {
+        Ok(r) => {
+            if !r {
+                ret_boxerr!(CannotSetProperty("CAP_PROP_FOURCC".to_string()));
+            }
+        }
+        Err(why) => {
+            ret_boxerr!(why);
+        }
     }
     Ok(())
 }

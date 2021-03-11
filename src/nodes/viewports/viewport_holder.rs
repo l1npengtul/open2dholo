@@ -20,6 +20,7 @@ use crate::{
     processing::input_processor::InputProcesser,
     util::camera::device_utils::{DeviceContact, Resolution},
 };
+use gdnative::api::CameraServer;
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::{cell::RefCell, error::Error, time::Instant};
 
@@ -68,11 +69,7 @@ impl ViewportHolder {
     // poll the channel to get the data
     #[export]
     pub fn _process(&self, _owner: TRef<VSplitContainer>, _delta: f32) {
-        // godot_print!("proc1");
-
         if let Some(input) = &*self.input_processer.borrow() {
-            godot_print!("proc1");
-            let now = Instant::now();
             match input.capture_frame() {
                 Ok(data) => {
                     println!("{}", data.len())
@@ -81,9 +78,18 @@ impl ViewportHolder {
                     println!("{}", why);
                 }
             }
-            dbg!("{}", input.device_held.borrow().get_framerate().unwrap());
-            let taken = now.elapsed();
-            println!("Time taken: {}", taken.as_millis());
+        }
+        let cs = CameraServer::godot_singleton();
+        let feeds = cs.get_feed_count();
+        for feed in 0..feeds {
+            unsafe {
+                let f = cs.get_feed(feed).unwrap();
+                dbg!(
+                    "{}, {}",
+                    f.assume_safe().get_id(),
+                    f.assume_safe().get_name()
+                );
+            };
         }
     }
 
@@ -120,8 +126,7 @@ impl ViewportHolder {
                 None => "".to_string(),
             };
 
-            // let device_contact = crate::CURRENT_DEVICE.with(|dev| dev.borrow().clone().unwrap());
-            let device_contact = DeviceContact::OPENCV { index: 0 };
+            let device_contact = crate::CURRENT_DEVICE.with(|dev| dev.borrow().clone().unwrap());
             godot_print!("input_proc");
 
             let input_processer = match InputProcesser::from_device_contact(
@@ -135,10 +140,8 @@ impl ViewportHolder {
                 Ok(return_to_monke) => Some(return_to_monke),
                 Err(why) => panic!("Could not generate InputProcesser: {}", why.to_string()),
             };
-            godot_print!("set");
             *self.input_processer.borrow_mut() = input_processer;
         }
-        godot_print!("ret void");
     }
 
     fn kill_input_processer(&mut self) {
