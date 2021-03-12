@@ -79,18 +79,6 @@ impl ViewportHolder {
                 }
             }
         }
-        let cs = CameraServer::godot_singleton();
-        let feeds = cs.get_feed_count();
-        for feed in 0..feeds {
-            unsafe {
-                let f = cs.get_feed(feed).unwrap();
-                dbg!(
-                    "{}, {}",
-                    f.assume_safe().get_id(),
-                    f.assume_safe().get_name()
-                );
-            };
-        }
     }
 
     #[export]

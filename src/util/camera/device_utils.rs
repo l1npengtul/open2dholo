@@ -14,23 +14,25 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::error::conversion_error::ConversionError;
-use crate::error::conversion_error::ConversionError::{ConversionFromError, MatchFailedError};
-use crate::error::invalid_device_error::InvalidDeviceError;
-use crate::util::camera::webcam::QueryCamera;
-use crate::util::camera::{
-    camera_device::{UVCameraDevice, V4LinuxDevice},
-    webcam::Webcam,
+use crate::{
+    error::{
+        conversion_error::ConversionError::{ConversionFromError, MatchFailedError},
+        invalid_device_error::InvalidDeviceError::CannotFindDevice,
+    },
+    ret_boxerr,
+    util::camera::{
+        camera_device::{UVCameraDevice, V4LinuxDevice},
+        webcam::{QueryCamera, Webcam},
+    },
 };
 use gdnative::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::fmt::Formatter;
 use std::{
     cmp::Ordering, collections::HashMap, convert::TryFrom, error::Error, fmt::Display,
-    os::raw::c_int,
+    fmt::Formatter, os::raw::c_int,
 };
 use usb_enumeration::USBDevice;
-use uvc::{Context, DeviceHandle, FrameFormat};
+use uvc::{Context, DeviceDescription, DeviceHandle, FrameFormat};
 use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -113,9 +115,7 @@ impl DeviceHolder {
                 return Ok(device);
             }
         }
-        Err(Box::new(InvalidDeviceError::CannotFindDevice(
-            "noaddr".to_string(),
-        )))
+        Err(Box::new(CannotFindDevice("noaddr".to_string())))
     }
 }
 
@@ -577,6 +577,10 @@ impl CachedDevice {
         })
     }
 
+    pub fn set_custom_cached_idx(&mut self, idx: u32) {
+        self.device_location = DeviceContact::OPENCV { index: idx };
+    }
+
     pub fn get_name(&self) -> String {
         self.device_name.clone()
     }
@@ -603,66 +607,85 @@ impl PartialEq for CachedDevice {
     }
 }
 
+// assume libuvc list == opencv list
+#[cfg(target_os = "macos", "windows")]
 pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
-    return match std::env::consts::OS {
-        "linux" => {
-            let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
-            // get device list from v4l2
-            for dev in v4l::context::enum_devices() {
-                if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
-                    let b: Box<dyn QueryCamera> = Box::new(v4l_dev);
-                    if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
-                        known_devices.insert(
-                            dev.name()
-                                .unwrap_or(format!("/dev/video{}", dev.index()))
-                                .to_string(),
-                            c_dev,
-                        );
-                    }
+    // The only supported platforms are Linux and winshit. If anyone wants to PR for macos cool with me
+    let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
+    match crate::UVC.devices() {
+        Ok(list) => {
+            for (idx, uvc_device) in list.enumerate() {
+                if let Ok(mut camera_device) = {
+                    let b: Box<dyn QueryCamera> =
+                        Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
+                    CachedDevice::from_webcam(&b)
+                } {
+                    let dev_name = camera_device.get_name();
+                    camera_device.set_custom_cached_idx(idx as u32);
+                    // weed out the repeating
+                    known_devices.entry(dev_name).or_insert(camera_device);
                 }
             }
-            Some(known_devices)
         }
-        "macos" | "windows" => {
-            // The only supported platforms are Linux and winshit. If anyone wants to PR for macos cool with me
-            let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
-            match crate::UVC.devices() {
-                Ok(list) => {
-                    for uvc_device in list {
-                        if let Ok(camera_device) = {
-                            let b: Box<dyn QueryCamera> =
-                                Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
-                            CachedDevice::from_webcam(&b)
-                        } {
-                            let dev_name = camera_device.get_name();
-                            // weed out the repeating
-                            known_devices.entry(dev_name).or_insert(camera_device);
-                        }
-                    }
-                }
-                Err(_why) => {
-                    return None;
-                }
+        Err(_why) => {
+            return None;
+        }
+    }
+    Some(known_devices)
+}
+
+#[cfg(target_os = "linux")]
+pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
+    let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
+    // get device list from v4l2
+    for dev in v4l::context::enum_devices() {
+        if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
+            let b: Box<dyn QueryCamera> = Box::new(v4l_dev);
+            if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
+                known_devices.insert(
+                    dev.name()
+                        .unwrap_or(format!("/dev/video{}", dev.index()))
+                        .to_string(),
+                    c_dev,
+                );
             }
-            Some(known_devices)
         }
-        _ => None,
-    };
+    }
+    Some(known_devices)
 }
 
 pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::error::Error>> {
     match device {
         PossibleDevice::UVCAM {
-            vendor_id: _,
-            product_id: _,
-            serial: _,
+            vendor_id,
+            product_id,
+            serial,
             res: _res,
             fps: _fps,
             fmt: _fmt,
         } => {
-            // I've been trying way too much to find a way on windows to get the webcam index. The user probably has only one webcam anyway, lol
-            // IIYA IIYA IIYA
-            // #PortV4L2ForLinuxOrGiveUsAcutalWindowsMediaFoundationBindingsForRustMicrosoft
+            match crate::UVC.devices() {
+                Ok(list) => {
+                    for (idx, uvc_device) in list.enumerate() {
+                        match uvc_device.description() {
+                            Ok(desc) => {
+                                if vendor_id == Some(desc.vendor_id)
+                                    && product_id == Some(desc.product_id)
+                                    && serial == desc.serial_number
+                                {
+                                    return Ok(idx as u32);
+                                } else {
+                                    ret_boxerr!(CannotFindDevice("Index not found!".to_string()))
+                                }
+                            }
+                            Err(why) => ret_boxerr!(why),
+                        }
+                    }
+                }
+                Err(why) => {
+                    ret_boxerr!(why)
+                }
+            }
             Ok(0)
         }
         PossibleDevice::V4L2 {
@@ -680,9 +703,7 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
                 }
                 match p_owned.parse::<u32>() {
                     Ok(i) => Ok(i),
-                    Err(why) => Err(Box::new(InvalidDeviceError::CannotFindDevice(
-                        why.to_string(),
-                    ))),
+                    Err(why) => Err(Box::new(CannotFindDevice(why.to_string()))),
                 }
             }
             PathIndex::Index(i) => Ok(i as u32),
