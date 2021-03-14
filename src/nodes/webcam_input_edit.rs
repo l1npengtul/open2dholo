@@ -14,24 +14,26 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::device_utils::DeviceContact;
-use crate::{
-    nodes::editor_tabs::util::create_custom_editable_item,
-    util::camera::device_utils::{
-        enumerate_cache_device, CachedDevice, DeviceFormat, PossibleDevice, Resolution,
-    },
-};
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use gdnative::{
     api::{
         popup_menu::PopupMenu,
         tree::Tree,
         tree_item::{TreeCellMode, TreeItem},
     },
-    prelude::*,
     NativeClass,
+    prelude::*,
 };
-use std::cell::RefCell;
-use std::collections::HashMap;
+
+use crate::{
+    util::camera::device_utils::{
+        CachedDevice, DeviceFormat, enumerate_cache_device, PossibleDevice, Resolution,
+    },
+};
+use crate::nodes::util::create_custom_editable_item;
+use crate::util::camera::device_utils::DeviceContact;
 
 #[derive(NativeClass)]
 #[inherit(Tree)]

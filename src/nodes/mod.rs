@@ -14,6 +14,9 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod editor_tabs;
-pub mod main;
-pub mod viewports;
+pub mod model_tree_edit;
+pub mod open2dhctrl;
+pub mod settings_edit;
+mod util;
+pub mod viewport_holder;
+pub mod webcam_input_edit;

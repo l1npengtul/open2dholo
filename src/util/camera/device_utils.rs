@@ -22,7 +22,7 @@ use crate::{
     ret_boxerr,
     util::camera::{
         camera_device::{UVCameraDevice, V4LinuxDevice},
-        webcam::{QueryCamera, Webcam},
+        webcam::QueryCamera,
     },
 };
 use gdnative::prelude::*;
@@ -32,7 +32,7 @@ use std::{
     fmt::Formatter, os::raw::c_int,
 };
 use usb_enumeration::USBDevice;
-use uvc::{Context, DeviceDescription, DeviceHandle, FrameFormat};
+use uvc::{DeviceHandle, FrameFormat};
 use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -607,48 +607,49 @@ impl PartialEq for CachedDevice {
     }
 }
 
-// assume libuvc list == opencv list
-#[cfg(target_os = "macos", "windows")]
-pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
-    // The only supported platforms are Linux and winshit. If anyone wants to PR for macos cool with me
-    let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
-    match crate::UVC.devices() {
-        Ok(list) => {
-            for (idx, uvc_device) in list.enumerate() {
-                if let Ok(mut camera_device) = {
-                    let b: Box<dyn QueryCamera> =
-                        Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
-                    CachedDevice::from_webcam(&b)
-                } {
-                    let dev_name = camera_device.get_name();
-                    camera_device.set_custom_cached_idx(idx as u32);
-                    // weed out the repeating
-                    known_devices.entry(dev_name).or_insert(camera_device);
-                }
-            }
-        }
-        Err(_why) => {
-            return None;
-        }
-    }
-    Some(known_devices)
-}
-
-#[cfg(target_os = "linux")]
 pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
     let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
     // get device list from v4l2
-    for dev in v4l::context::enum_devices() {
-        if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
-            let b: Box<dyn QueryCamera> = Box::new(v4l_dev);
-            if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
-                known_devices.insert(
-                    dev.name()
-                        .unwrap_or(format!("/dev/video{}", dev.index()))
-                        .to_string(),
-                    c_dev,
-                );
+    match std::env::consts::OS {
+        "linux" => {
+            for dev in v4l::context::enum_devices() {
+                if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
+                    let b: Box<dyn QueryCamera> = Box::new(v4l_dev);
+                    if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
+                        known_devices.insert(
+                            dev.name()
+                                .unwrap_or(format!("/dev/video{}", dev.index()))
+                                .to_string(),
+                            c_dev,
+                        );
+                    }
+                }
             }
+        }
+        "windows" | "macos" => {
+            // assume libuvc list == opencv list
+            match crate::UVC.devices() {
+                Ok(list) => {
+                    for (idx, uvc_device) in list.enumerate() {
+                        if let Ok(mut camera_device) = {
+                            let b: Box<dyn QueryCamera> =
+                                Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
+                            CachedDevice::from_webcam(&b)
+                        } {
+                            let dev_name = camera_device.get_name();
+                            camera_device.set_custom_cached_idx(idx as u32);
+                            // weed out the repeating
+                            known_devices.entry(dev_name).or_insert(camera_device);
+                        }
+                    }
+                }
+                Err(_why) => {
+                    return None;
+                }
+            }
+        }
+        &_ => {
+            return None;
         }
     }
     Some(known_devices)
@@ -674,9 +675,8 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
                                     && serial == desc.serial_number
                                 {
                                     return Ok(idx as u32);
-                                } else {
-                                    ret_boxerr!(CannotFindDevice("Index not found!".to_string()))
                                 }
+                                ret_boxerr!(CannotFindDevice("Index not found!".to_string()))
                             }
                             Err(why) => ret_boxerr!(why),
                         }

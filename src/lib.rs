@@ -48,7 +48,7 @@ extern crate ouroboros;
 
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
-    static ref UVC: Arc<Context<'static>> = { Arc::new(Context::new().unwrap()) };
+    static ref UVC: Arc<Context<'static>> = Arc::new(Context::new().unwrap());
     static ref USER_DIR: Arc<String> = {
         Arc::new(
             gdnative::api::OS::godot_singleton()
@@ -64,10 +64,10 @@ thread_local! {
 
 fn init(handle: InitHandle) {
     godot_print!("8uc3: {}", CV_8UC3);
-    handle.add_class::<crate::nodes::main::open2dhctrl::Main>();
-    handle.add_class::<crate::nodes::editor_tabs::model_tree_edit::ModelTreeEditor>();
-    handle.add_class::<crate::nodes::editor_tabs::webcam_input_edit::WebcamInputEditor>();
-    handle.add_class::<crate::nodes::viewports::viewport_holder::ViewportHolder>()
+    handle.add_class::<nodes::open2dhctrl::Open2DHCtrl>();
+    handle.add_class::<nodes::model_tree_edit::ModelTreeEditor>();
+    handle.add_class::<nodes::webcam_input_edit::WebcamInputEditor>();
+    handle.add_class::<nodes::viewport_holder::ViewportHolder>()
 }
 
 godot_init!(init);

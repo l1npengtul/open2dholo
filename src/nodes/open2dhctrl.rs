@@ -23,12 +23,12 @@ use gdnative::{
 
 #[derive(NativeClass)]
 #[inherit(Control)]
-pub struct Main;
+pub struct Open2DHCtrl;
 
 #[methods]
-impl Main {
+impl Open2DHCtrl {
     fn new(_owner: &Control) -> Self {
-        Main
+        Open2DHCtrl
     }
 
     #[export]

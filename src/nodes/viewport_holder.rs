@@ -14,15 +14,13 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::device_utils::PathIndex;
 use crate::{
     processing::face_detector::detectors::util::{DetectorHardware, DetectorType},
     processing::input_processor::InputProcesser,
-    util::camera::device_utils::{DeviceContact, Resolution},
+    util::camera::device_utils::Resolution,
 };
-use gdnative::api::CameraServer;
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
-use std::{cell::RefCell, error::Error, time::Instant};
+use std::cell::RefCell;
 
 #[derive(NativeClass)]
 #[inherit(VSplitContainer)]

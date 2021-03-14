@@ -28,6 +28,7 @@ use crate::{
     },
 };
 use flume::{Receiver, Sender, TryRecvError};
+use opencv::core::Vec3b;
 use opencv::videoio::VideoCaptureAPIs::CAP_ANY;
 use opencv::videoio::{VideoWriter, CAP_PROP_FOURCC};
 use opencv::{
@@ -872,13 +873,19 @@ impl OpenCVCameraDevice {
                         (frame.rows() * frame.cols() * frame.channels().unwrap_or(3)) as usize,
                     );
                     // make a scope so the vec outlives the pointer 100%
-                    unsafe {
+                    {
                         let vec_ptr = ret_vec.as_mut_ptr().cast(); // this looks, feels, and is probably a sin.
                         let mat_ptr = frame.as_raw_Mat();
-                        mat_ptr.copy_to_nonoverlapping(
-                            vec_ptr,
-                            (size_of::<u8>() as i32 * frame.rows() * frame.cols() * 3) as usize,
-                        );
+                        unsafe {
+                            mat_ptr.copy_to_nonoverlapping(
+                                vec_ptr,
+                                (size_of::<u8>() as i32
+                                    * frame.rows()
+                                    * frame.cols()
+                                    * frame.channels().unwrap_or(3))
+                                    as usize,
+                            );
+                        }
                     }
                     return Ok(ret_vec);
                 }
@@ -896,14 +903,18 @@ impl OpenCVCameraDevice {
                             ret_boxerr!(why);
                         }
                     };
-                    let slice = match mat_rw.data_typed::<u8>() {
+                    let slice = match mat_rw.data_typed::<Vec3b>() {
                         Ok(sl) => sl,
                         Err(why) => {
                             dbg!("{}", why.to_string());
                             ret_boxerr!(why);
                         }
                     };
-                    ret_vec.append(&mut slice.to_vec());
+                    for px in slice {
+                        ret_vec.push(px.0[0]);
+                        ret_vec.push(px.0[1]);
+                        ret_vec.push(px.0[2]);
+                    }
                 }
                 dbg!("aaa");
                 return Ok(ret_vec);

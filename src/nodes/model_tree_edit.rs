@@ -14,7 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::nodes::editor_tabs::util::create_editable_item;
+use crate::nodes::util::create_editable_item;
 use gdnative::{
     api::{tree::Tree, tree_item::TreeItem},
     prelude::*,
