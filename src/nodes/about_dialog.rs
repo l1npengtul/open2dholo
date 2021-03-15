@@ -1,5 +1,5 @@
 //     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021 l1npengtul
+//     Copyright (C) 2020-2021l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -14,12 +14,26 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod about_dialog;
-pub mod error_alert_dialog;
-pub mod model_tree_edit;
-pub mod open2dhctrl;
-pub mod settings_dialog;
-pub mod upper_tab_popups;
-mod util;
-pub mod viewport_holder;
-pub mod webcam_input_edit;
+use gdnative::{
+    api::{Tree, TreeItem, WindowDialog},
+    methods,
+    prelude::*,
+    NativeClass,
+};
+
+// TODO: Use window node for 4.0
+#[derive(NativeClass)]
+#[inherit(WindowDialog)]
+pub struct AboutDialog;
+
+#[methods]
+impl AboutDialog {
+    fn new(_owner: &WindowDialog) -> Self {
+        AboutDialog
+    }
+
+    #[export]
+    fn _ready(&self, owner: TRef<WindowDialog>) {
+        owner.set_title("About Open2DH");
+    }
+}

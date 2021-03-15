@@ -52,10 +52,13 @@ features = ["embed-all", "embed-any"]
 version = "0.12.0"
 features = ["v4l2-sys"]
 
-#[dependencies.tvm]
-#version = "0.1.1-alpha"
-#default-features = false
-#features = ["dynamic-linking"]
+[dependencies.tvm]
+version = "0.1.1-alpha"
+default-features = false
+features = ["static-linking"]
+
+[build-dependencies]
+cargo_metadata = "0.13.1"
 
 [lib]
 crate-type = ["cdylib"]

@@ -63,11 +63,15 @@ thread_local! {
 }
 
 fn init(handle: InitHandle) {
-    godot_print!("8uc3: {}", CV_8UC3);
     handle.add_class::<nodes::open2dhctrl::Open2DHCtrl>();
     handle.add_class::<nodes::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<nodes::webcam_input_edit::WebcamInputEditor>();
-    handle.add_class::<nodes::viewport_holder::ViewportHolder>()
+    handle.add_class::<nodes::viewport_holder::ViewportHolder>();
+    handle.add_class::<nodes::upper_tab_popups::FileMenuButton>();
+    handle.add_class::<nodes::upper_tab_popups::EditMenuButton>();
+    handle.add_class::<nodes::upper_tab_popups::HelpMenuButton>();
+    handle.add_class::<nodes::settings_dialog::SettingsDialog>();
+    handle.add_class::<nodes::about_dialog::AboutDialog>();
 }
 
 godot_init!(init);
