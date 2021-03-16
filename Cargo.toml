@@ -41,7 +41,6 @@ version = "0.9.3"
 
 [dependencies.dlib-face-recognition]
 git = "https://github.com/l1npengtul/dlib-face-recognition.git"
-version = "0.1.8"
 features = ["embed-all", "embed-any"]
 
 [dependencies.v4l]

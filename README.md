@@ -1,5 +1,5 @@
 <h1 align="center">Open2DHolo</h1>
-"Its facerig but worse and open source" 
+"Be an anime girl on youtube and you need not worry about the result of a hundred battles" 
 - Sun Tzu, <em>The Art of VTubers</em>
 
 <h3>Installing</h3>

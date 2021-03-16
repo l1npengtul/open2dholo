@@ -1,5 +1,5 @@
 //     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021l1npengtul
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@
 //     }
 // }
 //
-use gdnative::api::OS;
 
 #[macro_export]
 macro_rules! make_dyn {
@@ -40,5 +39,29 @@ macro_rules! ret_boxerr {
     ($a:expr) => {{
         let err: Box<dyn std::error::Error> = Box::new($a);
         return Err(err);
+    }};
+}
+
+#[macro_export]
+macro_rules! show_error {
+    ($err_name:expr) => {{
+        let os = gdnative::api::OS::godot_singleton();
+        os.emit_signal(
+            "error_occur_default",
+            &[Variant::from_str(
+                format!("{}", $err_name),
+                format!("{}", $err_name),
+            )],
+        )
+    }};
+    ($err_name:expr, $err_desc:expr) => {{
+        let os = gdnative::api::OS::godot_singleton();
+        os.emit_signal(
+            "error_occur_default",
+            &[Variant::from_str(
+                format!("{}", $err_name),
+                format!("{}", $err_desc),
+            )],
+        )
     }};
 }

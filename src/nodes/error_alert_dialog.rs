@@ -31,7 +31,7 @@ impl ErrorAlertDialog {
     // register the ErrorDialogShow signal
     fn register_signals(builder: &ClassBuilder<Self>) {
         builder.add_signal(Signal {
-            name: "error_occour_default",
+            name: "error_occur_default",
             args: &[
                 SignalArgument {
                     name: "error_name",
@@ -42,29 +42,6 @@ impl ErrorAlertDialog {
                 SignalArgument {
                     name: "error_desc",
                     default: Variant::from_str("i love emilia"),
-                    export_info: ExportInfo::new(VariantType::GodotString),
-                    usage: PropertyUsage::DEFAULT,
-                },
-            ],
-        });
-        builder.add_signal(Signal {
-            name: "error_occour_with_stacktrace",
-            args: &[
-                SignalArgument {
-                    name: "error_name",
-                    default: Variant::from_str("GenericError"),
-                    export_info: ExportInfo::new(VariantType::GodotString),
-                    usage: PropertyUsage::DEFAULT,
-                },
-                SignalArgument {
-                    name: "error_desc",
-                    default: Variant::from_str("i love emilia"),
-                    export_info: ExportInfo::new(VariantType::GodotString),
-                    usage: PropertyUsage::DEFAULT,
-                },
-                SignalArgument {
-                    name: "error_stack",
-                    default: Variant::from_str("main.rs 1: i love emilia"),
                     export_info: ExportInfo::new(VariantType::GodotString),
                     usage: PropertyUsage::DEFAULT,
                 },
@@ -79,16 +56,40 @@ impl ErrorAlertDialog {
     #[export]
     fn _ready(&self, owner: TRef<AcceptDialog>) {
         owner.set_title("Error");
+        if let Err(why) = owner.connect(
+            "confirmed",
+            self,
+            "on_confirmed",
+            VariantArray::new_shared(),
+            0,
+        ) {
+            panic!(why)
+        }
+        if let Err(why) = owner.connect(
+            "error_occur_default",
+            self,
+            "on_error_occur_default",
+            VariantArray::new_shared(),
+            0,
+        ) {
+            panic!(why)
+        }
     }
 
     #[export]
-    pub fn on_error_occour_with_stacktrace(
+    pub fn on_error_occur_default(
+        &self,
+        owner: TRef<AcceptDialog>,
         error_name: Variant,
         error_desc: Variant,
-        error_stack: Variant,
     ) {
+        owner.set_title(format!("Error: {}", error_name.to_string()));
+        owner.set_text(error_desc.to_string());
+        owner.set_visible(true);
     }
 
     #[export]
-    pub fn on_error_occour_default(error_name: Variant, error_desc: Variant) {}
+    pub fn on_confirmed(&self, owner: TRef<AcceptDialog>) {
+        owner.set_visible(false)
+    }
 }

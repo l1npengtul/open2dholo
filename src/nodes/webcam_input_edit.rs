@@ -23,17 +23,15 @@ use gdnative::{
         tree::Tree,
         tree_item::{TreeCellMode, TreeItem},
     },
-    NativeClass,
     prelude::*,
+    NativeClass,
 };
 
-use crate::{
-    util::camera::device_utils::{
-        CachedDevice, DeviceFormat, enumerate_cache_device, PossibleDevice, Resolution,
-    },
-};
 use crate::nodes::util::create_custom_editable_item;
 use crate::util::camera::device_utils::DeviceContact;
+use crate::util::camera::device_utils::{
+    enumerate_cache_device, CachedDevice, DeviceFormat, PossibleDevice, Resolution,
+};
 
 #[derive(NativeClass)]
 #[inherit(Tree)]

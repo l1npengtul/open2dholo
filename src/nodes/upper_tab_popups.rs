@@ -14,6 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::show_error;
 use dirs::home_dir;
 use gdnative::{
     api::{FileDialog, MenuButton, PopupMenu, OS},
@@ -21,7 +22,8 @@ use gdnative::{
     prelude::*,
     NativeClass,
 };
-use native_dialog::{FileDialog as NativeFileDialog, Filter, MessageDialog};
+use native_dialog::{Error, FileDialog as NativeFileDialog, Filter, MessageDialog};
+use std::path::Path;
 use std::{cell::RefCell, ffi::OsString, path::PathBuf};
 
 #[derive(NativeClass)]
@@ -68,23 +70,45 @@ impl FileMenuButton {
     pub fn on_popupmenu_button_clicked(&self, owner: TRef<MenuButton>, id: i32) {
         match id {
             0 => {
-                let model_path = NativeFileDialog::new()
+                match NativeFileDialog::new()
                     .set_location(&*self.previous_file_path.borrow())
-                    .set_fi
+                    .add_filter("glTF Model", &["*.gltf", "*.glb"])
+                    .add_filter("VRM Model", &["*.vrm"])
+                    .add_filter("FBX Model", &["*.fbx"])
+                    .add_filter("Collada Model", &["*.dae"])
                     .show_open_single_file()
+                {
+                    Ok(path) => {
+                        match path {
+                            Some(p) => {
+                                match p.parent() {
+                                    Some(dir_path) => {
+                                        let path_str = dir_path
+                                            .as_os_str()
+                                            .into_os_string()
+                                            .into_string()
+                                            .unwrap();
+                                        *self.previous_file_path.borrow_mut() = path_str
+                                    }
+                                    None => {
+                                        let path_str = p.into_os_string().into_string().unwrap();
+                                        *self.previous_file_path.borrow_mut() = path_str
+                                    }
+                                }
+                                // TODO: Loader emit signal
+                            }
+                            None => {
+                                show_error!("Failed to open file", "File path doesn't exist!")
+                            }
+                        }
+                    }
+                    Err(why) => {
+                        show_error!("Failed to open file", why)
+                    }
+                }
             }
             _ => {}
         }
-    }
-
-    #[export]
-    pub fn on_directory_selected_filedialog(&self, _owner: TRef<MenuButton>, dir: String) {
-        *self.previous_file_path.borrow_mut() = dir;
-    }
-
-    #[export]
-    pub fn on_file_selected_filedialog(&self, owner: TRef<MenuButton>, file: String) {
-        // TODO: Emit Signal
     }
 }
 
