@@ -73,15 +73,6 @@ size_flags_horizontal = 13
 size_flags_vertical = 13
 text = "File"
 
-[node name="ModelFileDialog" type="FileDialog" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File"]
-margin_right = 315.0
-margin_bottom = 130.0
-window_title = "Open Model"
-resizable = true
-mode_overrides_title = false
-mode = 0
-filters = PoolStringArray( ".fbx", ".gltf", ".glb" )
-
 [node name="Edit" type="MenuButton" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
 margin_left = 39.0
 margin_right = 75.0
@@ -124,8 +115,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
 margin_top = 32.0
-margin_right = 36.0
-margin_bottom = 36.0
+margin_right = -4.0
+margin_bottom = -4.0
 
 [node name="GridContainer" type="GridContainer" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer/VBoxContainer"]
 margin_right = 40.0
@@ -190,8 +181,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 margin_left = 4.0
 margin_top = 32.0
-margin_right = 36.0
-margin_bottom = 36.0
+margin_right = -4.0
+margin_bottom = -4.0
 
 [node name="Tree" type="Tree" parent="Open2GHMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help/AboutDialog/TabContainer/Dependencies"]
 margin_right = 40.0

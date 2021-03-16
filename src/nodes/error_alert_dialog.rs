@@ -46,7 +46,30 @@ impl ErrorAlertDialog {
                     usage: PropertyUsage::DEFAULT,
                 },
             ],
-        })
+        });
+        builder.add_signal(Signal {
+            name: "error_occour_with_stacktrace",
+            args: &[
+                SignalArgument {
+                    name: "error_name",
+                    default: Variant::from_str("GenericError"),
+                    export_info: ExportInfo::new(VariantType::GodotString),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                SignalArgument {
+                    name: "error_desc",
+                    default: Variant::from_str("i love emilia"),
+                    export_info: ExportInfo::new(VariantType::GodotString),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                SignalArgument {
+                    name: "error_stack",
+                    default: Variant::from_str("main.rs 1: i love emilia"),
+                    export_info: ExportInfo::new(VariantType::GodotString),
+                    usage: PropertyUsage::DEFAULT,
+                },
+            ],
+        });
     }
 
     fn new(_owner: &ErrorAlertDialog) -> Self {
@@ -57,4 +80,15 @@ impl ErrorAlertDialog {
     fn _ready(&self, owner: TRef<AcceptDialog>) {
         owner.set_title("Error");
     }
+
+    #[export]
+    pub fn on_error_occour_with_stacktrace(
+        error_name: Variant,
+        error_desc: Variant,
+        error_stack: Variant,
+    ) {
+    }
+
+    #[export]
+    pub fn on_error_occour_default(error_name: Variant, error_desc: Variant) {}
 }

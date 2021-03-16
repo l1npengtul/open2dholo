@@ -31,6 +31,7 @@
 #![allow(clippy::cast_possible_wrap)]
 
 use crate::util::camera::device_utils::DeviceContact;
+use gdnative::api::OS;
 use gdnative::prelude::*;
 use opencv::core::CV_8UC3;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -49,13 +50,6 @@ extern crate ouroboros;
 // Make it so we can get a webcam stream anywhere so we don't have to deal with 'static bullshit
 lazy_static! {
     static ref UVC: Arc<Context<'static>> = Arc::new(Context::new().unwrap());
-    static ref USER_DIR: Arc<String> = {
-        Arc::new(
-            gdnative::api::OS::godot_singleton()
-                .get_user_data_dir()
-                .to_string(),
-        )
-    };
 }
 
 thread_local! {

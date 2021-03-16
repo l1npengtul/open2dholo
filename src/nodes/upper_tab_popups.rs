@@ -14,13 +14,15 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use dirs::home_dir;
 use gdnative::{
-    api::{FileDialog, MenuButton, PopupMenu},
+    api::{FileDialog, MenuButton, PopupMenu, OS},
     methods,
     prelude::*,
     NativeClass,
 };
-use std::cell::RefCell;
+use native_dialog::{FileDialog as NativeFileDialog, Filter, MessageDialog};
+use std::{cell::RefCell, ffi::OsString, path::PathBuf};
 
 #[derive(NativeClass)]
 #[inherit(MenuButton)]
@@ -32,8 +34,21 @@ pub struct FileMenuButton {
 #[methods]
 impl FileMenuButton {
     fn new(_owner: &MenuButton) -> Self {
+        let home_dir = match home_dir() {
+            Some(h) => match h.into_os_string().into_string() {
+                Ok(p) => p,
+                Err(_) => {
+                    let os = OS::godot_singleton();
+                    os.get_user_data_dir().to_string()
+                }
+            },
+            None => {
+                let os = OS::godot_singleton();
+                os.get_user_data_dir().to_string()
+            }
+        };
         FileMenuButton {
-            previous_file_path: RefCell::new("res://".to_string()),
+            previous_file_path: RefCell::new(home_dir),
         }
     }
     #[export]
@@ -47,43 +62,16 @@ impl FileMenuButton {
             VariantArray::new_shared(),
             0,
         );
-        let filedialog = unsafe {
-            &*owner
-                .get_node("ModelFileDialog")
-                .unwrap()
-                .assume_safe()
-                .cast::<FileDialog>()
-                .unwrap()
-        };
-        filedialog.connect(
-            "dir_selected",
-            self,
-            "on_directory_selected_filedialog",
-            VariantArray::new_shared(),
-            0,
-        );
-        filedialog.connect(
-            "file_selected",
-            self,
-            "on_file_selected_filedialog",
-            VariantArray::new_shared(),
-            0,
-        );
     }
 
     #[export]
     pub fn on_popupmenu_button_clicked(&self, owner: TRef<MenuButton>, id: i32) {
         match id {
             0 => {
-                let filedialog = unsafe {
-                    &*owner
-                        .get_node("ModelFileDialog")
-                        .unwrap()
-                        .assume_safe()
-                        .cast::<FileDialog>()
-                        .unwrap()
-                };
-                filedialog.set_visible(true);
+                let model_path = NativeFileDialog::new()
+                    .set_location(&*self.previous_file_path.borrow())
+                    .set_fi
+                    .show_open_single_file()
             }
             _ => {}
         }
@@ -97,16 +85,6 @@ impl FileMenuButton {
     #[export]
     pub fn on_file_selected_filedialog(&self, owner: TRef<MenuButton>, file: String) {
         // TODO: Emit Signal
-
-        let filedialog = unsafe {
-            &*owner
-                .get_node("ModelFileDialog")
-                .unwrap()
-                .assume_safe()
-                .cast::<FileDialog>()
-                .unwrap()
-        };
-        filedialog.set_visible(false);
     }
 }
 

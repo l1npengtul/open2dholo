@@ -21,6 +21,7 @@
 //     }
 // }
 //
+use gdnative::api::OS;
 
 #[macro_export]
 macro_rules! make_dyn {

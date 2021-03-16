@@ -12,25 +12,21 @@ license = "GPL-3.0-or-later"
 parking_lot = "0.11.1"
 flume = "0.10.0"
 lazy_static = "1.4.0"
-thiserror = "1.0.22"
+thiserror = "1.0.24"
 ron = "0.6.2"
 serde = "1.0.117"
 usb_enumeration = "0.1.0"
 regex = "1.4.2"
 image = "0.23.12"
+dirs = "3.0.1"
 
 # Safety unknown. Replace when merged
 [dependencies.ouroboros]
-git = "https://github.com/tomprince/ouroboros.git"
-branch = "struct-lifetime"
+version = "0.8.3"
 
 [dependencies.rusty_pool]
-version = "0.5.0"
+version = "0.5.1"
 default-features = false
-
-[dependencies.uvc-sys]
-version = "0.2.0"
-features = ["vendor"]
 
 [dependencies.opencv]
 version = "0.49.1"
@@ -56,6 +52,10 @@ features = ["v4l2-sys"]
 version = "0.1.1-alpha"
 default-features = false
 features = ["static-linking"]
+
+[dependencies.native-dialog]
+version = "0.5.5"
+features = ["windows_dpi_awareness", "windows_visual_styles"]
 
 [build-dependencies]
 cargo_metadata = "0.13.1"
