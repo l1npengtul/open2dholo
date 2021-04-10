@@ -5,7 +5,8 @@
 /target
 Cargo.lock
 
-open2dh.iml
+open2dholo.iml
+Open2DHolo.iml
 .idea/
 .mono/
 addons/

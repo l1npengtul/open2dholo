@@ -1,0 +1,487 @@
+[gd_scene load_steps=5 format=2]
+
+[ext_resource path="res://src/GDNative/ModelTreeEditor.gdns" type="Script" id=1]
+[ext_resource path="res://src/GDNative/Open2DHolo.gdns" type="Script" id=2]
+[ext_resource path="res://HSplitContainer2.tscn" type="PackedScene" id=3]
+[ext_resource path="res://src/GDNative/WebcamInputEditor.gdns" type="Script" id=4]
+
+[node name="Open2DHolo" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource( 2 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ColorRect" type="ColorRect" parent="."]
+margin_right = 1105.0
+margin_bottom = 686.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+color = Color( 0.121569, 0.12549, 0.211765, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Open2DHoloMainUINode" type="Control" parent="."]
+margin_left = -1.0
+margin_right = 39.0
+margin_bottom = 40.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Panel" type="Panel" parent="Open2DHoloMainUINode"]
+margin_left = -1.68188
+margin_right = 1098.32
+margin_bottom = 684.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel"]
+margin_left = 16.0
+margin_top = 17.0
+margin_right = 1008.0
+margin_bottom = 583.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer"]
+margin_right = 992.0
+margin_bottom = 20.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer"]
+margin_right = 121.0
+margin_bottom = 20.0
+
+[node name="File" type="MenuButton" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
+margin_right = 35.0
+margin_bottom = 20.0
+size_flags_horizontal = 13
+size_flags_vertical = 13
+text = "File"
+
+[node name="Edit" type="MenuButton" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
+margin_left = 39.0
+margin_right = 75.0
+margin_bottom = 20.0
+size_flags_horizontal = 13
+size_flags_vertical = 13
+text = "Edit"
+
+[node name="SettingDialog" type="WindowDialog" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit"]
+margin_right = 48.0
+margin_bottom = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="TabContainer" type="TabContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer"]
+margin_right = 8.0
+margin_bottom = 36.0
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+
+[node name="Tree" type="Tree" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer/HSplitContainer"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="Tree2" type="Tree" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer/HSplitContainer"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+
+[node name="GridContainer" type="GridContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer/VBoxContainer"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer/VBoxContainer/GridContainer"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="LineEdit" type="LineEdit" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer/VBoxContainer/GridContainer/VBoxContainer"]
+margin_right = 58.0
+margin_bottom = 24.0
+
+[node name="Tree" type="Tree" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/TabContainer/VBoxContainer/GridContainer/VBoxContainer"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="Apply" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/HBoxContainer"]
+margin_right = 12.0
+margin_bottom = 20.0
+
+[node name="Ok" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/HBoxContainer"]
+margin_right = 12.0
+margin_bottom = 20.0
+
+[node name="Cancel" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit/SettingDialog/VBoxContainer/HBoxContainer"]
+margin_right = 12.0
+margin_bottom = 20.0
+
+[node name="Help" type="MenuButton" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
+margin_left = 79.0
+margin_right = 121.0
+margin_bottom = 20.0
+size_flags_horizontal = 13
+size_flags_vertical = 13
+text = "Help"
+
+[node name="AboutDialog" type="WindowDialog" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help"]
+margin_right = 48.0
+margin_bottom = 40.0
+
+[node name="TabContainer" type="TabContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help/AboutDialog"]
+margin_right = 8.0
+margin_bottom = 36.0
+
+[node name="License" type="TextEdit" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help/AboutDialog/TabContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+readonly = true
+
+[node name="Dependencies" type="HSplitContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help/AboutDialog/TabContainer"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+
+[node name="Tree" type="Tree" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help/AboutDialog/TabContainer/Dependencies"]
+margin_right = 40.0
+margin_bottom = 40.0
+
+[node name="TextEdit" type="TextEdit" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help/AboutDialog/TabContainer/Dependencies"]
+margin_right = 40.0
+margin_bottom = 40.0
+readonly = true
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer"]
+margin_top = 24.0
+margin_right = 992.0
+margin_bottom = 566.0
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+split_offset = 60
+
+[node name="VSplitContainer" type="VSplitContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer"]
+margin_right = 239.0
+margin_bottom = 542.0
+split_offset = 24
+
+[node name="HSplitContainer2" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer" instance=ExtResource( 3 )]
+margin_right = 239.0
+margin_bottom = 542.0
+
+[node name="PanelContainer" type="PanelContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer"]
+visible = false
+margin_top = 64.0
+margin_right = 466.0
+margin_bottom = 542.0
+
+[node name="HSplitContainer" type="HSplitContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer"]
+margin_left = 7.0
+margin_top = 7.0
+margin_right = 459.0
+margin_bottom = 471.0
+split_offset = 200
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer"]
+margin_right = 279.0
+margin_bottom = 464.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer"]
+margin_right = 279.0
+margin_bottom = 20.0
+
+[node name="Label" type="Label" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer"]
+margin_top = 3.0
+margin_right = 231.0
+margin_bottom = 17.0
+size_flags_horizontal = 3
+text = "Terminal Output"
+
+[node name="Button" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer"]
+margin_left = 235.0
+margin_right = 279.0
+margin_bottom = 20.0
+hint_tooltip = "Clear the current log output"
+text = "Clear"
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer"]
+margin_top = 24.0
+margin_right = 279.0
+margin_bottom = 436.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer"]
+margin_top = 440.0
+margin_right = 279.0
+margin_bottom = 464.0
+
+[node name="LineEdit" type="LineEdit" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer2"]
+margin_right = 232.0
+margin_bottom = 24.0
+size_flags_horizontal = 3
+
+[node name="Send" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer/HBoxContainer2"]
+margin_left = 236.0
+margin_right = 279.0
+margin_bottom = 24.0
+text = "Send"
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer"]
+margin_left = 291.0
+margin_right = 452.0
+margin_bottom = 464.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2"]
+margin_right = 161.0
+margin_bottom = 24.0
+
+[node name="Label" type="Label" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2/HBoxContainer"]
+margin_top = 5.0
+margin_right = 81.0
+margin_bottom = 19.0
+size_flags_horizontal = 2
+text = "Performance"
+
+[node name="CheckBox" type="CheckBox" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2/HBoxContainer"]
+margin_left = 85.0
+margin_right = 161.0
+margin_bottom = 24.0
+text = "Disable"
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2"]
+margin_top = 28.0
+margin_right = 161.0
+margin_bottom = 440.0
+size_flags_horizontal = 9
+size_flags_vertical = 3
+
+[node name="Button" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/VSplitContainer/PanelContainer/HSplitContainer/VBoxContainer2"]
+margin_left = 71.0
+margin_top = 444.0
+margin_right = 161.0
+margin_bottom = 464.0
+size_flags_horizontal = 8
+size_flags_vertical = 8
+text = "Log to File..."
+
+[node name="TabContainer" type="TabContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer"]
+margin_left = 251.0
+margin_right = 992.0
+margin_bottom = 542.0
+tab_align = 0
+
+[node name="Scene" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Grid" type="GridContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene"]
+margin_right = 733.0
+margin_bottom = 506.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
+margin_right = 717.0
+margin_bottom = 490.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LineEdit" type="LineEdit" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid/VBoxContainer"]
+margin_right = 717.0
+margin_bottom = 24.0
+placeholder_text = "Filter Properties..."
+
+[node name="Tree" type="Tree" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid/VBoxContainer"]
+margin_top = 28.0
+margin_right = 717.0
+margin_bottom = 490.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource( 1 )
+
+[node name="VScrollBar" type="VScrollBar" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
+margin_left = 721.0
+margin_right = 733.0
+margin_bottom = 490.0
+size_flags_horizontal = 8
+size_flags_vertical = 3
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="HScrollBar" type="HScrollBar" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Scene/Grid"]
+margin_top = 494.0
+margin_right = 717.0
+margin_bottom = 506.0
+
+[node name="Input" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+
+[node name="GridContainer" type="GridContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input"]
+margin_right = 733.0
+margin_bottom = 506.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
+margin_right = 717.0
+margin_bottom = 490.0
+
+[node name="LineEdit" type="LineEdit" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_right = 717.0
+margin_bottom = 24.0
+text = "Filter Properties"
+
+[node name="Tree" type="Tree" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_top = 28.0
+margin_right = 717.0
+margin_bottom = 466.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource( 4 )
+
+[node name="CameraPopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_right = 20.0
+margin_bottom = 20.0
+popup_exclusive = true
+allow_search = true
+
+[node name="FrameratePopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_right = 20.0
+margin_bottom = 20.0
+popup_exclusive = true
+hide_on_state_item_selection = true
+
+[node name="StartButton" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_left = 598.0
+margin_top = 470.0
+margin_right = 717.0
+margin_bottom = 490.0
+size_flags_horizontal = 8
+size_flags_vertical = 4
+disabled = true
+text = "Open Webcam..."
+
+[node name="FormatPopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_right = 20.0
+margin_bottom = 20.0
+popup_exclusive = true
+hide_on_state_item_selection = true
+
+[node name="ResolutionPopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
+margin_right = 20.0
+margin_bottom = 20.0
+popup_exclusive = true
+hide_on_state_item_selection = true
+
+[node name="VScrollBar" type="VScrollBar" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
+margin_left = 721.0
+margin_right = 733.0
+margin_bottom = 490.0
+size_flags_vertical = 3
+
+[node name="HScrollBar" type="HScrollBar" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
+margin_top = 494.0
+margin_right = 717.0
+margin_bottom = 506.0
+size_flags_horizontal = 3
+
+[node name="Output" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer"]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 4.0
+margin_top = 32.0
+margin_right = -4.0
+margin_bottom = -4.0
+
+[node name="GridContainer" type="GridContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output"]
+margin_right = 506.0
+margin_bottom = 506.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
+margin_right = 490.0
+margin_bottom = 490.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LineEdit" type="LineEdit" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer/VBoxContainer"]
+margin_right = 490.0
+margin_bottom = 24.0
+
+[node name="VScrollBar" type="VScrollBar" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
+margin_left = 494.0
+margin_right = 506.0
+margin_bottom = 490.0
+
+[node name="HScrollBar" type="HScrollBar" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Output/GridContainer"]
+margin_top = 494.0
+margin_right = 490.0
+margin_bottom = 506.0
+
+[node name="ErrorAlert" type="ConfirmationDialog" parent="Open2DHoloMainUINode"]
+margin_right = 200.0
+margin_bottom = 70.0

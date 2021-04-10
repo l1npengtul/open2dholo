@@ -1,5 +1,5 @@
 [package]
-name = "open2dh"
+name = "open2dholo"
 version = "0.1.0"
 authors = ["l1npengtul <l1npengtul@protonmail.com>"]
 edition = "2018"
@@ -10,17 +10,16 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 parking_lot = "0.11.1"
-flume = "0.10.0"
+flume = "0.10.3"
 lazy_static = "1.4.0"
 thiserror = "1.0.24"
-ron = "0.6.2"
-serde = "1.0.117"
-usb_enumeration = "0.1.0"
-regex = "1.4.2"
-image = "0.23.12"
+ron = "0.6.4"
+serde = "1.0.125"
+usb_enumeration = "0.1.1"
+regex = "1.4.5"
+image = "0.23.14"
 dirs = "3.0.1"
 
-# Safety unknown. Replace when merged
 [dependencies.ouroboros]
 version = "0.8.3"
 
@@ -29,7 +28,7 @@ version = "0.5.1"
 default-features = false
 
 [dependencies.opencv]
-version = "0.49.1"
+version = "0.51.0"
 features = ["clang-runtime", "buildtime-bindgen"]
 
 [dependencies.uvc]
@@ -39,23 +38,18 @@ features = ["vendor"]
 [dependencies.gdnative]
 version = "0.9.3"
 
-[dependencies.dlib-face-recognition]
-git = "https://github.com/l1npengtul/dlib-face-recognition.git"
-features = ["embed-all", "embed-any"]
-
 [dependencies.v4l]
 version = "0.12.0"
 features = ["v4l2-sys"]
 
-[dependencies.tvm]
-git = "https://github.com/l1npengtul/tvm.git"
-branch = "main"
-default-features = false
-features = ["static-linking"]
-
 [dependencies.native-dialog]
 version = "0.5.5"
 features = ["windows_dpi_awareness", "windows_visual_styles"]
+
+[dependencies.facial-processing]
+git = "https://github.com/l1npengtul/facial-processing-rs.git"
+branch = "senpai"
+features = ["dlib"]
 
 [build-dependencies]
 cargo_metadata = "0.13.1"

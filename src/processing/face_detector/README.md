@@ -1,1 +1,0 @@
-Different parts of this code is heavily adapted from different projects. Please check each file for cications. This is a rust translation.

@@ -1,5 +1,5 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021l1npengtul
+//     Open2DHolo - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ pub enum ProcessingError {
     #[error("Error: {0}!")]
     General(String),
     #[error("Could not get the CNN Facial Detection Model at filepath: {0}!")]
-    CNNModelNotFound(String),
+    CnnModelNotFound(String),
     #[error("Could not get the Facial Landmark Detector at filepath: {0}!")]
     LandmarkPredictorNotFound(String),
     #[error("Expected 68 landmark points, only found {0}!")]

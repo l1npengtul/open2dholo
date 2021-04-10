@@ -1,5 +1,5 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021l1npengtul
+//     Open2DHolo - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ use std::{
     sync::{atomic::AtomicUsize, Arc},
     time::Instant,
 };
-use usb_enumeration::{enumerate, Filters};
+use usb_enumeration::enumerate;
 use uvc::{
     ActiveStream, Context, DeviceDescription, DeviceHandle, FormatDescriptor, FrameFormat,
     StreamHandle,
@@ -137,7 +137,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
         device_name
     }
 
-    fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>> {
+    fn set_resolution(&self, res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
         let mut v4l2_format = FourCC::new(b"YUYV");
         match self.device_format.get() {
             DeviceFormat::YUYV => {}
@@ -150,8 +150,8 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
         Ok(())
     }
 
-    fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>> {
-        let parameter = Parameters::with_fps(*fps);
+    fn set_framerate(&self, fps: u32) -> Result<(), Box<dyn std::error::Error>> {
+        let parameter = Parameters::with_fps(fps);
         self.inner.borrow_mut().set_params(&parameter)?;
         Ok(())
     }
@@ -349,9 +349,7 @@ impl<'a> UVCameraDevice<'a> {
                 Err(why) => ret_boxerr!(why),
             };
             let description = device.description().unwrap();
-            let devices_list = enumerate()
-                .with_vendor_id(description.vendor_id)
-                .with_product_id(description.product_id);
+            let devices_list = enumerate(Some(description.vendor_id), Some(description.product_id));
             let usb_dev = devices_list.get(0).unwrap();
             let device_name = format!(
                 "{}:{} {}",
@@ -373,7 +371,7 @@ impl<'a> UVCameraDevice<'a> {
                 (send, recv)
             };
             UVCameraDeviceBuilder {
-                device_type: Box::new(WebcamType::USBVideo),
+                device_type: Box::new(WebcamType::UsbVideo),
                 device_desc: Box::new(device_name),
                 device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
                 device_resolution: Box::new(Cell::new(None)),
@@ -419,9 +417,7 @@ impl<'a> UVCameraDevice<'a> {
             std::mem::drop(uvc_dev);
             a
         };
-        let devices_list = enumerate()
-            .with_vendor_id(description.vendor_id)
-            .with_product_id(description.product_id);
+        let devices_list = enumerate(Some(description.vendor_id), Some(description.product_id));
 
         let device_name = format!(
             "{}:{} {}",
@@ -443,7 +439,7 @@ impl<'a> UVCameraDevice<'a> {
                 (send, recv)
             };
             UVCameraDeviceBuilder {
-                device_type: Box::new(WebcamType::USBVideo),
+                device_type: Box::new(WebcamType::UsbVideo),
                 device_desc: Box::new(device_name),
                 device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
                 device_resolution: Box::new(Cell::new(None)),
@@ -473,9 +469,10 @@ impl<'a> UVCameraDevice<'a> {
             }
             .build()
         });
-        match result {
-            Ok(uvcam) => Ok(uvcam),
-            Err(_) => {
+        if let Ok(uvcam) = result {
+            Ok(uvcam)
+        } else {
+            {
                 ret_boxerr!(CannotFindDevice(
                     "Failed to build final UVCameraStruct from builder!".to_string()
                 ))
@@ -489,29 +486,31 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
         self.with_device_desc(|name| name).to_string()
     }
 
-    fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>> {
-        self.with_device_resolution(|set| set.set(Some(*res)));
+    fn set_resolution(&self, res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
+        self.with_device_resolution(|set| set.set(Some(res)));
         Ok(())
     }
 
-    fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>> {
-        self.with_device_framerate(|set| set.set(Some(*fps)));
+    fn set_framerate(&self, fps: u32) -> Result<(), Box<dyn std::error::Error>> {
+        self.with_device_framerate(|set| set.set(Some(fps)));
         Ok(())
     }
 
     fn get_resolution(&self) -> Result<Resolution, Box<dyn Error>> {
-        match self.with_device_resolution(|res| res.get()) {
-            Some(r) => Ok(r),
-            None => ret_boxerr!(CannotGetProperty(
+        if let Some(r) = self.with_device_resolution(|res| res.get()) {
+            Ok(r)
+        } else {
+            ret_boxerr!(CannotGetProperty(
                 "Resolution of UVCameraDevice".to_string()
-            )),
+            ))
         }
     }
 
     fn get_framerate(&self) -> Result<u32, Box<dyn Error>> {
-        match self.with_device_framerate(|fps| fps.get()) {
-            Some(r) => Ok(r),
-            None => ret_boxerr!(CannotGetProperty("Framerate of UVCameraDevice".to_string())),
+        if let Some(r) = self.with_device_framerate(|fps| fps.get()) {
+            Ok(r)
+        } else {
+            ret_boxerr!(CannotGetProperty("Framerate of UVCameraDevice".to_string()))
         }
     }
 
@@ -522,13 +521,10 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
     fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
         // check if we already did this
         let opened: bool = self.with_opened(|o| o.get());
-        if opened == true {
+        if opened {
             return Ok(());
         }
         // drop active stream
-        self.with_active_stream(|astream| unsafe {
-            (&mut *astream.borrow_mut()).assume_init_drop();
-        });
 
         self.with(|fields| {
             let resolution: Resolution = self.with_device_resolution(|res| res).get().unwrap();
@@ -553,16 +549,16 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
         self.with(|fields| {
             let cnt = Arc::new(AtomicUsize::new(0));
             let sender: Sender<Vec<u8>> = *(self.with_device_sender(|send| send)).clone();
-            let mut streamh_ref = unsafe {
+            let streamh_ref = unsafe {
                 let raw_ptr =
                     (*fields.stream_handle.borrow_mut()).as_ptr() as *mut MaybeUninit<StreamHandle>;
                 let assume_inited: *mut MaybeUninit<StreamHandle<'static>> =
-                    raw_ptr as *mut MaybeUninit<StreamHandle<'static>>;
+                    raw_ptr.cast::<std::mem::MaybeUninit<uvc::StreamHandle>>();
                 &mut *assume_inited
             };
-            let mut streamh_init = unsafe { streamh_ref.assume_init_mut() };
+            let streamh_init = unsafe { streamh_ref.as_mut_ptr().as_mut().unwrap() };
 
-            let act_stream = streamh_init
+            let act_stream = &mut streamh_init
                 .start_stream(
                     move |frame, _count| {
                         let vec_frame: Vec<u8> = frame.to_rgb().unwrap().to_bytes().to_vec();
@@ -571,11 +567,8 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                     cnt,
                 )
                 .unwrap();
-            let mut activestream_init = MaybeUninit::<ActiveStream<Arc<AtomicUsize>>>::uninit();
-            *fields.active_stream.borrow_mut() = unsafe {
-                activestream_init.as_mut_ptr().write(act_stream);
-                activestream_init
-            }
+            let activestream_init = MaybeUninit::<ActiveStream<Arc<AtomicUsize>>>::uninit();
+            *fields.active_stream.borrow_mut() = unsafe { activestream_init }
         });
         self.with_opened(|o| o.set(true));
         Ok(())
@@ -937,12 +930,12 @@ impl<'a> Webcam<'a> for OpenCVCameraDevice {
         (*self.name.borrow()).clone()
     }
 
-    fn set_resolution(&self, res: &Resolution) -> Result<(), Box<dyn std::error::Error>> {
-        self.set_res(*res)
+    fn set_resolution(&self, res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
+        self.set_res(res)
     }
 
-    fn set_framerate(&self, fps: &u32) -> Result<(), Box<dyn std::error::Error>> {
-        self.set_fps(*fps)
+    fn set_framerate(&self, fps: u32) -> Result<(), Box<dyn std::error::Error>> {
+        self.set_fps(fps)
     }
 
     fn get_resolution(&self) -> Result<Resolution, Box<dyn Error>> {
@@ -1016,7 +1009,7 @@ fn set_property_fps(vc: &mut VideoCapture, fps: u32) -> Result<(), Box<dyn std::
 fn set_property_fourcc(vc: &mut VideoCapture) -> Result<(), Box<dyn std::error::Error>> {
     match vc.set(
         CAP_PROP_FOURCC as i32,
-        VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap() as f64,
+        f64::from(VideoWriter::fourcc('M' as i8, 'J' as i8, 'P' as i8, 'G' as i8).unwrap()),
     ) {
         Ok(r) => {
             if !r {

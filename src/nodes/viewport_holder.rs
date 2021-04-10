@@ -1,5 +1,5 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021l1npengtul
+//     Open2DHolo - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -14,11 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    processing::face_detector::detectors::util::{DetectorHardware, DetectorType},
-    processing::input_processor::InputProcesser,
-    util::camera::device_utils::Resolution,
-};
+use crate::{processing::input_processor::InputProcesser, util::camera::device_utils::Resolution};
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
 
@@ -38,7 +34,7 @@ impl ViewportHolder {
     #[export]
     pub fn _ready(&self, owner: TRef<VSplitContainer>) {
         let emitter = unsafe {
-            &mut owner.get_node("/root/Open2DH/Open2GHMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer/Tree").unwrap().assume_safe()
+            &mut owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer/Tree").unwrap().assume_safe()
         };
         if let Err(why) = emitter.connect(
             "new_input_processer",
@@ -120,7 +116,7 @@ impl ViewportHolder {
                 device_contact,
                 device_res,
                 device_fps as u32,
-                DetectorType::DLibFHOG,
+                DetectorType::DLibFhog,
                 DetectorHardware::Cpu,
             ) {
                 Ok(return_to_monke) => Some(return_to_monke),

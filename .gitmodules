@@ -1,0 +1,3 @@
+[submodule "models/facial-processing-rs-models"]
+	path = models/facial-processing-rs-models
+	url = https://github.com/l1npengtul/facial-processing-rs-models

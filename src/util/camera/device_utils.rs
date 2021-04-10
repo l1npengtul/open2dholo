@@ -1,5 +1,5 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021l1npengtul
+//     Open2DHolo - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ use std::{
     cmp::Ordering, collections::HashMap, convert::TryFrom, error::Error, fmt::Display,
     fmt::Formatter, os::raw::c_int,
 };
-use usb_enumeration::USBDevice;
+use usb_enumeration::UsbDevice;
 use uvc::{DeviceHandle, FrameFormat};
 use v4l::{framesize::FrameSizeEnum, prelude::*, FourCC};
 
@@ -94,7 +94,7 @@ impl DeviceHolder {
     }
 
     pub fn from_devices(
-        usb: &USBDevice,
+        usb: &UsbDevice,
         uvc: &uvc::Device,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         if let Ok(uvc_desc) = uvc.description() {

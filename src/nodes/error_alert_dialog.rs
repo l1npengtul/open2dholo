@@ -1,5 +1,5 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021l1npengtul
+//     Open2DHolo - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -14,16 +14,12 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use gdnative::{
-    api::{AcceptDialog, Tree, TreeItem},
-    methods,
-    prelude::*,
-    NativeClass,
-};
+use gdnative::{api::AcceptDialog, methods, prelude::*};
 
 // TODO: Use window node for 4.0
 #[derive(NativeClass)]
 #[inherit(AcceptDialog)]
+#[register_with(Self::register_signals)]
 pub struct ErrorAlertDialog;
 
 #[methods]
@@ -49,8 +45,8 @@ impl ErrorAlertDialog {
         });
     }
 
-    fn new(_owner: &ErrorAlertDialog) -> Self {
-        ErrorAlertDialog
+    fn new(_owner: &AcceptDialog) -> Self {
+        ErrorAlertDialog {}
     }
 
     #[export]
@@ -58,7 +54,7 @@ impl ErrorAlertDialog {
         owner.set_title("Error");
         if let Err(why) = owner.connect(
             "confirmed",
-            self,
+            owner,
             "on_confirmed",
             VariantArray::new_shared(),
             0,
@@ -67,7 +63,7 @@ impl ErrorAlertDialog {
         }
         if let Err(why) = owner.connect(
             "error_occur_default",
-            self,
+            owner,
             "on_error_occur_default",
             VariantArray::new_shared(),
             0,
@@ -79,7 +75,7 @@ impl ErrorAlertDialog {
     #[export]
     pub fn on_error_occur_default(
         &self,
-        owner: TRef<AcceptDialog>,
+        owner: &AcceptDialog,
         error_name: Variant,
         error_desc: Variant,
     ) {

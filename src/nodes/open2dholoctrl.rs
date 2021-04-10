@@ -1,5 +1,5 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
-//     Copyright (C) 2020-2021l1npengtul
+//     Open2DHolo - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
+//     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
 //     it under the terms of the GNU General Public License as published by
@@ -23,12 +23,12 @@ use gdnative::{
 
 #[derive(NativeClass)]
 #[inherit(Control)]
-pub struct Open2DHCtrl;
+pub struct Open2DHoloCtrl;
 
 #[methods]
-impl Open2DHCtrl {
+impl Open2DHoloCtrl {
     fn new(_owner: &Control) -> Self {
-        Open2DHCtrl
+        Open2DHoloCtrl
     }
 
     #[export]
@@ -67,7 +67,7 @@ impl Open2DHCtrl {
         };
         let main_ui = unsafe {
             &*owner
-                .get_node("Open2GHMainUINode")
+                .get_node("Open2DHoloMainUINode")
                 .unwrap()
                 .assume_safe()
                 .cast::<Control>()
@@ -75,7 +75,7 @@ impl Open2DHCtrl {
         };
         let panel = unsafe {
             &*owner
-                .get_node("Open2GHMainUINode/Panel")
+                .get_node("Open2DHoloMainUINode/Panel")
                 .unwrap()
                 .assume_safe()
                 .cast::<Panel>()
@@ -83,7 +83,7 @@ impl Open2DHCtrl {
         };
         let vbox = unsafe {
             &*owner
-                .get_node("Open2GHMainUINode/Panel/VBoxContainer")
+                .get_node("Open2DHoloMainUINode/Panel/VBoxContainer")
                 .unwrap()
                 .assume_safe()
                 .cast::<VBoxContainer>()

@@ -1,4 +1,4 @@
-//     Open2DH - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
+//     Open2DHolo - Open 2D Holo, a program to procedurally animate your face onto an 3D Model.
 //     Copyright (C) 2020-2021 l1npengtul
 //
 //     This program is free software: you can redistribute it and/or modify
@@ -13,8 +13,6 @@
 //
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#![feature(maybe_uninit_ref)]
-#![feature(maybe_uninit_extra)]
 #![deny(clippy::pedantic)]
 #![warn(clippy::all)]
 // NO MATTER WHAT LINT COMES THROUGH THAT GATE
@@ -29,11 +27,10 @@
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_possible_wrap)]
-
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::clippy::single_match_else)]
 use crate::util::camera::device_utils::DeviceContact;
-use gdnative::api::OS;
 use gdnative::prelude::*;
-use opencv::core::CV_8UC3;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use uvc::Context;
 
@@ -57,7 +54,7 @@ thread_local! {
 }
 
 fn init(handle: InitHandle) {
-    handle.add_class::<nodes::open2dhctrl::Open2DHCtrl>();
+    handle.add_class::<nodes::open2dholoctrl::Open2DHoloCtrl>();
     handle.add_class::<nodes::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<nodes::webcam_input_edit::WebcamInputEditor>();
     handle.add_class::<nodes::viewport_holder::ViewportHolder>();
