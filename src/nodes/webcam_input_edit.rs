@@ -30,14 +30,14 @@ use gdnative::{
 use crate::nodes::util::create_custom_editable_item;
 use crate::util::camera::device_utils::DeviceContact;
 use crate::util::camera::device_utils::{
-    enumerate_cache_device, CachedDevice, DeviceFormat, PossibleDevice, Resolution,
+    enumerate_cache_device, CachedDeviceList, DeviceFormat, PossibleDevice, Resolution,
 };
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
 #[register_with(Self::register_signals)]
 pub struct WebcamInputEditor {
-    device_list: RefCell<HashMap<String, CachedDevice>>,
+    device_list: RefCell<HashMap<String, CachedDeviceList>>,
     device_selected: RefCell<Option<String>>,
     resolution_selected: RefCell<Option<Resolution>>,
     fps_selected: RefCell<Option<i32>>,

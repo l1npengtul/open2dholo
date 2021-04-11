@@ -281,7 +281,7 @@ pub enum PossibleDevice {
 
 impl<'a> PossibleDevice {
     pub fn from_cached_device(
-        cached: CachedDevice,
+        cached: CachedDeviceList,
         res: Resolution,
         fps: u32,
         fmt: DeviceFormat,
@@ -540,14 +540,14 @@ impl From<PossibleDevice> for DeviceContact {
 }
 
 #[derive(Clone)]
-pub struct CachedDevice {
+pub struct CachedDeviceList {
     device_name: String,
     device_location: DeviceContact,
     device_format_mjpg: Box<HashMap<Resolution, Vec<u32>>>,
     device_format_yuyv: Box<HashMap<Resolution, Vec<u32>>>,
 }
 
-impl CachedDevice {
+impl CachedDeviceList {
     // DO NOT REMOVE THE `&`
     pub fn from_webcam(camera: &Box<dyn QueryCamera>) -> Result<Self, ()> {
         let device_name = camera.name();
@@ -598,7 +598,7 @@ impl CachedDevice {
     }
 }
 
-impl PartialEq for CachedDevice {
+impl PartialEq for CachedDeviceList {
     fn eq(&self, other: &Self) -> bool {
         if self.device_name == other.device_name {
             return true;
@@ -607,15 +607,21 @@ impl PartialEq for CachedDevice {
     }
 }
 
-pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
-    let mut known_devices: HashMap<String, CachedDevice> = HashMap::new();
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+pub struct DeviceConfig {
+    pub res: Resolution,
+    pub fps: u32,
+}
+
+pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDeviceList>> {
+    let mut known_devices: HashMap<String, CachedDeviceList> = HashMap::new();
     // get device list from v4l2
     match std::env::consts::OS {
         "linux" => {
             for dev in v4l::context::enum_devices() {
                 if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
                     let b: Box<dyn QueryCamera> = Box::new(v4l_dev);
-                    if let Ok(c_dev) = CachedDevice::from_webcam(&b) {
+                    if let Ok(c_dev) = CachedDeviceList::from_webcam(&b) {
                         known_devices.insert(
                             dev.name()
                                 .unwrap_or(format!("/dev/video{}", dev.index()))
@@ -634,7 +640,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDevice>> {
                         if let Ok(mut camera_device) = {
                             let b: Box<dyn QueryCamera> =
                                 Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
-                            CachedDevice::from_webcam(&b)
+                            CachedDeviceList::from_webcam(&b)
                         } {
                             let dev_name = camera_device.get_name();
                             camera_device.set_custom_cached_idx(idx as u32);

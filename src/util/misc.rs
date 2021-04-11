@@ -16,14 +16,14 @@
 
 use facial_processing::utils::{face::FaceLandmark, misc::{BackendProviders, EulerAngles, Point2D}};
 
-use crate::util::camera::device_utils::{PossibleDevice, Resolution};
+use crate::util::camera::device_utils::{PossibleDevice, Resolution, DeviceConfig};
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
 pub enum MessageType {
     Die(u8),
-    Set(PossibleDevice),
-    Close(u8),
+    SetDevice(PossibleDevice),
+    ChangeDevice(DeviceConfig)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -68,8 +68,9 @@ impl BackendConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct FullyCalculatedPacket {
-    landmarks: FaceLandmark,
-    euler: EulerAngles,
-    eye_positions: [Point2D; 2],
+    pub landmarks: FaceLandmark,
+    pub euler: EulerAngles,
+    pub eye_positions: [Point2D; 2],
 }

@@ -7,12 +7,17 @@ use crate::util::{
     misc::{BackendConfig, FullyCalculatedPacket},
 };
 use facial_processing::face_processor::FaceProcessorBuilder;
-use flume::{Receiver, Sender};
+use flume::{Receiver, Sender, TryRecvError};
 use rusty_pool::{JoinHandle, ThreadPool};
 use std::{
     cell::{Cell, RefCell},
     time::Duration,
 };
+use std::sync::Arc;
+use crate::util::misc::MessageType;
+use std::error::Error;
+use std::alloc::Global;
+use image::{ImageBuffer, Rgb};
 
 pub struct InputProcesser<'a> {
     // device: PossibleDevice,
@@ -20,9 +25,11 @@ pub struct InputProcesser<'a> {
     // bruh wtf
     backend_cfg: Cell<BackendConfig>,
     // face_detector: Arc<Mutex<Box<dyn DetectorTrait>>>,
-    thread: JoinHandle<(), ()>,
-    int_sender_ft: Sender<FullyCalculatedPacket>,
-    int_receiver_ft: Receiver<FullyCalculatedPacket>,
+    thread: JoinHandle<()>,
+    sender_fromthread: Arc<Sender<FullyCalculatedPacket>>,
+    receiver_fromthread: Receiver<FullyCalculatedPacket>,
+    sender_tothread: Sender<MessageType>,
+    receiver_tothread: Arc<Receiver<MessageType>>
 }
 
 impl<'a> InputProcesser<'a> {
@@ -44,15 +51,18 @@ impl<'a> InputProcesser<'a> {
         //         DetectorType::DLibCNN => DLibDetector::new(true),
         //     })));
 
-        let (int_sender_ft, int_receiver_ft) = flume::unbounded();
+        let (sender_fromthread, receiver_fromthread) = flume::unbounded();
+        let (sender_tothread, receiver_tothread) = flume::unbounded();
+
 
         Ok(InputProcesser {
             device_held: RefCell::new(device_held),
-            detector_type,
-            detector_hw,
-            thread_pool,
-            int_sender_ft,
-            int_receiver_ft,
+            backend_cfg,
+            thread: (),
+            sender_fromthread: Arc::new(sender_fromthread),
+            receiver_fromthread,
+            sender_tothread,
+            receiver_tothread: Arc::new(receiver_tothread)
         })
     }
 
@@ -117,7 +127,7 @@ impl<'a> InputProcesser<'a> {
 
     pub fn query_gotten_results(&self) -> Vec<PointType> {
         let mut point_vec = Vec::new();
-        for point in self.int_receiver_ft.drain() {
+        for point in self.receiver_fromthread.drain() {
             // lmao imagine using a blocking function in a loop that waits until everything has been dropped, couldn't be me
             point_vec.push(point);
         }
@@ -125,8 +135,61 @@ impl<'a> InputProcesser<'a> {
     }
 }
 
-fn process_input(cfg: BackendConfig, sender: Sender<FullyCalculatedPacket>) {
-    let processor = FaceProcessorBuilder::new().with_backend();
+fn process_input(cfg: BackendConfig, device: PossibleDevice,  sender: Arc<Sender<FullyCalculatedPacket>>, message: Arc<Receiver<MessageType>>) -> u8 {
+    let processor = FaceProcessorBuilder::new()
+        .with_backend(cfg.backend_as_facial())
+        .with_input(cfg.res().x, cfg.res().y)
+        .build()
+        .unwrap();
+    let init_res = device.res();
+    let init_fps = device.fps();
+    let mut device = match get_dyn_webcam(name, new_device) {
+        Ok(webcam) => webcam,
+        Err(_) => return -1
+    };
+
+    loop {
+        if let Ok(msg_recv) = message.try_recv() {
+            match msg_recv {
+                MessageType::Die(code) => {
+                    return code;
+                }
+                MessageType::SetDevice(new_dev) => {
+                    device = match get_dyn_webcam(name, new_dev) {
+                        Ok(webcam) => webcam,
+                        Err(_) => return -1
+                    };
+                }
+                MessageType::ChangeDevice(new_cfg) => {
+                    let new_res = new_cfg.res;
+                    let new_fps = new_cfg.fps;
+                    if new_res != init_res {
+                        device.set_resolution(new_res);
+                    }
+                    if new_fps != init_fps {
+                        device.set_framerate(new_fps);
+                    }
+                }
+            }
+        }
+
+        // get frame
+        let frame = match  device.get_frame() {
+            Ok(f) => f,
+            Err(_) => {
+                return -1;
+            }
+        };
+        let res = device.get_resolution().unwrap();
+        let image: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_raw(res.x, res.y, frame).unwrap();
+
+        // detections
+        let bbox = processor.calculate_face_bboxes(&image);
+        if bbox.len() > 0 {
+            let face_landmarks = processor.calculate_landmarks(&image, *bbox.get(0).unwrap());
+        }
+
+    }
 }
 
 fn get_dyn_webcam<'a>(
