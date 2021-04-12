@@ -217,16 +217,16 @@ impl Ord for Resolution {
 
 #[derive(Copy, Clone, Debug)]
 pub enum DeviceFormat {
-    YUYV,
-    MJPEG,
+    Yuyv,
+    MJpeg,
 }
 
 impl DeviceFormat {
     pub fn from_variant(var: &Variant) -> Result<Self, Box<dyn std::error::Error>> {
         if let Some(st) = var.try_to_string() {
             return match &st.to_lowercase()[..] {
-                "yuyv" => Ok(DeviceFormat::YUYV),
-                "mjpg" | "mjpeg" => Ok(DeviceFormat::MJPEG),
+                "yuyv" => Ok(DeviceFormat::Yuyv),
+                "mjpg" | "mjpeg" => Ok(DeviceFormat::MJpeg),
                 _ => Err(Box::new(MatchFailedError(st))),
             };
         }
@@ -240,10 +240,10 @@ impl DeviceFormat {
 impl Display for DeviceFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DeviceFormat::YUYV => {
+            DeviceFormat::Yuyv => {
                 write!(f, "YUYV")
             }
-            DeviceFormat::MJPEG => {
+            DeviceFormat::MJpeg => {
                 write!(f, "MJPG")
             }
         }
@@ -257,7 +257,7 @@ pub enum StreamType<'a> {
 
 #[derive(Clone)]
 pub enum PossibleDevice {
-    UVCAM {
+    UVCam {
         vendor_id: Option<u16>,
         product_id: Option<u16>,
         serial: Option<String>,
@@ -271,7 +271,7 @@ pub enum PossibleDevice {
         fps: u32,
         fmt: FourCC,
     },
-    OPENCV {
+    OpenCV {
         index: u32,
         res: Resolution,
         fps: u32,
@@ -293,11 +293,11 @@ impl<'a> PossibleDevice {
                 serial,
             } => {
                 let dev_format = match fmt {
-                    DeviceFormat::YUYV => FrameFormat::YUYV,
-                    DeviceFormat::MJPEG => FrameFormat::MJPEG,
+                    DeviceFormat::Yuyv => FrameFormat::YUYV,
+                    DeviceFormat::MJpeg => FrameFormat::MJPEG,
                 };
 
-                PossibleDevice::UVCAM {
+                PossibleDevice::UVCam {
                     vendor_id: vendor_id.to_owned(),
                     product_id: product_id.to_owned(),
                     serial: serial.clone(),
@@ -308,8 +308,8 @@ impl<'a> PossibleDevice {
             }
             DeviceContact::V4L2 { location } => {
                 let dev_format = match fmt {
-                    DeviceFormat::YUYV => FourCC::new(b"MJPG"),
-                    DeviceFormat::MJPEG => FourCC::new(b"YUYV"),
+                    DeviceFormat::Yuyv => FourCC::new(b"MJPG"),
+                    DeviceFormat::MJpeg => FourCC::new(b"YUYV"),
                 };
                 let lc: PathIndex = match location {
                     PathIndex::Path(p) => PathIndex::Path(p.clone()),
@@ -322,7 +322,7 @@ impl<'a> PossibleDevice {
                     fmt: dev_format,
                 }
             }
-            DeviceContact::OPENCV { index } => PossibleDevice::OPENCV {
+            DeviceContact::OPENCV { index } => PossibleDevice::OpenCV {
                 index: *index,
                 res,
                 fps,
@@ -344,11 +344,11 @@ impl<'a> PossibleDevice {
                 serial,
             } => {
                 let dev_format = match fmt {
-                    DeviceFormat::YUYV => FrameFormat::YUYV,
-                    DeviceFormat::MJPEG => FrameFormat::MJPEG,
+                    DeviceFormat::Yuyv => FrameFormat::YUYV,
+                    DeviceFormat::MJpeg => FrameFormat::MJPEG,
                 };
 
-                PossibleDevice::UVCAM {
+                PossibleDevice::UVCam {
                     vendor_id: vendor_id.to_owned(),
                     product_id: product_id.to_owned(),
                     serial: serial.clone(),
@@ -359,8 +359,8 @@ impl<'a> PossibleDevice {
             }
             DeviceContact::V4L2 { location } => {
                 let dev_format = match fmt {
-                    DeviceFormat::YUYV => FourCC::new(b"MJPG"),
-                    DeviceFormat::MJPEG => FourCC::new(b"YUYV"),
+                    DeviceFormat::Yuyv => FourCC::new(b"MJPG"),
+                    DeviceFormat::MJpeg => FourCC::new(b"YUYV"),
                 };
                 let lc: PathIndex = match location {
                     PathIndex::Path(p) => PathIndex::Path(p.clone()),
@@ -373,7 +373,7 @@ impl<'a> PossibleDevice {
                     fmt: dev_format,
                 }
             }
-            DeviceContact::OPENCV { index } => PossibleDevice::OPENCV {
+            DeviceContact::OPENCV { index } => PossibleDevice::OpenCV {
                 index,
                 res,
                 fps,
@@ -384,7 +384,7 @@ impl<'a> PossibleDevice {
 
     pub fn to_device_contact(&self) -> DeviceContact {
         match self {
-            PossibleDevice::UVCAM {
+            PossibleDevice::UVCam {
                 vendor_id,
                 product_id,
                 serial,
@@ -404,7 +404,7 @@ impl<'a> PossibleDevice {
             } => DeviceContact::V4L2 {
                 location: location.clone(),
             },
-            PossibleDevice::OPENCV {
+            PossibleDevice::OpenCV {
                 index,
                 res: _res,
                 fps: _fps,
@@ -415,7 +415,7 @@ impl<'a> PossibleDevice {
 
     pub fn res(&self) -> Resolution {
         match self {
-            PossibleDevice::UVCAM {
+            PossibleDevice::UVCam {
                 vendor_id: _vendor_id,
                 product_id: _product_id,
                 serial: _serial,
@@ -429,7 +429,7 @@ impl<'a> PossibleDevice {
                 fps: _fps,
                 fmt: _fmt,
             } => *res,
-            PossibleDevice::OPENCV {
+            PossibleDevice::OpenCV {
                 index: _index,
                 res,
                 fps: _fps,
@@ -440,7 +440,7 @@ impl<'a> PossibleDevice {
 
     pub fn fps(&self) -> u32 {
         match self {
-            PossibleDevice::UVCAM {
+            PossibleDevice::UVCam {
                 vendor_id: _vendor_id,
                 product_id: _product_id,
                 serial: _serial,
@@ -454,7 +454,7 @@ impl<'a> PossibleDevice {
                 fps,
                 fmt: _fmt,
             } => *fps,
-            PossibleDevice::OPENCV {
+            PossibleDevice::OpenCV {
                 index: _index,
                 res: _res,
                 fps,
@@ -464,7 +464,7 @@ impl<'a> PossibleDevice {
     }
 
     pub fn fmt(&self) -> DeviceFormat {
-        DeviceFormat::MJPEG
+        DeviceFormat::MJpeg
     }
 }
 
@@ -505,7 +505,7 @@ pub enum DeviceContact {
 impl DeviceContact {
     pub fn from_possible_device(dev: &PossibleDevice) -> Self {
         match dev.clone() {
-            PossibleDevice::UVCAM {
+            PossibleDevice::UVCam {
                 vendor_id,
                 product_id,
                 serial,
@@ -523,7 +523,7 @@ impl DeviceContact {
                 fps: _fps,
                 fmt: _fmt,
             } => DeviceContact::V4L2 { location },
-            PossibleDevice::OPENCV {
+            PossibleDevice::OpenCV {
                 index,
                 res: _res,
                 fps: _fps,
@@ -663,7 +663,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDeviceList>> {
 
 pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::error::Error>> {
     match device {
-        PossibleDevice::UVCAM {
+        PossibleDevice::UVCam {
             vendor_id,
             product_id,
             serial,
@@ -714,7 +714,7 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
             }
             PathIndex::Index(i) => Ok(i as u32),
         },
-        PossibleDevice::OPENCV {
+        PossibleDevice::OpenCV {
             index,
             res: _res,
             fps: _fps,

@@ -26,7 +26,10 @@ use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution
 #[derive(Clone)]
 pub enum MessageType {
     Die(u8),
-    SetDevice(PossibleDevice),
+    SetDevice {
+        name: Option<String>, 
+        device: PossibleDevice,
+    },
     ChangeDevice(DeviceConfig),
 }
 

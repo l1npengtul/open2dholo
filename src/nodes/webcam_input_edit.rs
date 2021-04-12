@@ -499,7 +499,7 @@ impl WebcamInputEditor {
             None => return,
         };
 
-        let possible = PossibleDevice::from_cached_device(dev, res, framerate, DeviceFormat::MJPEG);
+        let possible = PossibleDevice::from_cached_device(dev, res, framerate, DeviceFormat::MJpeg);
 
         let resolution = Vector2::new(res.x as f32, res.y as f32);
 

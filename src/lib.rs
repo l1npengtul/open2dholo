@@ -29,6 +29,7 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::clippy::single_match_else)]
+#![allow(clippy::clippy::similar_names)]
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
 use std::{cell::RefCell, rc::Rc, sync::Arc};

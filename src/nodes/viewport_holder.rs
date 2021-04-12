@@ -14,20 +14,17 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    processing::input_processor::InputProcesser,
-    util::{
+use crate::{processing::input_processor::InputProcesser, show_error, util::{
         camera::device_utils::{DeviceFormat, PossibleDevice, Resolution},
         misc::{Backend, BackendConfig},
-    },
-};
+    }};
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
 
 #[derive(NativeClass)]
 #[inherit(VSplitContainer)]
 pub struct ViewportHolder {
-    input_processer: RefCell<Option<InputProcesser<'static>>>,
+    input_processer: RefCell<Option<InputProcesser>>,
 }
 
 #[methods]
@@ -61,6 +58,16 @@ impl ViewportHolder {
         ) {
             panic!("Failed to connect signals: {}!", why.to_string())
         }
+
+        if let Err(why) = emitter.connect(
+            "new_model_load",
+            owner,
+            "on_kill_signal",
+            VariantArray::new_shared(),
+            0,
+        ) {
+            panic!("Failed to connect signals: {}!", why.to_string())
+        }
     }
 
     #[export]
@@ -71,7 +78,9 @@ impl ViewportHolder {
     pub fn _process(&self, _owner: TRef<VSplitContainer>, _delta: f32) {
         if let Some(input) = &*self.input_processer.borrow() {
             let results = input.query_gotten_results();
-            godot_print!(results);
+            for pkt in results {
+                godot_print!("a")
+            } // TODO: Remove
         }
     }
 
@@ -117,7 +126,7 @@ impl ViewportHolder {
                     device_contact,
                     device_res,
                     device_fps as u32,
-                    DeviceFormat::MJPEG,
+                    DeviceFormat::MJpeg,
                 );
                 self.input_processer
                     .borrow()
@@ -136,6 +145,20 @@ impl ViewportHolder {
                 *self.input_processer.borrow_mut() = input_processer;
             }
         }
+    }
+
+    #[export]
+    pub fn on_new_model_load(&self, owner: TRef<VSplitContainer>, model_path: Variant) {
+        let string_path = match GodotString::from_variant(&model_path) {
+            Ok(gdstr) => {
+                gdstr.to_string()
+            }
+            Err(why) => {
+                show_error!(why.to_string())
+            }
+        };
+
+        
     }
 
     fn kill_input_processer(&mut self) {

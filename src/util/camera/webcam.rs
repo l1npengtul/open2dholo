@@ -47,9 +47,9 @@ pub enum WebcamType {
 impl WebcamType {
     pub fn from_possible_device(pd: &PossibleDevice) -> Self {
         match pd {
-            PossibleDevice::UVCAM { .. } => WebcamType::UsbVideo,
+            PossibleDevice::UVCam { .. } => WebcamType::UsbVideo,
             PossibleDevice::V4L2 { .. } => WebcamType::V4linux2,
-            PossibleDevice::OPENCV { .. } => WebcamType::OpenCVCapture,
+            PossibleDevice::OpenCV { .. } => WebcamType::OpenCVCapture,
         }
     }
 }

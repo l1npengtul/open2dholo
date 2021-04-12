@@ -44,3 +44,20 @@ pub fn create_custom_editable_item(owner: TRef<Tree>, parent: &TreeItem, field: 
     webcam_format_resoultion.set_cell_mode(1, 4);
     webcam_format_resoultion.set_editable(1, true);
 }
+
+pub fn get_immidiate_treeitems(owner: TRef<Tree>, root: TRef<TreeItem>) -> Vec<Ref<TreeItem>>{
+    let mut item = unsafe {
+        root.get_children()
+    };
+    let mut children: Vec<Ref<TreeItem>> = vec![];
+    loop {
+        if let Some(i) = item {
+            children.push(i);
+            item = unsafe {i.assume_safe()}.get_next()
+        }
+        else {
+            break;
+        }
+    }
+    children
+}

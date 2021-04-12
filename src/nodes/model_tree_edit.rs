@@ -14,7 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::nodes::util::{create_editable_item, create_editable_range};
+use crate::nodes::util::{create_editable_item, create_editable_range, get_immidiate_treeitems};
 use gdnative::{
     api::{tree::Tree, tree_item::TreeItem},
     prelude::*,
@@ -41,7 +41,7 @@ pub struct ModelTreeEditor {
 impl ModelTreeEditor {
     fn register_signals(builder: &ClassBuilder<Self>) {
         builder.add_signal(Signal {
-            name: model_transform_change,
+            name: "model_transform_change",
             args: &[
                 SignalArgument {
                     name: "xyz_transform",
@@ -69,7 +69,7 @@ impl ModelTreeEditor {
         }
     }
     #[export]
-    fn _ready(&self, owner: &Tree) {
+    fn _ready(&self, owner: TRef<Tree>) {
         let root_item: &TreeItem = unsafe {
             &*owner
                 .create_item(owner.assume_shared(), 0)
@@ -188,19 +188,12 @@ impl ModelTreeEditor {
 
         // sift through every item in the tree
         // we know that every item is only 1 deep
-
-        let mut treeitems: Vec<Ref<TreeItem, Shared>> = vec![];
-        let first_item = unsafe {
-            owner
-                .get_root()
-                .unwrap()
-                .get_children()
-                .unwrap()
-                .assume_safe()
+        let root = unsafe {
+            owner.get_root().unwrap().assume_safe()
         };
-        loop {
-            if Some(item) = unsafe { first_item.assume_safe() }.get_next() { // why does `children` only return one treeitem?
-            }
-        }
+        let mut treeitems: Vec<Ref<TreeItem, Shared>> = get_immidiate_treeitems(owner, root);
+        
     }
+
+    
 }

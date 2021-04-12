@@ -2,7 +2,7 @@ use crate::{
     util::misc::MessageType,
     util::{
         camera::{
-            camera_device::{OpenCVCameraDevice, UVCameraDevice, V4LinuxDevice},
+            camera_device::{OpenCvCameraDevice, UVCameraDevice, V4LinuxDevice},
             device_utils::{DeviceContact, DeviceFormat, PossibleDevice, Resolution},
             webcam::Webcam,
         },
@@ -10,17 +10,15 @@ use crate::{
     },
 };
 use facial_processing::face_processor::FaceProcessorBuilder;
-use flume::{Receiver, Sender, TryRecvError};
+use flume::{Receiver, Sender};
 use image::{ImageBuffer, Rgb};
 use std::{
     cell::{Cell, RefCell},
-    error::Error,
     sync::Arc,
-    thread::{Builder, JoinHandle, Thread},
-    time::Duration,
+    thread::{Builder, JoinHandle},
 };
 
-pub struct InputProcesser<'a> {
+pub struct InputProcesser {
     device: RefCell<PossibleDevice>,
     // bruh wtf
     backend_cfg: Cell<BackendConfig>,
@@ -32,26 +30,21 @@ pub struct InputProcesser<'a> {
     receiver_tothread: Arc<Receiver<MessageType>>,
 }
 
-impl<'a> InputProcesser<'a> {
+impl InputProcesser {
     pub fn new(
         device: PossibleDevice,
         config: BackendConfig,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let backend_cfg = Cell::new(config);
-
-        // let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> =
-        //     Arc::new(Mutex::new(Box::new(match detect_typ {
-        //         DetectorType::DLibFHOG => DLibDetector::new(false),
-        //         DetectorType::DLibCNN => DLibDetector::new(true),
-        //     })));
-
         let (sender_fromthread, receiver_fromthread) = flume::unbounded();
         let (sender_tothread, receiver_tothread) = flume::unbounded();
 
         let thread = Builder::new()
-            .name("input_processor".into_string())
-            .stack_size(33554432)
-            .spawn(process_input)
+            .name("input_processor".to_string())
+            .stack_size(33_554_432) // 32 MiB
+            .spawn(move || {
+                process_input(backend_cfg, device, sender_fromthread, receiver_tothread)
+            })
             .unwrap();
 
         Ok(InputProcesser {
@@ -72,7 +65,7 @@ impl<'a> InputProcesser<'a> {
         cfg: BackendConfig,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let device =
-            PossibleDevice::from_device_contact(device_contact, res, fps, DeviceFormat::MJPEG);
+            PossibleDevice::from_device_contact(device_contact, res, fps, DeviceFormat::MJpeg);
         InputProcesser::new(device, cfg)
     }
 
@@ -82,7 +75,11 @@ impl<'a> InputProcesser<'a> {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.device.replace(new_device.clone());
         self.sender_tothread
-            .send(MessageType::SetDevice(new_device));
+            .send(MessageType::SetDevice{
+                name: None,
+                device: new_device,
+
+            });
         Ok(())
     }
 
@@ -109,7 +106,7 @@ fn process_input(
         .unwrap();
     let init_res = device.res();
     let init_fps = device.fps();
-    let mut device = match get_dyn_webcam(name, new_device) {
+    let mut device = match get_dyn_webcam(None, device) {
         Ok(webcam) => webcam,
         Err(_) => return -1,
     };
@@ -121,7 +118,7 @@ fn process_input(
                     return code;
                 }
                 MessageType::SetDevice(new_dev) => {
-                    device = match get_dyn_webcam(name, new_dev) {
+                    device = match get_dyn_webcam(None, new_dev) {
                         Ok(webcam) => webcam,
                         Err(_) => return -1,
                     };
@@ -152,18 +149,19 @@ fn process_input(
 
         // detections
         let bbox = processor.calculate_face_bboxes(&image);
-        if bbox.len() > 0 {
-            let face_landmarks = processor.calculate_landmark(&image, *bbox.get(0).unwrap());
-            let eyes = processor.calculate_eyes(face_landmarks.clone(), &image);
-            let pnp = processor
-                .calculate_pnp(&image, face_landmarks.clone())
-                .unwrap();
-            sender.send(FullyCalculatedPacket {
-                landmarks: face_landmarks,
-                euler: pnp,
-                eye_positions: eyes,
-            })
+        if bbox.len() <= 0 {
+            continue;
         }
+        let face_landmarks = processor.calculate_landmark(&image, *bbox.get(0).unwrap());
+        let eyes = processor.calculate_eyes(face_landmarks.clone(), &image);
+        let pnp = processor
+            .calculate_pnp(&image, face_landmarks.clone())
+            .unwrap();
+        sender.send(FullyCalculatedPacket {
+            landmarks: face_landmarks,
+            euler: pnp,
+            eye_positions: eyes,
+        })
     }
 }
 
@@ -172,7 +170,7 @@ fn get_dyn_webcam<'a>(
     device: PossibleDevice,
 ) -> Result<Box<dyn Webcam<'a> + 'a>, Box<dyn std::error::Error>> {
     let device_held: Box<dyn Webcam<'a>> = match device {
-        PossibleDevice::UVCAM {
+        PossibleDevice::UVCam {
             vendor_id,
             product_id,
             serial,
@@ -210,13 +208,13 @@ fn get_dyn_webcam<'a>(
             v4lcam.set_framerate(fps);
             Box::new(v4lcam)
         }
-        PossibleDevice::OPENCV {
+        PossibleDevice::OpenCV {
             index: _index,
             res,
             fps,
             fmt: _fmt,
         } => {
-            let ocvcam = match OpenCVCameraDevice::from_possible_device(
+            let ocvcam = match OpenCvCameraDevice::from_possible_device(
                 name.unwrap_or("OpenCV Camera".to_string()),
                 device,
             ) {

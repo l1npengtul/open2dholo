@@ -29,8 +29,8 @@ use crate::{
 };
 use flume::{Receiver, Sender, TryRecvError};
 use opencv::{
+    core::Mat,
     core::Vec3b,
-    core::{Mat, MatTrait, MatTraitManual},
     videoio::{
         VideoCapture, VideoCaptureAPIs::CAP_ANY, VideoCaptureProperties, VideoCaptureTrait,
         VideoWriter, CAP_MSMF, CAP_PROP_FOURCC, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT,
@@ -44,7 +44,6 @@ use std::{
     mem::size_of,
     mem::MaybeUninit,
     sync::{atomic::AtomicUsize, Arc},
-    time::Instant,
 };
 use usb_enumeration::enumerate;
 use uvc::{
@@ -54,7 +53,6 @@ use uvc::{
 use v4l::{
     buffer::Type,
     format::Format,
-    fraction::Fraction,
     framesize::FrameSizeEnum,
     io::{mmap::Stream, traits::CaptureStream},
     video::{capture::Parameters, traits::Capture},
@@ -90,7 +88,7 @@ impl<'a> V4LinuxDevice<'a> {
         let device_path = PathIndex::Index(index);
         Ok(V4LinuxDevice {
             device_type,
-            device_format: Cell::new(DeviceFormat::MJPEG),
+            device_format: Cell::new(DeviceFormat::MJpeg),
             device_path,
             device_stream: RefCell::new(None),
             inner: RefCell::new(device),
@@ -112,7 +110,7 @@ impl<'a> V4LinuxDevice<'a> {
         let device_path = PathIndex::Path(path);
         Ok(V4LinuxDevice {
             device_type,
-            device_format: Cell::new(DeviceFormat::MJPEG),
+            device_format: Cell::new(DeviceFormat::MJpeg),
             device_path,
             device_stream: RefCell::new(None),
             inner: RefCell::new(device),
@@ -139,8 +137,8 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     fn set_resolution(&self, res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
         let mut v4l2_format = FourCC::new(b"YUYV");
         match self.device_format.get() {
-            DeviceFormat::YUYV => {}
-            DeviceFormat::MJPEG => {
+            DeviceFormat::Yuyv => {}
+            DeviceFormat::MJpeg => {
                 v4l2_format = FourCC::new(b"MJPG");
             }
         }
@@ -229,8 +227,8 @@ impl<'a> QueryCamera<'a> for V4LinuxDevice<'a> {
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
         let mut v4l2_format = FourCC::new(b"YUYV");
         match self.device_format.get() {
-            DeviceFormat::YUYV => {}
-            DeviceFormat::MJPEG => {
+            DeviceFormat::Yuyv => {}
+            DeviceFormat::MJpeg => {
                 v4l2_format = FourCC::new(b"MJPG");
             }
         }
@@ -264,8 +262,8 @@ impl<'a> QueryCamera<'a> for V4LinuxDevice<'a> {
     ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
         let mut v4l2_format = FourCC::new(b"YUYV");
         match self.device_format.get() {
-            DeviceFormat::YUYV => {}
-            DeviceFormat::MJPEG => {
+            DeviceFormat::Yuyv => {}
+            DeviceFormat::MJpeg => {
                 v4l2_format = FourCC::new(b"MJPG");
             }
         }
@@ -372,7 +370,7 @@ impl<'a> UVCameraDevice<'a> {
             UVCameraDeviceBuilder {
                 device_type: Box::new(WebcamType::UsbVideo),
                 device_desc: Box::new(device_name),
-                device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
+                device_format: Box::new(Cell::new(DeviceFormat::MJpeg)),
                 device_resolution: Box::new(Cell::new(None)),
                 device_framerate: Box::new(Cell::new(None)),
                 device_receiver: recv,
@@ -440,7 +438,7 @@ impl<'a> UVCameraDevice<'a> {
             UVCameraDeviceBuilder {
                 device_type: Box::new(WebcamType::UsbVideo),
                 device_desc: Box::new(device_name),
-                device_format: Box::new(Cell::new(DeviceFormat::MJPEG)),
+                device_format: Box::new(Cell::new(DeviceFormat::MJpeg)),
                 device_resolution: Box::new(Cell::new(None)),
                 device_framerate: Box::new(Cell::new(None)),
                 device_receiver: recv,
@@ -665,7 +663,7 @@ impl<'a> QueryCamera<'a> for UVCameraDevice<'a> {
     }
 }
 
-pub struct OpenCVCameraDevice {
+pub struct OpenCvCameraDevice {
     name: RefCell<String>,
     res: Cell<Resolution>,
     fps: Cell<u32>,
@@ -673,7 +671,7 @@ pub struct OpenCVCameraDevice {
     video_capture: RefCell<VideoCapture>,
 }
 
-impl OpenCVCameraDevice {
+impl OpenCvCameraDevice {
     pub fn new(
         name: String,
         idx: u32,
@@ -700,7 +698,7 @@ impl OpenCVCameraDevice {
             RefCell::new(v_cap)
         };
 
-        Ok(OpenCVCameraDevice {
+        Ok(OpenCvCameraDevice {
             name: RefCell::new(name),
             res: Cell::new(resolution),
             fps: Cell::new(frame),
@@ -742,7 +740,7 @@ impl OpenCVCameraDevice {
             RefCell::new(v_cap)
         };
 
-        Ok(OpenCVCameraDevice {
+        Ok(OpenCvCameraDevice {
             name,
             res,
             fps,
@@ -763,7 +761,7 @@ impl OpenCVCameraDevice {
                 product_id,
                 serial,
             } => {
-                let pd = PossibleDevice::UVCAM {
+                let pd = PossibleDevice::UVCam {
                     vendor_id,
                     product_id,
                     serial,
@@ -771,7 +769,7 @@ impl OpenCVCameraDevice {
                     fps: framerate,
                     fmt: FrameFormat::MJPEG,
                 };
-                OpenCVCameraDevice::from_possible_device(n, pd)
+                OpenCvCameraDevice::from_possible_device(n, pd)
             }
             DeviceContact::V4L2 { location } => {
                 let pd = PossibleDevice::V4L2 {
@@ -780,10 +778,10 @@ impl OpenCVCameraDevice {
                     fps: framerate,
                     fmt: FourCC::new(b"MJPG"),
                 };
-                OpenCVCameraDevice::from_possible_device(n, pd)
+                OpenCvCameraDevice::from_possible_device(n, pd)
             }
             DeviceContact::OPENCV { index } => {
-                OpenCVCameraDevice::new("OpenCVCamera".to_string(), index, framerate, resolution)
+                OpenCvCameraDevice::new("OpenCVCamera".to_string(), index, framerate, resolution)
             }
         }
     }
@@ -924,7 +922,7 @@ impl OpenCVCameraDevice {
     pub fn dispose_of_body(self) {}
 }
 
-impl<'a> Webcam<'a> for OpenCVCameraDevice {
+impl<'a> Webcam<'a> for OpenCvCameraDevice {
     fn name(&self) -> String {
         (*self.name.borrow()).clone()
     }
