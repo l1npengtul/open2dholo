@@ -27,6 +27,7 @@ use std::cell::RefCell;
 
 #[derive(NativeClass)]
 #[inherit(MenuButton)]
+#[register_with(Self::register_signals)]
 pub struct FileMenuButton {
     previous_file_path: RefCell<String>,
 }
@@ -34,6 +35,17 @@ pub struct FileMenuButton {
 // TODO: signal to connect to Viewport and change model
 #[methods]
 impl FileMenuButton {
+    fn register_signals(builder: &ClassBuilder<Self>) {
+        builder.add_signal(Signal {
+            name: "new_model_load",
+            args: &[SignalArgument {
+                name: "model_path",
+                default: Variant::from_str(""),
+                export_info: ExportInfo::new(VariantType::GodotString),
+                usage: PropertyUsage::DEFAULT,
+            }],
+        })
+    }
     fn new(_owner: &MenuButton) -> Self {
         let home_dir = home_dir().map_or_else(
             || {
@@ -67,7 +79,7 @@ impl FileMenuButton {
     }
 
     #[export]
-    pub fn on_popupmenu_button_clicked(&self, _owner: TRef<MenuButton>, id: i32) {
+    pub fn on_popupmenu_button_clicked(&self, owner: TRef<MenuButton>, id: i32) {
         if id != 0 {
             return;
         }
@@ -85,7 +97,8 @@ impl FileMenuButton {
                         Some(dir_path) => {
                             let path_str =
                                 dir_path.as_os_str().to_os_string().into_string().unwrap();
-                            *self.previous_file_path.borrow_mut() = path_str
+                            *self.previous_file_path.borrow_mut() = path_str.clone();
+                            owner.emit_signal("new_model_load", &[Variant::from_str(path_str)]);
                         }
                         None => {
                             let path_str = p.into_os_string().into_string().unwrap();

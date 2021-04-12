@@ -28,7 +28,7 @@ version = "0.5.1"
 default-features = false
 
 [dependencies.opencv]
-version = "0.51.0"
+version = "0.52.0"
 features = ["clang-runtime", "buildtime-bindgen"]
 
 [dependencies.uvc]

@@ -14,26 +14,59 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::nodes::util::create_editable_item;
+use crate::nodes::util::{create_editable_item, create_editable_range};
 use gdnative::{
     api::{tree::Tree, tree_item::TreeItem},
     prelude::*,
     NativeClass,
 };
+use std::cell::Cell;
 
 // imagine if l1npengtul was a real thing in real life
 // would be scary TBH
-// ~~that's why i am an illusion created by the south korean government running on JaVM - Jar Virtualisation Module~~
-// l1npengtul exists inside a jar virtual machine, he is lie
 
 #[derive(NativeClass)]
 #[inherit(Tree)]
-pub struct ModelTreeEditor;
+#[register_with(Self::register_signals)]
+pub struct ModelTreeEditor {
+    x_offset: Cell<f64>,
+    y_offset: Cell<f64>,
+    z_offset: Cell<f64>,
+    x_rotate: Cell<f64>, // degrees
+    y_rotate: Cell<f64>, // degrees
+    z_rotate: Cell<f64>, // degrees
+}
 
 #[methods]
 impl ModelTreeEditor {
+    fn register_signals(builder: &ClassBuilder<Self>) {
+        builder.add_signal(Signal {
+            name: model_transform_change,
+            args: &[
+                SignalArgument {
+                    name: "xyz_transform",
+                    default: Variant::from_vector3(&Vector3::zero()),
+                    export_info: ExportInfo::new(VariantType::Vector3),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                SignalArgument {
+                    name: "xyz_angle",
+                    default: Variant::from_vector3(&Vector3::zero()),
+                    export_info: ExportInfo::new(VariantType::Vector3),
+                    usage: PropertyUsage::DEFAULT,
+                },
+            ],
+        })
+    }
     fn new(_owner: &Tree) -> Self {
-        ModelTreeEditor
+        ModelTreeEditor {
+            x_offset: Cell::new(0.0),
+            y_offset: Cell::new(0.0),
+            z_offset: Cell::new(0.0),
+            x_rotate: Cell::new(0.0),
+            y_rotate: Cell::new(0.0),
+            z_rotate: Cell::new(0.0),
+        }
     }
     #[export]
     fn _ready(&self, owner: &Tree) {
@@ -60,37 +93,114 @@ impl ModelTreeEditor {
         model_offset_editor.set_text(0, "Model Offset");
         model_offset_editor.set_text_align(0, TreeItem::ALIGN_CENTER);
         // X Modifier
-        let model_offset_editor_x: &TreeItem = unsafe {
+        let model_offset_editor_x_offset: &TreeItem = unsafe {
+            &*owner
+                .create_item(model_offset_editor.assume_shared(), 0)
+                .unwrap()
+                .assume_safe()
+        };
+        create_editable_item(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_x_offset),
+            "X Offset",
+        );
+        // Y Modifier
+        let model_offset_editor_y_offset: &TreeItem = unsafe {
+            &*owner
+                .create_item(model_offset_editor.assume_shared(), 0)
+                .unwrap()
+                .assume_safe()
+        };
+        create_editable_item(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_y_offset),
+            "Y Offset",
+        );
+        // Z Modifier
+        let model_offset_editor_z_offset: &TreeItem = unsafe {
+            &*owner
+                .create_item(model_offset_editor.assume_shared(), 0)
+                .unwrap()
+                .assume_safe()
+        };
+        create_editable_item(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_z_offset),
+            "Z Offset",
+        );
+
+        // Rotations
+
+        let model_offset_editor_x_rot: &TreeItem = unsafe {
             &*owner
                 .create_item(model_offset_editor.assume_shared(), 2)
                 .unwrap()
                 .assume_safe()
         };
-        create_editable_item(
-            <&gdnative::api::TreeItem>::clone(&model_offset_editor_x),
-            "X Offset",
+        create_editable_range(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_x_rot),
+            "X Rotation",
+            -360.0,
+            360.0,
+            0.01,
         );
-        // Y Modifier
-        let model_offset_editor_y: &TreeItem = unsafe {
+
+        let model_offset_editor_y_rot: &TreeItem = unsafe {
             &*owner
-                .create_item(model_offset_editor.assume_shared(), 3)
+                .create_item(model_offset_editor.assume_shared(), 2)
                 .unwrap()
                 .assume_safe()
         };
-        create_editable_item(
-            <&gdnative::api::TreeItem>::clone(&model_offset_editor_y),
-            "Y Offset",
+        create_editable_range(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_y_rot),
+            "Y Rotation",
+            -360.0,
+            360.0,
+            0.01,
         );
-        // Z Modifier
-        let model_offset_editor_z: &TreeItem = unsafe {
+
+        let model_offset_editor_z_rot: &TreeItem = unsafe {
             &*owner
-                .create_item(model_offset_editor.assume_shared(), 4)
+                .create_item(model_offset_editor.assume_shared(), 2)
                 .unwrap()
                 .assume_safe()
         };
-        create_editable_item(
-            <&gdnative::api::TreeItem>::clone(&model_offset_editor_z),
-            "Z Offset",
+        create_editable_range(
+            <&gdnative::api::TreeItem>::clone(&model_offset_editor_z_rot),
+            "Z Rotation",
+            -360.0,
+            360.0,
+            0.01,
         );
+
+        // add signal
+        if let Err(why) = owner.connect(
+            "item_edited",
+            owner,
+            "on_item_edited",
+            VariantArray::new_shared(),
+            0,
+        ) {
+            panic!(format!("Failed to initialize UI: {}", why.to_string()))
+        }
+    }
+
+    #[export]
+    fn on_item_edited(&self, owner: TRef<Tree>) {
+        // validate x,y,z offsets
+
+        // sift through every item in the tree
+        // we know that every item is only 1 deep
+
+        let mut treeitems: Vec<Ref<TreeItem, Shared>> = vec![];
+        let first_item = unsafe {
+            owner
+                .get_root()
+                .unwrap()
+                .get_children()
+                .unwrap()
+                .assume_safe()
+        };
+        loop {
+            if Some(item) = unsafe { first_item.assume_safe() }.get_next() { // why does `children` only return one treeitem?
+            }
+        }
     }
 }

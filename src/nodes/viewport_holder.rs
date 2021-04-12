@@ -14,7 +14,13 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{processing::input_processor::InputProcesser, util::camera::device_utils::Resolution};
+use crate::{
+    processing::input_processor::InputProcesser,
+    util::{
+        camera::device_utils::{DeviceFormat, PossibleDevice, Resolution},
+        misc::{Backend, BackendConfig},
+    },
+};
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
 
@@ -64,14 +70,8 @@ impl ViewportHolder {
     #[export]
     pub fn _process(&self, _owner: TRef<VSplitContainer>, _delta: f32) {
         if let Some(input) = &*self.input_processer.borrow() {
-            match input.capture_frame() {
-                Ok(data) => {
-                    println!("{}", data.len())
-                }
-                Err(why) => {
-                    println!("{}", why);
-                }
-            }
+            let results = input.query_gotten_results();
+            godot_print!(results);
         }
     }
 
@@ -92,6 +92,7 @@ impl ViewportHolder {
     ) {
         {
             // fill with input processor spawn logic
+            // TODO: Allow regeneration of face processer
 
             let device_res = match Resolution::from_variant(&res) {
                 Ok(r) => r,
@@ -103,26 +104,37 @@ impl ViewportHolder {
                 None => panic!("Improper framerate format set!"),
             };
 
-            let device_name = match name.try_to_string() {
-                Some(n) => n,
-                None => "".to_string(),
-            };
+            // TODO: Get backend config from backend settings panel
+            let backend = BackendConfig::new(device_res, Backend::Dlib);
 
             let device_contact = crate::CURRENT_DEVICE.with(|dev| dev.borrow().clone().unwrap());
             godot_print!("input_proc");
 
-            let input_processer = match InputProcesser::from_device_contact(
-                Some(device_name),
-                device_contact,
-                device_res,
-                device_fps as u32,
-                DetectorType::DLibFhog,
-                DetectorHardware::Cpu,
-            ) {
-                Ok(return_to_monke) => Some(return_to_monke),
-                Err(why) => panic!("Could not generate InputProcesser: {}", why.to_string()),
-            };
-            *self.input_processer.borrow_mut() = input_processer;
+            let device_exists = { self.input_processer.borrow().is_some() };
+
+            if device_exists {
+                let possible = PossibleDevice::from_device_contact(
+                    device_contact,
+                    device_res,
+                    device_fps as u32,
+                    DeviceFormat::MJPEG,
+                );
+                self.input_processer
+                    .borrow()
+                    .unwrap()
+                    .change_device(possible);
+            } else {
+                let input_processer = match InputProcesser::from_device_contact(
+                    device_contact,
+                    device_res,
+                    device_fps as u32,
+                    backend,
+                ) {
+                    Ok(return_to_monke) => Some(return_to_monke),
+                    Err(why) => panic!("Could not generate InputProcesser: {}", why.to_string()),
+                };
+                *self.input_processer.borrow_mut() = input_processer;
+            }
         }
     }
 

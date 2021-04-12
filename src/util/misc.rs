@@ -14,16 +14,20 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use facial_processing::utils::{face::FaceLandmark, misc::{BackendProviders, EulerAngles, Point2D}};
+use facial_processing::utils::{
+    eyes::Eye,
+    face::FaceLandmark,
+    misc::{BackendProviders, EulerAngles, Point2D},
+};
 
-use crate::util::camera::device_utils::{PossibleDevice, Resolution, DeviceConfig};
+use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution};
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
 pub enum MessageType {
     Die(u8),
     SetDevice(PossibleDevice),
-    ChangeDevice(DeviceConfig)
+    ChangeDevice(DeviceConfig),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -72,5 +76,5 @@ impl BackendConfig {
 pub struct FullyCalculatedPacket {
     pub landmarks: FaceLandmark,
     pub euler: EulerAngles,
-    pub eye_positions: [Point2D; 2],
+    pub eye_positions: [Eye; 2],
 }

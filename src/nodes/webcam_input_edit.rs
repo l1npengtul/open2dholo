@@ -14,8 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 use gdnative::{
     api::{
@@ -27,10 +26,12 @@ use gdnative::{
     NativeClass,
 };
 
-use crate::nodes::util::create_custom_editable_item;
-use crate::util::camera::device_utils::DeviceContact;
-use crate::util::camera::device_utils::{
-    enumerate_cache_device, CachedDeviceList, DeviceFormat, PossibleDevice, Resolution,
+use crate::{
+    nodes::util::create_custom_editable_item,
+    util::camera::device_utils::{
+        enumerate_cache_device, CachedDeviceList, DeviceContact, DeviceFormat, PossibleDevice,
+        Resolution,
+    },
 };
 
 #[derive(NativeClass)]

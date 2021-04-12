@@ -15,17 +15,9 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    error::{
-        invalid_device_error::{
-            InvalidDeviceError::{
-                CannotGetProperty,
-                CannotFindDevice,
-                CannotGetDeviceInfo,
-                CannotGetFrame,
-                CannotOpenStream,
-                CannotSetProperty
-            }
-        }
+    error::invalid_device_error::InvalidDeviceError::{
+        CannotFindDevice, CannotGetDeviceInfo, CannotGetFrame, CannotGetProperty, CannotOpenStream,
+        CannotSetProperty,
     },
     ret_boxerr,
     util::camera::{
@@ -33,25 +25,17 @@ use crate::{
             get_os_webcam_index, DeviceContact, DeviceFormat, PathIndex, PossibleDevice, Resolution,
         },
         webcam::{QueryCamera, Webcam, WebcamType},
-    }
+    },
 };
 use flume::{Receiver, Sender, TryRecvError};
 use opencv::{
     core::Vec3b,
-    videoio::{
-        VideoCaptureAPIs::CAP_ANY,
-        VideoWriter,
-        CAP_PROP_FOURCC,
-        VideoCapture,
-        VideoCaptureProperties,
-        VideoCaptureTrait,
-        CAP_MSMF,
-        CAP_PROP_FPS,
-        CAP_PROP_FRAME_HEIGHT,
-        CAP_PROP_FRAME_WIDTH,
-        CAP_V4L2
-    },
     core::{Mat, MatTrait, MatTraitManual},
+    videoio::{
+        VideoCapture, VideoCaptureAPIs::CAP_ANY, VideoCaptureProperties, VideoCaptureTrait,
+        VideoWriter, CAP_MSMF, CAP_PROP_FOURCC, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT,
+        CAP_PROP_FRAME_WIDTH, CAP_V4L2,
+    },
 };
 use ouroboros::self_referencing;
 use std::{

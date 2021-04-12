@@ -1,48 +1,42 @@
-use crate::util::{
-    camera::{
-        camera_device::{OpenCVCameraDevice, UVCameraDevice, V4LinuxDevice},
-        device_utils::{DeviceContact, DeviceFormat, PossibleDevice, Resolution},
-        webcam::Webcam,
+use crate::{
+    util::misc::MessageType,
+    util::{
+        camera::{
+            camera_device::{OpenCVCameraDevice, UVCameraDevice, V4LinuxDevice},
+            device_utils::{DeviceContact, DeviceFormat, PossibleDevice, Resolution},
+            webcam::Webcam,
+        },
+        misc::{BackendConfig, FullyCalculatedPacket},
     },
-    misc::{BackendConfig, FullyCalculatedPacket},
 };
 use facial_processing::face_processor::FaceProcessorBuilder;
 use flume::{Receiver, Sender, TryRecvError};
-use rusty_pool::{JoinHandle, ThreadPool};
+use image::{ImageBuffer, Rgb};
 use std::{
     cell::{Cell, RefCell},
+    error::Error,
+    sync::Arc,
+    thread::{Builder, JoinHandle, Thread},
     time::Duration,
 };
-use std::sync::Arc;
-use crate::util::misc::MessageType;
-use std::error::Error;
-use std::alloc::Global;
-use image::{ImageBuffer, Rgb};
 
 pub struct InputProcesser<'a> {
-    // device: PossibleDevice,
-    pub device_held: RefCell<Box<dyn Webcam<'a> + 'a>>,
+    device: RefCell<PossibleDevice>,
     // bruh wtf
     backend_cfg: Cell<BackendConfig>,
     // face_detector: Arc<Mutex<Box<dyn DetectorTrait>>>,
-    thread: JoinHandle<()>,
+    thread: JoinHandle<u8>,
     sender_fromthread: Arc<Sender<FullyCalculatedPacket>>,
     receiver_fromthread: Receiver<FullyCalculatedPacket>,
     sender_tothread: Sender<MessageType>,
-    receiver_tothread: Arc<Receiver<MessageType>>
+    receiver_tothread: Arc<Receiver<MessageType>>,
 }
 
 impl<'a> InputProcesser<'a> {
     pub fn new(
-        name: Option<String>,
         device: PossibleDevice,
         config: BackendConfig,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let device_held: Box<dyn Webcam<'a> + 'a> = match get_dyn_webcam(name, device) {
-            Ok(webcam) => webcam,
-            Err(why) => return Err(why),
-        };
-        device_held.open_stream();
         let backend_cfg = Cell::new(config);
 
         // let face_detector: Arc<Mutex<Box<dyn DetectorTrait>>> =
@@ -54,78 +48,45 @@ impl<'a> InputProcesser<'a> {
         let (sender_fromthread, receiver_fromthread) = flume::unbounded();
         let (sender_tothread, receiver_tothread) = flume::unbounded();
 
+        let thread = Builder::new()
+            .name("input_processor".into_string())
+            .stack_size(33554432)
+            .spawn(process_input)
+            .unwrap();
 
         Ok(InputProcesser {
-            device_held: RefCell::new(device_held),
+            device: RefCell::new(device),
             backend_cfg,
-            thread: (),
+            thread,
             sender_fromthread: Arc::new(sender_fromthread),
             receiver_fromthread,
             sender_tothread,
-            receiver_tothread: Arc::new(receiver_tothread)
+            receiver_tothread: Arc::new(receiver_tothread),
         })
     }
 
     pub fn from_device_contact(
-        name: Option<String>,
         device_contact: DeviceContact,
         res: Resolution,
         fps: u32,
-        detect_typ: DetectorType,
-        detect_hw: DetectorHardware,
+        cfg: BackendConfig,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let device =
             PossibleDevice::from_device_contact(device_contact, res, fps, DeviceFormat::MJPEG);
-        InputProcesser::new(name, device, detect_typ, detect_hw)
+        InputProcesser::new(device, cfg)
     }
 
     pub fn change_device(
         &self,
-        name: Option<String>,
         new_device: PossibleDevice,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let device_held: Box<dyn Webcam<'a> + 'a> = match get_dyn_webcam(name, new_device) {
-            Ok(webcam) => webcam,
-            Err(why) => return Err(why),
-        };
-
-        device_held.open_stream();
-
-        self.device_held.replace(device_held);
+        self.device.replace(new_device.clone());
+        self.sender_tothread
+            .send(MessageType::SetDevice(new_device));
         Ok(())
     }
 
-    pub fn add_workload(&self, _img_height: u32, _img_width: u32, _img_data: Vec<u8>) {
-        // let send = self.int_sender_ft.clone();
-        // let detector = self.face_detector.clone();
-        //
-        // self.thread_pool.execute(move || {
-        //     let locked = detector.lock();
-        //     let i_d = img_data.as_slice();
-        //     let faces = locked.detect_face_rects(img_height, img_width, i_d);
-        //     let result =
-        //         locked.detect_landmarks(&faces.get(0).unwrap(), img_height, img_width, i_d);
-        //     if let Err(why) = send.send(result) {
-        //         godot_print!("Error: {}", why.to_string());
-        //     }
-        // })
-    }
-
-    pub fn capture_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        self.device_held.borrow().get_frame()
-    }
-
-    pub fn capture_and_record(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let img_captured = match self.device_held.borrow().get_frame() {
-            Ok(frame) => frame,
-            Err(why) => return Err(why),
-        };
-        let res = { self.device_held.borrow().get_resolution().unwrap() };
-        self.add_workload(res.y, res.x, img_captured);
-        Ok(())
-    }
-
-    pub fn query_gotten_results(&self) -> Vec<PointType> {
+    pub fn query_gotten_results(&self) -> Vec<FullyCalculatedPacket> {
         let mut point_vec = Vec::new();
         for point in self.receiver_fromthread.drain() {
             // lmao imagine using a blocking function in a loop that waits until everything has been dropped, couldn't be me
@@ -135,7 +96,12 @@ impl<'a> InputProcesser<'a> {
     }
 }
 
-fn process_input(cfg: BackendConfig, device: PossibleDevice,  sender: Arc<Sender<FullyCalculatedPacket>>, message: Arc<Receiver<MessageType>>) -> u8 {
+fn process_input(
+    cfg: BackendConfig,
+    device: PossibleDevice,
+    sender: Arc<Sender<FullyCalculatedPacket>>,
+    message: Arc<Receiver<MessageType>>,
+) -> u8 {
     let processor = FaceProcessorBuilder::new()
         .with_backend(cfg.backend_as_facial())
         .with_input(cfg.res().x, cfg.res().y)
@@ -145,7 +111,7 @@ fn process_input(cfg: BackendConfig, device: PossibleDevice,  sender: Arc<Sender
     let init_fps = device.fps();
     let mut device = match get_dyn_webcam(name, new_device) {
         Ok(webcam) => webcam,
-        Err(_) => return -1
+        Err(_) => return -1,
     };
 
     loop {
@@ -157,7 +123,7 @@ fn process_input(cfg: BackendConfig, device: PossibleDevice,  sender: Arc<Sender
                 MessageType::SetDevice(new_dev) => {
                     device = match get_dyn_webcam(name, new_dev) {
                         Ok(webcam) => webcam,
-                        Err(_) => return -1
+                        Err(_) => return -1,
                     };
                 }
                 MessageType::ChangeDevice(new_cfg) => {
@@ -174,21 +140,30 @@ fn process_input(cfg: BackendConfig, device: PossibleDevice,  sender: Arc<Sender
         }
 
         // get frame
-        let frame = match  device.get_frame() {
+        let frame = match device.get_frame() {
             Ok(f) => f,
             Err(_) => {
                 return -1;
             }
         };
         let res = device.get_resolution().unwrap();
-        let image: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_raw(res.x, res.y, frame).unwrap();
+        let image: ImageBuffer<Rgb<u8>, Vec<u8>> =
+            ImageBuffer::from_raw(res.x, res.y, frame).unwrap();
 
         // detections
         let bbox = processor.calculate_face_bboxes(&image);
         if bbox.len() > 0 {
-            let face_landmarks = processor.calculate_landmarks(&image, *bbox.get(0).unwrap());
+            let face_landmarks = processor.calculate_landmark(&image, *bbox.get(0).unwrap());
+            let eyes = processor.calculate_eyes(face_landmarks.clone(), &image);
+            let pnp = processor
+                .calculate_pnp(&image, face_landmarks.clone())
+                .unwrap();
+            sender.send(FullyCalculatedPacket {
+                landmarks: face_landmarks,
+                euler: pnp,
+                eye_positions: eyes,
+            })
         }
-
     }
 }
 
