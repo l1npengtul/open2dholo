@@ -86,9 +86,9 @@ impl FileMenuButton {
         match NativeFileDialog::new()
             .set_location(&*self.previous_file_path.borrow())
             .add_filter("glTF Model", &["*.gltf", "*.glb"])
-            .add_filter("VRM Model", &["*.vrm"])
-            .add_filter("FBX Model", &["*.fbx"])
-            .add_filter("Collada Model", &["*.dae"])
+            // .add_filter("VRM Model", &["*.vrm"]) // HAHA TFW GODOT NO DYNAMIC LOADING SUPPORT KEKW
+            // .add_filter("FBX Model", &["*.fbx"])
+            // .add_filter("Collada Model", &["*.dae"])
             .show_open_single_file()
         {
             Ok(path) => {
