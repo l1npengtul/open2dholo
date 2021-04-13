@@ -14,7 +14,10 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::nodes::util::{create_editable_item, create_editable_range, get_immidiate_treeitems};
+use crate::{
+    nodes::util::{create_editable_item, create_editable_range, get_immidiate_treeitems},
+    wtf,
+};
 use gdnative::{
     api::{tree::Tree, tree_item::TreeItem},
     prelude::*,
@@ -91,7 +94,7 @@ impl ModelTreeEditor {
                 .assume_safe()
         }; // god this is ugly
         model_offset_editor.set_text(0, "Model Offset");
-        model_offset_editor.set_text_align(0, TreeItem::ALIGN_CENTER);
+        model_offset_editor.set_text_align(0, TreeItem::ALIGN_LEFT);
         // X Modifier
         let model_offset_editor_x_offset: &TreeItem = unsafe {
             &*owner
@@ -106,7 +109,7 @@ impl ModelTreeEditor {
         // Y Modifier
         let model_offset_editor_y_offset: &TreeItem = unsafe {
             &*owner
-                .create_item(model_offset_editor.assume_shared(), 0)
+                .create_item(model_offset_editor.assume_shared(), 1)
                 .unwrap()
                 .assume_safe()
         };
@@ -117,7 +120,7 @@ impl ModelTreeEditor {
         // Z Modifier
         let model_offset_editor_z_offset: &TreeItem = unsafe {
             &*owner
-                .create_item(model_offset_editor.assume_shared(), 0)
+                .create_item(model_offset_editor.assume_shared(), 2)
                 .unwrap()
                 .assume_safe()
         };
@@ -130,7 +133,7 @@ impl ModelTreeEditor {
 
         let model_offset_editor_x_rot: &TreeItem = unsafe {
             &*owner
-                .create_item(model_offset_editor.assume_shared(), 2)
+                .create_item(model_offset_editor.assume_shared(), 3)
                 .unwrap()
                 .assume_safe()
         };
@@ -144,7 +147,7 @@ impl ModelTreeEditor {
 
         let model_offset_editor_y_rot: &TreeItem = unsafe {
             &*owner
-                .create_item(model_offset_editor.assume_shared(), 2)
+                .create_item(model_offset_editor.assume_shared(), 4)
                 .unwrap()
                 .assume_safe()
         };
@@ -158,7 +161,7 @@ impl ModelTreeEditor {
 
         let model_offset_editor_z_rot: &TreeItem = unsafe {
             &*owner
-                .create_item(model_offset_editor.assume_shared(), 2)
+                .create_item(model_offset_editor.assume_shared(), 5)
                 .unwrap()
                 .assume_safe()
         };
@@ -171,15 +174,13 @@ impl ModelTreeEditor {
         );
 
         // add signal
-        if let Err(why) = owner.connect(
+        wtf!(owner.connect(
             "item_edited",
             owner,
             "on_item_edited",
             VariantArray::new_shared(),
             0,
-        ) {
-            panic!(format!("Failed to initialize UI: {}", why.to_string()))
-        }
+        ));
     }
 
     #[export]
@@ -188,12 +189,7 @@ impl ModelTreeEditor {
 
         // sift through every item in the tree
         // we know that every item is only 1 deep
-        let root = unsafe {
-            owner.get_root().unwrap().assume_safe()
-        };
-        let mut treeitems: Vec<Ref<TreeItem, Shared>> = get_immidiate_treeitems(owner, root);
-        
+        let root = unsafe { owner.get_root().unwrap().assume_safe() };
+        let mut _treeitems: Vec<Ref<TreeItem, Shared>> = get_immidiate_treeitems(owner, root);
     }
-
-    
 }

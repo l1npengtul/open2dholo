@@ -14,7 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::show_error;
+use crate::{show_error, wtf};
 use dirs::home_dir;
 use gdnative::{
     api::{MenuButton, PopupMenu, OS},
@@ -69,13 +69,13 @@ impl FileMenuButton {
     fn _ready(&self, owner: TRef<MenuButton>) {
         let popupmenu = unsafe { &*owner.get_popup().unwrap().assume_safe() };
         popupmenu.add_item("Open Model", 0, -1);
-        popupmenu.connect(
+        wtf!(popupmenu.connect(
             "id_pressed",
             owner,
             "on_popupmenu_button_clicked",
             VariantArray::new_shared(),
-            0,
-        );
+            0
+        ));
     }
 
     #[export]
@@ -134,19 +134,20 @@ impl EditMenuButton {
     fn _ready(&self, owner: TRef<MenuButton>) {
         let popupmenu = unsafe { &*owner.get_popup().unwrap().assume_safe() };
         popupmenu.add_item("Open Settings", 0, -1);
-        popupmenu.connect(
+
+        wtf!(popupmenu.connect(
             "id_pressed",
             owner,
             "on_popupmenu_button_clicked",
             VariantArray::new_shared(),
             0,
-        );
+        ))
     }
 
     #[export]
     pub fn on_popupmenu_button_clicked(&self, _owner: TRef<MenuButton>, id: i32) {
         match id {
-            0 => {}
+            // 0 => {}
             _ => {}
         }
     }
@@ -175,17 +176,17 @@ impl HelpMenuButton {
         popupmenu.add_item("Open Docs", 0, -1); // TODO: Fix Nonexistant Docs
         popupmenu.add_separator("");
         popupmenu.add_item("About", 1, -1);
-        popupmenu.connect(
+        wtf!(popupmenu.connect(
             "id_pressed",
             owner,
             "on_popupmenu_button_clicked",
             VariantArray::new_shared(),
             0,
-        );
+        ))
     }
 
     #[export]
-    pub fn on_popupmenu_button_clicked(&self, owner: TRef<MenuButton>, id: i32) {
+    pub fn on_popupmenu_button_clicked(&self, _owner: TRef<MenuButton>, id: i32) {
         match id {
             _ => {}
         }

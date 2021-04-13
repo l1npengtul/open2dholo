@@ -44,16 +44,6 @@ macro_rules! ret_boxerr {
 
 #[macro_export]
 macro_rules! show_error {
-    ($err_name:expr) => {{
-        let os = gdnative::api::OS::godot_singleton();
-        os.emit_signal(
-            "error_occur_default",
-            &[
-                Variant::from_str(format!("{}", $err_name)),
-                Variant::from_str(format!("")),
-            ],
-        )
-    }};
     ($err_name:expr, $err_desc:expr) => {{
         let os = gdnative::api::OS::godot_singleton();
         os.emit_signal(
@@ -63,6 +53,31 @@ macro_rules! show_error {
                 Variant::from_str(format!("{}", $err_desc)),
             ],
         )
+    }};
+}
+
+#[macro_export]
+macro_rules! wtf {
+    ($result:expr) => {{
+        match $result {
+            Ok(a) => a,
+            Err(why) => {
+                let file: &'static str = std::file!();
+                let line: u32 = std::line!();
+                let cols: u32 = std::column!();
+                let why_str = format!("{}", why);
+                let os: &'static gdnative::api::OS = gdnative::api::OS::godot_singleton();
+                os.alert(
+                    format!(
+                        "Fatal Error at file {}, {}:{}. \nResult message: {}",
+                        file, line, cols, why_str
+                    ),
+                    format!("Open2DHolo Fatal Error"),
+                );
+                // get scene tree
+                os.emit_signal("error_critical", &[Variant::from_i64(1)]);
+            }
+        }
     }};
 }
 

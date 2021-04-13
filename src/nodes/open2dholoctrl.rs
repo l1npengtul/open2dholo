@@ -21,6 +21,8 @@ use gdnative::{
     NativeClass,
 };
 
+use crate::wtf;
+
 #[derive(NativeClass)]
 #[inherit(Control)]
 pub struct Open2DHoloCtrl;
@@ -41,15 +43,13 @@ impl Open2DHoloCtrl {
                 .cast::<Viewport>()
                 .unwrap()
         };
-        if let Err(_why) = root_viewport.connect(
+        wtf!(root_viewport.connect(
             "size_changed",
             owner,
             "on_size_change",
             VariantArray::new_shared(),
             0,
-        ) {
-            panic!("Failed to initialise UI!");
-        }
+        ));
 
         // set the size at ready to avoid weird UI scaling on first boot
         self.on_size_change(owner);

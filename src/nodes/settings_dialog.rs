@@ -14,12 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use gdnative::{
-    api::{Tree, TreeItem, WindowDialog},
-    methods,
-    prelude::*,
-    NativeClass,
-};
+use gdnative::{api::WindowDialog, methods, prelude::*, NativeClass};
 
 // TODO: Use window node for 4.0
 #[derive(NativeClass)]

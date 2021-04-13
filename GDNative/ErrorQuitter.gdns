@@ -1,0 +1,8 @@
+[gd_resource type="NativeScript" load_steps=2 format=2]
+
+[ext_resource path="res://open2dholo_lib.gdnlib" type="GDNativeLibrary" id=1]
+
+[resource]
+resource_name = "ErrorQuitter"
+class_name = "ErrorQuitter"
+library = ExtResource( 1 )

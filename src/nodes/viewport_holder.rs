@@ -14,10 +14,14 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{processing::input_processor::InputProcesser, show_error, util::{
+use crate::{
+    processing::input_processor::InputProcesser,
+    show_error,
+    util::{
         camera::device_utils::{DeviceFormat, PossibleDevice, Resolution},
         misc::{Backend, BackendConfig},
-    }};
+    },
+};
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
 
@@ -36,10 +40,15 @@ impl ViewportHolder {
     }
     #[export]
     pub fn _ready(&self, owner: TRef<VSplitContainer>) {
-        let emitter = unsafe {
+        let emitter_tree = unsafe {
             &mut owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer/Tree").unwrap().assume_safe()
         };
-        if let Err(why) = emitter.connect(
+
+        let emitter_loader = unsafe {
+            &mut owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File").unwrap().assume_safe()
+        };
+
+        if let Err(why) = emitter_tree.connect(
             "new_input_processer",
             owner,
             "on_new_input_processer",
@@ -49,7 +58,7 @@ impl ViewportHolder {
             panic!("Failed to connect signals: {}!", why.to_string())
         }
 
-        if let Err(why) = emitter.connect(
+        if let Err(why) = emitter_tree.connect(
             "kill_input_process",
             owner,
             "on_kill_signal",
@@ -59,10 +68,10 @@ impl ViewportHolder {
             panic!("Failed to connect signals: {}!", why.to_string())
         }
 
-        if let Err(why) = emitter.connect(
+        if let Err(why) = emitter_loader.connect(
             "new_model_load",
             owner,
-            "on_kill_signal",
+            "on_new_model_load",
             VariantArray::new_shared(),
             0,
         ) {
@@ -78,7 +87,7 @@ impl ViewportHolder {
     pub fn _process(&self, _owner: TRef<VSplitContainer>, _delta: f32) {
         if let Some(input) = &*self.input_processer.borrow() {
             let results = input.query_gotten_results();
-            for pkt in results {
+            for _pkt in results {
                 godot_print!("a")
             } // TODO: Remove
         }
@@ -95,7 +104,7 @@ impl ViewportHolder {
     pub fn on_new_input_processer(
         &self,
         _owner: TRef<VSplitContainer>,
-        name: Variant,
+        _name: Variant,
         res: Variant,
         fps: Variant,
     ) {
@@ -130,6 +139,7 @@ impl ViewportHolder {
                 );
                 self.input_processer
                     .borrow()
+                    .as_ref()
                     .unwrap()
                     .change_device(possible);
             } else {
@@ -148,17 +158,14 @@ impl ViewportHolder {
     }
 
     #[export]
-    pub fn on_new_model_load(&self, owner: TRef<VSplitContainer>, model_path: Variant) {
-        let string_path = match GodotString::from_variant(&model_path) {
-            Ok(gdstr) => {
-                gdstr.to_string()
-            }
+    pub fn on_new_model_load(&self, _owner: TRef<VSplitContainer>, model_path: Variant) {
+        let _string_path = match GodotString::from_variant(&model_path) {
+            Ok(gdstr) => gdstr.to_string(),
             Err(why) => {
-                show_error!(why.to_string())
+                show_error!("Could not load model", why.to_string());
+                return;
             }
         };
-
-        
     }
 
     fn kill_input_processer(&mut self) {

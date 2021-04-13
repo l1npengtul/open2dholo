@@ -1,9 +1,13 @@
-[gd_scene load_steps=5 format=2]
+[gd_scene load_steps=9 format=2]
 
-[ext_resource path="res://src/GDNative/ModelTreeEditor.gdns" type="Script" id=1]
-[ext_resource path="res://src/GDNative/Open2DHolo.gdns" type="Script" id=2]
+[ext_resource path="res://GDNative/ModelTreeEditor.gdns" type="Script" id=1]
+[ext_resource path="res://GDNative/Open2DHolo.gdns" type="Script" id=2]
 [ext_resource path="res://HSplitContainer2.tscn" type="PackedScene" id=3]
-[ext_resource path="res://src/GDNative/WebcamInputEditor.gdns" type="Script" id=4]
+[ext_resource path="res://GDNative/WebcamInputEditor.gdns" type="Script" id=4]
+[ext_resource path="res://GDNative/EditMenuButton.gdns" type="Script" id=5]
+[ext_resource path="res://GDNative/FileMenuButton.gdns" type="Script" id=6]
+[ext_resource path="res://GDNative/HelpMenuButton.gdns" type="Script" id=7]
+[ext_resource path="res://GDNative/ErrorQuitter.gdns" type="Script" id=9]
 
 [node name="Open2DHolo" type="Control"]
 anchor_right = 1.0
@@ -72,6 +76,7 @@ margin_bottom = 20.0
 size_flags_horizontal = 13
 size_flags_vertical = 13
 text = "File"
+script = ExtResource( 6 )
 
 [node name="Edit" type="MenuButton" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
 margin_left = 39.0
@@ -80,6 +85,7 @@ margin_bottom = 20.0
 size_flags_horizontal = 13
 size_flags_vertical = 13
 text = "Edit"
+script = ExtResource( 5 )
 
 [node name="SettingDialog" type="WindowDialog" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Edit"]
 margin_right = 48.0
@@ -157,6 +163,7 @@ margin_bottom = 20.0
 size_flags_horizontal = 13
 size_flags_vertical = 13
 text = "Help"
+script = ExtResource( 7 )
 
 [node name="AboutDialog" type="WindowDialog" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/Help"]
 margin_right = 48.0
@@ -485,3 +492,8 @@ margin_bottom = 506.0
 [node name="ErrorAlert" type="ConfirmationDialog" parent="Open2DHoloMainUINode"]
 margin_right = 200.0
 margin_bottom = 70.0
+
+[node name="ErrorQuitter" type="Control" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+script = ExtResource( 9 )

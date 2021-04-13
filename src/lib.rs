@@ -64,6 +64,7 @@ fn init(handle: InitHandle) {
     handle.add_class::<nodes::upper_tab_popups::HelpMenuButton>();
     handle.add_class::<nodes::settings_dialog::SettingsDialog>();
     handle.add_class::<nodes::about_dialog::AboutDialog>();
+    handle.add_class::<nodes::error_quitter::ErrorQuitter>();
 }
 
 godot_init!(init);

@@ -29,8 +29,7 @@ use crate::{
 };
 use flume::{Receiver, Sender, TryRecvError};
 use opencv::{
-    core::Mat,
-    core::Vec3b,
+    core::{Mat, MatTrait, MatTraitManual, Vec3b},
     videoio::{
         VideoCapture, VideoCaptureAPIs::CAP_ANY, VideoCaptureProperties, VideoCaptureTrait,
         VideoWriter, CAP_MSMF, CAP_PROP_FOURCC, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT,
@@ -58,8 +57,6 @@ use v4l::{
     video::{capture::Parameters, traits::Capture},
     FourCC,
 };
-
-type RefCellOption<T> = RefCell<Option<RefCell<T>>>;
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice<'a> {
@@ -847,7 +844,7 @@ impl OpenCvCameraDevice {
     fn get_next_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let vc = &mut *self.video_capture.borrow_mut();
         {
-            let mut frame = Mat::default().unwrap();
+            let mut frame = Mat::default();
             match vc.read(&mut frame) {
                 Ok(_) => {}
                 Err(why) => {

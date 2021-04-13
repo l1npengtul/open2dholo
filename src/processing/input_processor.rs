@@ -14,7 +14,6 @@ use flume::{Receiver, Sender};
 use image::{ImageBuffer, Rgb};
 use std::{
     cell::{Cell, RefCell},
-    sync::Arc,
     thread::{Builder, JoinHandle},
 };
 
@@ -24,10 +23,8 @@ pub struct InputProcesser {
     backend_cfg: Cell<BackendConfig>,
     // face_detector: Arc<Mutex<Box<dyn DetectorTrait>>>,
     thread: JoinHandle<u8>,
-    sender_fromthread: Arc<Sender<FullyCalculatedPacket>>,
     receiver_fromthread: Receiver<FullyCalculatedPacket>,
     sender_tothread: Sender<MessageType>,
-    receiver_tothread: Arc<Receiver<MessageType>>,
 }
 
 impl InputProcesser {
@@ -38,23 +35,21 @@ impl InputProcesser {
         let backend_cfg = Cell::new(config);
         let (sender_fromthread, receiver_fromthread) = flume::unbounded();
         let (sender_tothread, receiver_tothread) = flume::unbounded();
+        let cfg2 = backend_cfg.clone().get();
+        let dev2 = device.clone();
 
         let thread = Builder::new()
             .name("input_processor".to_string())
             .stack_size(33_554_432) // 32 MiB
-            .spawn(move || {
-                process_input(backend_cfg, device, sender_fromthread, receiver_tothread)
-            })
+            .spawn(move || process_input(cfg2, dev2, sender_fromthread, receiver_tothread))
             .unwrap();
 
         Ok(InputProcesser {
             device: RefCell::new(device),
             backend_cfg,
             thread,
-            sender_fromthread: Arc::new(sender_fromthread),
             receiver_fromthread,
             sender_tothread,
-            receiver_tothread: Arc::new(receiver_tothread),
         })
     }
 
@@ -74,12 +69,10 @@ impl InputProcesser {
         new_device: PossibleDevice,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.device.replace(new_device.clone());
-        self.sender_tothread
-            .send(MessageType::SetDevice{
-                name: None,
-                device: new_device,
-
-            });
+        self.sender_tothread.send(MessageType::SetDevice {
+            name: None,
+            device: new_device,
+        });
         Ok(())
     }
 
@@ -96,8 +89,8 @@ impl InputProcesser {
 fn process_input(
     cfg: BackendConfig,
     device: PossibleDevice,
-    sender: Arc<Sender<FullyCalculatedPacket>>,
-    message: Arc<Receiver<MessageType>>,
+    sender: Sender<FullyCalculatedPacket>,
+    message: Receiver<MessageType>,
 ) -> u8 {
     let processor = FaceProcessorBuilder::new()
         .with_backend(cfg.backend_as_facial())
@@ -108,7 +101,7 @@ fn process_input(
     let init_fps = device.fps();
     let mut device = match get_dyn_webcam(None, device) {
         Ok(webcam) => webcam,
-        Err(_) => return -1,
+        Err(_) => return 255,
     };
 
     loop {
@@ -117,10 +110,13 @@ fn process_input(
                 MessageType::Die(code) => {
                     return code;
                 }
-                MessageType::SetDevice(new_dev) => {
-                    device = match get_dyn_webcam(None, new_dev) {
+                MessageType::SetDevice {
+                    name,
+                    device: new_dev,
+                } => {
+                    device = match get_dyn_webcam(name, new_dev) {
                         Ok(webcam) => webcam,
-                        Err(_) => return -1,
+                        Err(_) => return 255,
                     };
                 }
                 MessageType::ChangeDevice(new_cfg) => {
@@ -140,7 +136,7 @@ fn process_input(
         let frame = match device.get_frame() {
             Ok(f) => f,
             Err(_) => {
-                return -1;
+                return 255;
             }
         };
         let res = device.get_resolution().unwrap();
@@ -161,7 +157,7 @@ fn process_input(
             landmarks: face_landmarks,
             euler: pnp,
             eye_positions: eyes,
-        })
+        });
     }
 }
 
@@ -179,8 +175,8 @@ fn get_dyn_webcam<'a>(
             fmt: _fmt,
         } => {
             let uvcam: UVCameraDevice<'a> = match UVCameraDevice::new_camera(
-                vendor_id.map(|v| i32::from(v)),
-                product_id.map(|v| i32::from(v)),
+                vendor_id.map(i32::from),
+                product_id.map(i32::from),
                 serial,
             ) {
                 Ok(camera) => camera,

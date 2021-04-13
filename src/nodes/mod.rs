@@ -16,6 +16,7 @@
 
 pub mod about_dialog;
 pub mod error_alert_dialog;
+pub mod error_quitter;
 pub mod model_tree_edit;
 pub mod open2dholoctrl;
 pub mod settings_dialog;

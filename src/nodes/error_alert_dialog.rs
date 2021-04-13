@@ -16,6 +16,8 @@
 
 use gdnative::{api::AcceptDialog, methods, prelude::*};
 
+use crate::wtf;
+
 // TODO: Use window node for 4.0
 #[derive(NativeClass)]
 #[inherit(AcceptDialog)]
@@ -52,24 +54,20 @@ impl ErrorAlertDialog {
     #[export]
     fn _ready(&self, owner: TRef<AcceptDialog>) {
         owner.set_title("Error");
-        if let Err(why) = owner.connect(
+        wtf!(owner.connect(
             "confirmed",
             owner,
             "on_confirmed",
             VariantArray::new_shared(),
             0,
-        ) {
-            panic!(why)
-        }
-        if let Err(why) = owner.connect(
+        ));
+        wtf!(owner.connect(
             "error_occur_default",
             owner,
             "on_error_occur_default",
             VariantArray::new_shared(),
             0,
-        ) {
-            panic!(why)
-        }
+        ));
     }
 
     #[export]
