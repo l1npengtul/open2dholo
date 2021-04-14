@@ -1,14 +1,11 @@
-use crate::{
-    util::misc::MessageType,
-    util::{
+use crate::{error::{processing_error::ProcessingError, thread_send_message_error::ThreadSendMessageError}, handle_boxerr, util::{
         camera::{
             camera_device::{OpenCvCameraDevice, UVCameraDevice, V4LinuxDevice},
             device_utils::{DeviceContact, DeviceFormat, PossibleDevice, Resolution},
             webcam::Webcam,
         },
-        misc::{BackendConfig, FullyCalculatedPacket},
-    },
-};
+        misc::{BackendConfig, FullyCalculatedPacket, MessageType},
+    }};
 use facial_processing::face_processor::FaceProcessorBuilder;
 use flume::{Receiver, Sender};
 use image::{ImageBuffer, Rgb};
@@ -69,10 +66,12 @@ impl InputProcesser {
         new_device: PossibleDevice,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.device.replace(new_device.clone());
-        self.sender_tothread.send(MessageType::SetDevice {
+        if self.sender_tothread.send(MessageType::SetDevice {
             name: None,
             device: new_device,
-        });
+        }).is_err() {
+            return Err(Box::new(ThreadSendMessageError::CannotSend));
+        }
         Ok(())
     }
 
@@ -123,10 +122,10 @@ fn process_input(
                     let new_res = new_cfg.res;
                     let new_fps = new_cfg.fps;
                     if new_res != init_res {
-                        device.set_resolution(new_res);
+                        handle_boxerr!(device.set_resolution(new_res), 253);
                     }
                     if new_fps != init_fps {
-                        device.set_framerate(new_fps);
+                        handle_boxerr!(device.set_framerate(new_fps), 253);
                     }
                 }
             }
@@ -145,7 +144,7 @@ fn process_input(
 
         // detections
         let bbox = processor.calculate_face_bboxes(&image);
-        if bbox.len() <= 0 {
+        if bbox.is_empty() {
             continue;
         }
         let face_landmarks = processor.calculate_landmark(&image, *bbox.get(0).unwrap());
@@ -153,11 +152,16 @@ fn process_input(
         let pnp = processor
             .calculate_pnp(&image, face_landmarks.clone())
             .unwrap();
-        sender.send(FullyCalculatedPacket {
-            landmarks: face_landmarks,
-            euler: pnp,
-            eye_positions: eyes,
-        });
+        if sender
+            .send(FullyCalculatedPacket {
+                landmarks: face_landmarks,
+                euler: pnp,
+                eye_positions: eyes,
+            })
+            .is_err()
+        {
+            return 254;
+        }
     }
 }
 
@@ -184,8 +188,8 @@ fn get_dyn_webcam<'a>(
                     return Err(why);
                 }
             };
-            uvcam.set_framerate(fps);
-            uvcam.set_resolution(res);
+            handle_boxerr!(uvcam.set_framerate(fps));
+            handle_boxerr!(uvcam.set_resolution(res));
             Box::new(uvcam)
         }
         PossibleDevice::V4L2 {
@@ -200,8 +204,8 @@ fn get_dyn_webcam<'a>(
                     return Err(why);
                 }
             };
-            v4lcam.set_resolution(res);
-            v4lcam.set_framerate(fps);
+            handle_boxerr!(v4lcam.set_resolution(res));
+            handle_boxerr!(v4lcam.set_framerate(fps));
             Box::new(v4lcam)
         }
         PossibleDevice::OpenCV {
@@ -211,7 +215,7 @@ fn get_dyn_webcam<'a>(
             fmt: _fmt,
         } => {
             let ocvcam = match OpenCvCameraDevice::from_possible_device(
-                name.unwrap_or("OpenCV Camera".to_string()),
+                name.unwrap_or_else(|| "OpenCV Camera".to_string()),
                 device,
             ) {
                 Ok(device) => device,
@@ -219,8 +223,8 @@ fn get_dyn_webcam<'a>(
                     return Err(why);
                 }
             };
-            ocvcam.set_resolution(res);
-            ocvcam.set_framerate(fps);
+            handle_boxerr!(ocvcam.set_resolution(res));
+            handle_boxerr!(ocvcam.set_framerate(fps));
             Box::new(ocvcam)
         }
     };

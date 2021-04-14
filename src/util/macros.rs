@@ -43,6 +43,20 @@ macro_rules! ret_boxerr {
 }
 
 #[macro_export]
+macro_rules! handle_boxerr {
+    ($a:expr) => {{
+        if let Err(why) = $a {
+            return Err(why);
+        }
+    }};
+    ($a:expr, $b:expr) => {{
+        if let Err(_) = $a {
+            return $b;
+        }
+    }};
+}
+
+#[macro_export]
 macro_rules! show_error {
     ($err_name:expr, $err_desc:expr) => {{
         let os = gdnative::api::OS::godot_singleton();

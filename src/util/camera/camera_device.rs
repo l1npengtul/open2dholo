@@ -547,22 +547,24 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 let raw_ptr =
                     (*fields.stream_handle.borrow_mut()).as_ptr() as *mut MaybeUninit<StreamHandle>;
                 let assume_inited: *mut MaybeUninit<StreamHandle<'static>> =
-                    raw_ptr.cast::<std::mem::MaybeUninit<uvc::StreamHandle>>();
+                    raw_ptr.cast::<MaybeUninit<uvc::StreamHandle>>();
                 &mut *assume_inited
             };
             let streamh_init = unsafe { streamh_ref.as_mut_ptr().as_mut().unwrap() };
 
-            let act_stream = &mut streamh_init
+            let _act_stream = &mut streamh_init
                 .start_stream(
                     move |frame, _count| {
                         let vec_frame: Vec<u8> = frame.to_rgb().unwrap().to_bytes().to_vec();
-                        sender.send(vec_frame);
+                        if sender.send(vec_frame).is_err() {
+                            // do nothing
+                        }
                     },
                     cnt,
                 )
                 .unwrap();
             let activestream_init = MaybeUninit::<ActiveStream<Arc<AtomicUsize>>>::uninit();
-            *fields.active_stream.borrow_mut() = unsafe { activestream_init }
+            *fields.active_stream.borrow_mut() = activestream_init;
         });
         self.with_opened(|o| o.set(true));
         Ok(())

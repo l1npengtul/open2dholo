@@ -1,10 +1,7 @@
-
 // TODO: Add IK struct~
 
-// Godot provides parents in the form 
-pub struct BoneNode {
-
-}
+// Godot provides parents in the form
+pub struct BoneNode {}
 
 pub struct ModelBonesMap {
     // Bones here!

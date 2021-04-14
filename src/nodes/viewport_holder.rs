@@ -21,6 +21,7 @@ use crate::{
         camera::device_utils::{DeviceFormat, PossibleDevice, Resolution},
         misc::{Backend, BackendConfig},
     },
+    wtf,
 };
 use gdnative::{api::VSplitContainer, prelude::*, NativeClass};
 use std::cell::RefCell;
@@ -137,11 +138,13 @@ impl ViewportHolder {
                     device_fps as u32,
                     DeviceFormat::MJpeg,
                 );
-                self.input_processer
+                wtf!(self
+                    .input_processer
                     .borrow()
                     .as_ref()
                     .unwrap()
-                    .change_device(possible);
+                    .change_device(possible)
+                );
             } else {
                 let input_processer = match InputProcesser::from_device_contact(
                     device_contact,

@@ -1,3 +1,6 @@
 [submodule "models/facial-processing-rs-models"]
 	path = models/facial-processing-rs-models
 	url = https://github.com/l1npengtul/facial-processing-rs-models
+[submodule "default_models/vrm-samples"]
+	path = default_models/vrm-samples
+	url = https://github.com/l1npengtul/vrm-samples.git
