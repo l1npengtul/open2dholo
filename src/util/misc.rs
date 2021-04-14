@@ -17,7 +17,7 @@
 use facial_processing::utils::{
     eyes::Eye,
     face::FaceLandmark,
-    misc::{BackendProviders, EulerAngles, Point2D},
+    misc::{BackendProviders, EulerAngles},
 };
 
 use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution};

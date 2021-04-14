@@ -35,7 +35,7 @@ impl InputProcesser {
         let backend_cfg = Cell::new(config);
         let (sender_fromthread, receiver_fromthread) = flume::unbounded();
         let (sender_tothread, receiver_tothread) = flume::unbounded();
-        let cfg2 = backend_cfg.clone().get();
+        let cfg2 = backend_cfg.get();
         let dev2 = device.clone();
 
         let thread = Builder::new()

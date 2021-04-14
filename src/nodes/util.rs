@@ -46,7 +46,7 @@ pub fn create_custom_editable_item(owner: TRef<Tree>, parent: &TreeItem, field: 
 }
 
 pub fn get_immidiate_treeitems(_owner: TRef<Tree>, root: TRef<TreeItem>) -> Vec<Ref<TreeItem>> {
-    let mut item = unsafe { root.get_children() };
+    let mut item = root.get_children();
     let mut children: Vec<Ref<TreeItem>> = vec![];
     loop {
         if let Some(i) = item {

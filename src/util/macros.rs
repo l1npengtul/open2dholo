@@ -75,7 +75,8 @@ macro_rules! wtf {
                     format!("Open2DHolo Fatal Error"),
                 );
                 // get scene tree
-                os.emit_signal("error_critical", &[Variant::from_i64(1)]);
+                // os.emit_signal("error_critical", &[Variant::from_i64(1)]);
+                std::process::exit(1);
             }
         }
     }};

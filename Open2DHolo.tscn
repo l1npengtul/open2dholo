@@ -78,6 +78,10 @@ size_flags_vertical = 13
 text = "File"
 script = ExtResource( 6 )
 
+[node name="Default" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File"]
+margin_right = 20.0
+margin_bottom = 20.0
+
 [node name="Edit" type="MenuButton" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer"]
 margin_left = 39.0
 margin_right = 75.0
@@ -497,3 +501,6 @@ margin_bottom = 70.0
 margin_right = 40.0
 margin_bottom = 40.0
 script = ExtResource( 9 )
+__meta__ = {
+"_edit_use_anchors_": false
+}

@@ -68,7 +68,8 @@ impl FileMenuButton {
     #[export]
     fn _ready(&self, owner: TRef<MenuButton>) {
         let popupmenu = unsafe { &*owner.get_popup().unwrap().assume_safe() };
-        popupmenu.add_item("Open Model", 0, -1);
+        popupmenu.add_item("Open Model From Filesystem", 0, -1);
+        popupmenu.add_submenu_item("Open Default Model", "/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File/Default", 1);
         wtf!(popupmenu.connect(
             "id_pressed",
             owner,
@@ -76,48 +77,75 @@ impl FileMenuButton {
             VariantArray::new_shared(),
             0
         ));
+
+        let default_popupmenu = unsafe {
+            &*owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File/Default").unwrap().assume_safe().cast::<PopupMenu>().unwrap()
+        };
+
+        default_popupmenu.add_item("ModelNameModelName", 0, -1);
+        wtf!(default_popupmenu.connect(
+            "id_pressed",
+            owner,
+            "on_default_model_popupmenu_button_clicked",
+            VariantArray::new_shared(),
+            0
+        ));
     }
 
     #[export]
     pub fn on_popupmenu_button_clicked(&self, owner: TRef<MenuButton>, id: i32) {
-        if id != 0 {
-            return;
-        }
-        match NativeFileDialog::new()
-            .set_location(&*self.previous_file_path.borrow())
-            .add_filter("glTF Model", &["*.gltf", "*.glb"])
-            // .add_filter("VRM Model", &["*.vrm"]) // HAHA TFW GODOT NO DYNAMIC LOADING SUPPORT KEKW
-            // .add_filter("FBX Model", &["*.fbx"])
-            // .add_filter("Collada Model", &["*.dae"])
-            .show_open_single_file()
-        {
-            Ok(path) => {
-                if let Some(p) = path {
-                    match p.parent() {
-                        Some(dir_path) => {
-                            let path_str =
-                                dir_path.as_os_str().to_os_string().into_string().unwrap();
-                            *self.previous_file_path.borrow_mut() = path_str.clone();
-                            owner.emit_signal("new_model_load", &[Variant::from_str(path_str)]);
-                        }
-                        None => {
-                            let path_str = p.into_os_string().into_string().unwrap();
-                            *self.previous_file_path.borrow_mut() = path_str
+        match id {
+            0 => {
+                match NativeFileDialog::new()
+                    .set_location(&*self.previous_file_path.borrow())
+                    .add_filter("glTF Model", &["*.gltf", "*.glb"])
+                    // .add_filter("VRM Model", &["*.vrm"]) // HAHA TFW GODOT NO DYNAMIC LOADING SUPPORT KEKW
+                    // .add_filter("FBX Model", &["*.fbx"])
+                    // .add_filter(~"Collada Model", &["*.dae"])
+                    .show_open_single_file()
+                {
+                    Ok(path) => {
+                        if let Some(p) = path {
+                            match p.parent() {
+                                Some(dir_path) => {
+                                    let path_str =
+                                        dir_path.as_os_str().to_os_string().into_string().unwrap();
+                                    *self.previous_file_path.borrow_mut() = path_str.clone();
+                                    owner.emit_signal(
+                                        "new_model_load",
+                                        &[Variant::from_str(path_str)],
+                                    );
+                                }
+                                None => {
+                                    let path_str = p.into_os_string().into_string().unwrap();
+                                    *self.previous_file_path.borrow_mut() = path_str
+                                }
+                            }
+                            // TODO: Loader emit signal
+                        } else {
+                            {
+                                {
+                                    show_error!("Failed to open file", "File path doesn't exist!");
+                                }
+                            }
                         }
                     }
-                    // TODO: Loader emit signal
-                } else {
-                    {
-                        {
-                            show_error!("Failed to open file", "File path doesn't exist!");
-                        }
+                    Err(why) => {
+                        show_error!("Failed to open file", why);
                     }
                 }
             }
-            Err(why) => {
-                show_error!("Failed to open file", why);
-            }
+
+            // 1 => {
+            //     godot_print!("AAAA");
+            // }
+            _ => {}
         }
+    }
+
+    #[export]
+    pub fn on_default_model_popupmenu_button_clicked(&self, _owner: TRef<MenuButton>, id: i32) {
+        godot_print!("{}", id);
     }
 }
 
@@ -186,9 +214,5 @@ impl HelpMenuButton {
     }
 
     #[export]
-    pub fn on_popupmenu_button_clicked(&self, _owner: TRef<MenuButton>, id: i32) {
-        match id {
-            _ => {}
-        }
-    }
+    pub fn on_popupmenu_button_clicked(&self, _owner: TRef<MenuButton>, _id: i32) {}
 }

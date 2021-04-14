@@ -18,3 +18,4 @@ pub mod camera;
 #[macro_use]
 pub mod macros;
 pub mod misc;
+pub mod model;
