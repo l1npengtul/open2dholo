@@ -31,4 +31,8 @@ impl SettingsDialog {
     fn _ready(&self, owner: TRef<WindowDialog>) {
         owner.set_title("Open2DHolo Settings");
     }
+
+    // fn on_show(&self, owner: TRef<WindowDialog>) {
+
+    // }
 }

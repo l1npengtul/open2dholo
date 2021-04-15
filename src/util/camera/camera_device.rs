@@ -182,7 +182,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     }
 
     fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.opened.get() == false {
+        if !self.opened.get() {
             return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
                 Ok(stream) => {
                     *self.device_stream.borrow_mut() = Some(RefCell::new(stream));
@@ -292,7 +292,7 @@ impl<'a> QueryCamera<'a> for V4LinuxDevice<'a> {
     }
 
     fn get_location(&self) -> DeviceContact {
-        DeviceContact::V4L2 {
+        DeviceContact::Video4Linux2 {
             location: (self.device_path).clone(),
         }
     }
@@ -311,7 +311,7 @@ pub struct UVCameraDevice<'a> {
     device_receiver: Box<Receiver<Vec<u8>>>,
     device_sender: Box<Sender<Vec<u8>>>,
     opened: Box<Cell<bool>>,
-    str: Box<&'a str>, // Im too lazy to use PhantomData, so here is a lifetime box &str.
+    str: &'a str, // Im too lazy to use PhantomData, so here is a lifetime box &str.
     ctx: Box<Context<'static>>,
     #[borrows(ctx)]
     #[not_covariant]
@@ -373,7 +373,7 @@ impl<'a> UVCameraDevice<'a> {
                 device_receiver: recv,
                 device_sender: send,
                 opened: Box::new(Cell::new(false)),
-                str: Box::new("a"),
+                str: "a",
                 ctx: Box::new(Context::new().unwrap()),
                 device_builder: |ctx| {
                     Box::new(
@@ -441,7 +441,7 @@ impl<'a> UVCameraDevice<'a> {
                 device_receiver: recv,
                 device_sender: send,
                 opened: Box::new(Cell::new(false)),
-                str: Box::new("a"),
+                str: "a",
                 ctx: Box::new(Context::new().unwrap()),
                 device_builder: |ctx| {
                     Box::new(
@@ -648,12 +648,12 @@ impl<'a> QueryCamera<'a> for UVCameraDevice<'a> {
         let desc: uvc::Result<DeviceDescription> = self.with_device(|dev| dev.description());
 
         match desc {
-            Ok(description) => DeviceContact::UVCAM {
+            Ok(description) => DeviceContact::UniversalVideoCamera {
                 vendor_id: Some(description.vendor_id),
                 product_id: Some(description.product_id),
                 serial: description.serial_number,
             },
-            Err(_why) => DeviceContact::UVCAM {
+            Err(_why) => DeviceContact::UniversalVideoCamera {
                 vendor_id: None,
                 product_id: None,
                 serial: None,
@@ -755,12 +755,12 @@ impl OpenCvCameraDevice {
         framerate: u32,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         match device_contact {
-            DeviceContact::UVCAM {
+            DeviceContact::UniversalVideoCamera {
                 vendor_id,
                 product_id,
                 serial,
             } => {
-                let pd = PossibleDevice::UVCam {
+                let pd = PossibleDevice::UniversalVideoCamera {
                     vendor_id,
                     product_id,
                     serial,
@@ -770,8 +770,8 @@ impl OpenCvCameraDevice {
                 };
                 OpenCvCameraDevice::from_possible_device(n, pd)
             }
-            DeviceContact::V4L2 { location } => {
-                let pd = PossibleDevice::V4L2 {
+            DeviceContact::Video4Linux2 { location } => {
+                let pd = PossibleDevice::Video4Linux2 {
                     location,
                     res: resolution,
                     fps: framerate,
@@ -779,7 +779,7 @@ impl OpenCvCameraDevice {
                 };
                 OpenCvCameraDevice::from_possible_device(n, pd)
             }
-            DeviceContact::OPENCV { index } => {
+            DeviceContact::OpenComVision { index } => {
                 OpenCvCameraDevice::new("OpenCVCamera".to_string(), index, framerate, resolution)
             }
         }

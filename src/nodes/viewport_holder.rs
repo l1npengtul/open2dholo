@@ -143,8 +143,7 @@ impl ViewportHolder {
                     .borrow()
                     .as_ref()
                     .unwrap()
-                    .change_device(possible)
-                );
+                    .change_device(possible));
             } else {
                 let input_processer = match InputProcesser::from_device_contact(
                     device_contact,
@@ -169,17 +168,5 @@ impl ViewportHolder {
                 return;
             }
         };
-    }
-
-    fn kill_input_processer(&mut self) {
-        // if let Some(processer) = self.input_processer.get_mut() {
-        //     // processer.kill();
-        // }
-    }
-}
-
-impl<'a> Drop for ViewportHolder {
-    fn drop(&mut self) {
-        // self.kill_input_processer();
     }
 }

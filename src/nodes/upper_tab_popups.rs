@@ -14,7 +14,7 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{show_error, wtf};
+use crate::{show_error, wtf, globalize_path};
 use dirs::home_dir;
 use gdnative::{
     api::{MenuButton, PopupMenu, OS},
@@ -23,13 +23,14 @@ use gdnative::{
     NativeClass,
 };
 use native_dialog::FileDialog as NativeFileDialog;
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::HashMap};
 
 #[derive(NativeClass)]
 #[inherit(MenuButton)]
 #[register_with(Self::register_signals)]
 pub struct FileMenuButton {
     previous_file_path: RefCell<String>,
+    default_model_paths: RefCell<HashMap<String, String>> // Name and Path
 }
 
 // TODO: signal to connect to Viewport and change model
@@ -44,6 +45,11 @@ impl FileMenuButton {
                 export_info: ExportInfo::new(VariantType::GodotString),
                 usage: PropertyUsage::DEFAULT,
             }],
+        });
+
+        builder.add_signal(Signal {
+            name: "settings_open",
+            args: &[],
         })
     }
     fn new(_owner: &MenuButton) -> Self {
@@ -63,6 +69,7 @@ impl FileMenuButton {
         );
         FileMenuButton {
             previous_file_path: RefCell::new(home_dir),
+            default_model_paths: RefCell::new(HashMap::new()),
         }
     }
     #[export]
@@ -82,6 +89,10 @@ impl FileMenuButton {
             &*owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File/Default").unwrap().assume_safe().cast::<PopupMenu>().unwrap()
         };
 
+        // crawl the default model directory
+        let default_model_global = globalize_path!("res://default_models");
+        
+
         default_popupmenu.add_item("ModelNameModelName", 0, -1);
         wtf!(default_popupmenu.connect(
             "id_pressed",
@@ -90,6 +101,9 @@ impl FileMenuButton {
             VariantArray::new_shared(),
             0
         ));
+
+        popupmenu.add_separator("");
+        popupmenu.add_item("Open Settigs", 2, -1);
     }
 
     #[export]
@@ -122,12 +136,8 @@ impl FileMenuButton {
                                 }
                             }
                             // TODO: Loader emit signal
-                        } else {
-                            {
-                                {
-                                    show_error!("Failed to open file", "File path doesn't exist!");
-                                }
-                            }
+                        } else {    
+                            show_error!("Failed to open file", "File path doesn't exist!");
                         }
                     }
                     Err(why) => {
@@ -136,9 +146,9 @@ impl FileMenuButton {
                 }
             }
 
-            // 1 => {
-            //     godot_print!("AAAA");
-            // }
+            2 => {
+                godot_print!("AAAA");
+            }
             _ => {}
         }
     }
@@ -161,7 +171,7 @@ impl EditMenuButton {
     #[export]
     fn _ready(&self, owner: TRef<MenuButton>) {
         let popupmenu = unsafe { &*owner.get_popup().unwrap().assume_safe() };
-        popupmenu.add_item("Open Settings", 0, -1);
+        popupmenu.add_item("Open Editor", 0, -1);
 
         wtf!(popupmenu.connect(
             "id_pressed",

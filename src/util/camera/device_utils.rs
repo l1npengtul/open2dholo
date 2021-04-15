@@ -245,13 +245,13 @@ impl Display for DeviceFormat {
 }
 
 pub enum StreamType<'a> {
-    V4L2Stream(MmapStream<'a>),
-    UVCStream(DeviceHandle<'a>),
+    Video4Linux2Stream(MmapStream<'a>),
+    UniversalVideoStream(DeviceHandle<'a>),
 }
 
 #[derive(Clone)]
 pub enum PossibleDevice {
-    UVCam {
+    UniversalVideoCamera {
         vendor_id: Option<u16>,
         product_id: Option<u16>,
         serial: Option<String>,
@@ -259,13 +259,13 @@ pub enum PossibleDevice {
         fps: u32,
         fmt: FrameFormat,
     },
-    V4L2 {
+    Video4Linux2 {
         location: PathIndex,
         res: Resolution,
         fps: u32,
         fmt: FourCC,
     },
-    OpenCV {
+    OpenComVision {
         index: u32,
         res: Resolution,
         fps: u32,
@@ -281,7 +281,7 @@ impl<'a> PossibleDevice {
         fmt: DeviceFormat,
     ) -> PossibleDevice {
         match &cached.device_location {
-            DeviceContact::UVCAM {
+            DeviceContact::UniversalVideoCamera {
                 vendor_id,
                 product_id,
                 serial,
@@ -291,7 +291,7 @@ impl<'a> PossibleDevice {
                     DeviceFormat::MJpeg => FrameFormat::MJPEG,
                 };
 
-                PossibleDevice::UVCam {
+                PossibleDevice::UniversalVideoCamera {
                     vendor_id: vendor_id.to_owned(),
                     product_id: product_id.to_owned(),
                     serial: serial.clone(),
@@ -300,7 +300,7 @@ impl<'a> PossibleDevice {
                     fmt: dev_format,
                 }
             }
-            DeviceContact::V4L2 { location } => {
+            DeviceContact::Video4Linux2 { location } => {
                 let dev_format = match fmt {
                     DeviceFormat::Yuyv => FourCC::new(b"MJPG"),
                     DeviceFormat::MJpeg => FourCC::new(b"YUYV"),
@@ -309,14 +309,14 @@ impl<'a> PossibleDevice {
                     PathIndex::Path(p) => PathIndex::Path(p.clone()),
                     PathIndex::Index(i) => PathIndex::Index(*i),
                 };
-                PossibleDevice::V4L2 {
+                PossibleDevice::Video4Linux2 {
                     location: lc,
                     res,
                     fps,
                     fmt: dev_format,
                 }
             }
-            DeviceContact::OPENCV { index } => PossibleDevice::OpenCV {
+            DeviceContact::OpenComVision { index } => PossibleDevice::OpenComVision {
                 index: *index,
                 res,
                 fps,
@@ -332,7 +332,7 @@ impl<'a> PossibleDevice {
         fmt: DeviceFormat,
     ) -> Self {
         match contact {
-            DeviceContact::UVCAM {
+            DeviceContact::UniversalVideoCamera {
                 vendor_id,
                 product_id,
                 serial,
@@ -342,32 +342,32 @@ impl<'a> PossibleDevice {
                     DeviceFormat::MJpeg => FrameFormat::MJPEG,
                 };
 
-                PossibleDevice::UVCam {
+                PossibleDevice::UniversalVideoCamera {
                     vendor_id: vendor_id.to_owned(),
                     product_id: product_id.to_owned(),
-                    serial: serial.clone(),
+                    serial,
                     res,
                     fps,
                     fmt: dev_format,
                 }
             }
-            DeviceContact::V4L2 { location } => {
+            DeviceContact::Video4Linux2 { location } => {
                 let dev_format = match fmt {
                     DeviceFormat::Yuyv => FourCC::new(b"MJPG"),
                     DeviceFormat::MJpeg => FourCC::new(b"YUYV"),
                 };
                 let lc: PathIndex = match location {
-                    PathIndex::Path(p) => PathIndex::Path(p.clone()),
+                    PathIndex::Path(p) => PathIndex::Path(p),
                     PathIndex::Index(i) => PathIndex::Index(i),
                 };
-                PossibleDevice::V4L2 {
+                PossibleDevice::Video4Linux2 {
                     location: lc,
                     res,
                     fps,
                     fmt: dev_format,
                 }
             }
-            DeviceContact::OPENCV { index } => PossibleDevice::OpenCV {
+            DeviceContact::OpenComVision { index } => PossibleDevice::OpenComVision {
                 index,
                 res,
                 fps,
@@ -378,38 +378,38 @@ impl<'a> PossibleDevice {
 
     pub fn to_device_contact(&self) -> DeviceContact {
         match self {
-            PossibleDevice::UVCam {
+            PossibleDevice::UniversalVideoCamera {
                 vendor_id,
                 product_id,
                 serial,
                 res: _res,
                 fps: _fps,
                 fmt: _fmt,
-            } => DeviceContact::UVCAM {
+            } => DeviceContact::UniversalVideoCamera {
                 vendor_id: *vendor_id,
                 product_id: *product_id,
                 serial: serial.clone(),
             },
-            PossibleDevice::V4L2 {
+            PossibleDevice::Video4Linux2 {
                 location,
                 res: _res,
                 fps: _fps,
                 fmt: _fmt,
-            } => DeviceContact::V4L2 {
+            } => DeviceContact::Video4Linux2 {
                 location: location.clone(),
             },
-            PossibleDevice::OpenCV {
+            PossibleDevice::OpenComVision {
                 index,
                 res: _res,
                 fps: _fps,
                 fmt: _fmt,
-            } => DeviceContact::OPENCV { index: *index },
+            } => DeviceContact::OpenComVision { index: *index },
         }
     }
 
     pub fn res(&self) -> Resolution {
         match self {
-            PossibleDevice::UVCam {
+            PossibleDevice::UniversalVideoCamera {
                 vendor_id: _vendor_id,
                 product_id: _product_id,
                 serial: _serial,
@@ -417,13 +417,13 @@ impl<'a> PossibleDevice {
                 fps: _fps,
                 fmt: _fmt,
             } => *res,
-            PossibleDevice::V4L2 {
+            PossibleDevice::Video4Linux2 {
                 location: _location,
                 res,
                 fps: _fps,
                 fmt: _fmt,
             } => *res,
-            PossibleDevice::OpenCV {
+            PossibleDevice::OpenComVision {
                 index: _index,
                 res,
                 fps: _fps,
@@ -434,7 +434,7 @@ impl<'a> PossibleDevice {
 
     pub fn fps(&self) -> u32 {
         match self {
-            PossibleDevice::UVCam {
+            PossibleDevice::UniversalVideoCamera {
                 vendor_id: _vendor_id,
                 product_id: _product_id,
                 serial: _serial,
@@ -442,13 +442,13 @@ impl<'a> PossibleDevice {
                 fps,
                 fmt: _fmt,
             } => *fps,
-            PossibleDevice::V4L2 {
+            PossibleDevice::Video4Linux2 {
                 location: _location,
                 res: _res,
                 fps,
                 fmt: _fmt,
             } => *fps,
-            PossibleDevice::OpenCV {
+            PossibleDevice::OpenComVision {
                 index: _index,
                 res: _res,
                 fps,
@@ -483,15 +483,15 @@ impl Display for PathIndex {
 
 #[derive(Clone)]
 pub enum DeviceContact {
-    UVCAM {
+    UniversalVideoCamera {
         vendor_id: Option<u16>,
         product_id: Option<u16>,
         serial: Option<String>,
     },
-    V4L2 {
+    Video4Linux2 {
         location: PathIndex,
     },
-    OPENCV {
+    OpenComVision {
         index: u32,
     },
 }
@@ -499,30 +499,30 @@ pub enum DeviceContact {
 impl DeviceContact {
     pub fn from_possible_device(dev: &PossibleDevice) -> Self {
         match dev.clone() {
-            PossibleDevice::UVCam {
+            PossibleDevice::UniversalVideoCamera {
                 vendor_id,
                 product_id,
                 serial,
                 res: _res,
                 fps: _fps,
                 fmt: _fmt,
-            } => DeviceContact::UVCAM {
+            } => DeviceContact::UniversalVideoCamera {
                 vendor_id,
                 product_id,
                 serial,
             },
-            PossibleDevice::V4L2 {
+            PossibleDevice::Video4Linux2 {
                 location,
                 res: _res,
                 fps: _fps,
                 fmt: _fmt,
-            } => DeviceContact::V4L2 { location },
-            PossibleDevice::OpenCV {
+            } => DeviceContact::Video4Linux2 { location },
+            PossibleDevice::OpenComVision {
                 index,
                 res: _res,
                 fps: _fps,
                 fmt: _fmt,
-            } => DeviceContact::OPENCV { index },
+            } => DeviceContact::OpenComVision { index },
         }
     }
 }
@@ -543,14 +543,13 @@ pub struct CachedDeviceList {
 
 impl CachedDeviceList {
     // DO NOT REMOVE THE `&`
-    pub fn from_webcam(camera: &Box<dyn QueryCamera>) -> Result<Self, ()> {
+    pub fn from_webcam(camera: &dyn QueryCamera) -> Result<Self, Box<dyn std::error::Error>> {
         let device_name = camera.name();
         let device_location = camera.get_location();
         let mut resolutions = match camera.get_supported_resolutions() {
             Ok(res) => res,
             Err(why) => {
-                println!("{}", why.to_string());
-                return Err(());
+                return Err(why);
             }
         };
 
@@ -572,7 +571,7 @@ impl CachedDeviceList {
     }
 
     pub fn set_custom_cached_idx(&mut self, idx: u32) {
-        self.device_location = DeviceContact::OPENCV { index: idx };
+        self.device_location = DeviceContact::OpenComVision { index: idx };
     }
 
     pub fn get_name(&self) -> String {
@@ -615,7 +614,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDeviceList>> {
             for dev in v4l::context::enum_devices() {
                 if let Ok(v4l_dev) = V4LinuxDevice::new(dev.index()) {
                     let b: Box<dyn QueryCamera> = Box::new(v4l_dev);
-                    if let Ok(c_dev) = CachedDeviceList::from_webcam(&b) {
+                    if let Ok(c_dev) = CachedDeviceList::from_webcam(b.as_ref()) {
                         known_devices.insert(
                             dev.name()
                                 .unwrap_or(format!("/dev/video{}", dev.index()))
@@ -634,7 +633,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDeviceList>> {
                         if let Ok(mut camera_device) = {
                             let b: Box<dyn QueryCamera> =
                                 Box::new(UVCameraDevice::from_device(uvc_device).unwrap());
-                            CachedDeviceList::from_webcam(&b)
+                            CachedDeviceList::from_webcam(b.as_ref())
                         } {
                             let dev_name = camera_device.get_name();
                             camera_device.set_custom_cached_idx(idx as u32);
@@ -657,7 +656,7 @@ pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDeviceList>> {
 
 pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::error::Error>> {
     match device {
-        PossibleDevice::UVCam {
+        PossibleDevice::UniversalVideoCamera {
             vendor_id,
             product_id,
             serial,
@@ -688,7 +687,7 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
             }
             Ok(0)
         }
-        PossibleDevice::V4L2 {
+        PossibleDevice::Video4Linux2 {
             location,
             res: _res,
             fps: _fps,
@@ -708,7 +707,7 @@ pub fn get_os_webcam_index(device: PossibleDevice) -> Result<u32, Box<dyn std::e
             }
             PathIndex::Index(i) => Ok(i as u32),
         },
-        PossibleDevice::OpenCV {
+        PossibleDevice::OpenComVision {
             index,
             res: _res,
             fps: _fps,

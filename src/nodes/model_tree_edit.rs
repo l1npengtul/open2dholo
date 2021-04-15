@@ -192,4 +192,34 @@ impl ModelTreeEditor {
         let root = unsafe { owner.get_root().unwrap().assume_safe() };
         let mut _treeitems: Vec<Ref<TreeItem, Shared>> = get_immidiate_treeitems(owner, root);
     }
+
+    /// Get a reference to the model tree editor's x offset.
+    pub fn x_offset(&self) -> &Cell<f64> {
+        &self.x_offset
+    }
+
+    /// Get a reference to the model tree editor's y offset.
+    pub fn y_offset(&self) -> &Cell<f64> {
+        &self.y_offset
+    }
+
+    /// Get a reference to the model tree editor's z offset.
+    pub fn z_offset(&self) -> &Cell<f64> {
+        &self.z_offset
+    }
+
+    /// Get a reference to the model tree editor's x rotate.
+    pub fn x_rotate(&self) -> &Cell<f64> {
+        &self.x_rotate
+    }
+
+    /// Get a reference to the model tree editor's y rotate.
+    pub fn y_rotate(&self) -> &Cell<f64> {
+        &self.y_rotate
+    }
+
+    /// Get a reference to the model tree editor's z rotate.
+    pub fn z_rotate(&self) -> &Cell<f64> {
+        &self.z_rotate
+    }
 }

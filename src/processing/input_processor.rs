@@ -1,11 +1,15 @@
-use crate::{error::{processing_error::ProcessingError, thread_send_message_error::ThreadSendMessageError}, handle_boxerr, util::{
+use crate::{
+    error::thread_send_message_error::ThreadSendMessageError,
+    handle_boxerr,
+    util::{
         camera::{
             camera_device::{OpenCvCameraDevice, UVCameraDevice, V4LinuxDevice},
             device_utils::{DeviceContact, DeviceFormat, PossibleDevice, Resolution},
             webcam::Webcam,
         },
         misc::{BackendConfig, FullyCalculatedPacket, MessageType},
-    }};
+    },
+};
 use facial_processing::face_processor::FaceProcessorBuilder;
 use flume::{Receiver, Sender};
 use image::{ImageBuffer, Rgb};
@@ -66,10 +70,14 @@ impl InputProcesser {
         new_device: PossibleDevice,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.device.replace(new_device.clone());
-        if self.sender_tothread.send(MessageType::SetDevice {
-            name: None,
-            device: new_device,
-        }).is_err() {
+        if self
+            .sender_tothread
+            .send(MessageType::SetDevice {
+                name: None,
+                device: new_device,
+            })
+            .is_err()
+        {
             return Err(Box::new(ThreadSendMessageError::CannotSend));
         }
         Ok(())
@@ -82,6 +90,16 @@ impl InputProcesser {
             point_vec.push(point);
         }
         point_vec
+    }
+
+    /// Get a reference to the input processer's backend cfg.
+    pub fn backend_cfg(&self) -> &Cell<BackendConfig> {
+        &self.backend_cfg
+    }
+
+    /// Get a reference to the input processer's thread.
+    pub fn thread(&self) -> &JoinHandle<u8> {
+        &self.thread
     }
 }
 
@@ -170,7 +188,7 @@ fn get_dyn_webcam<'a>(
     device: PossibleDevice,
 ) -> Result<Box<dyn Webcam<'a> + 'a>, Box<dyn std::error::Error>> {
     let device_held: Box<dyn Webcam<'a>> = match device {
-        PossibleDevice::UVCam {
+        PossibleDevice::UniversalVideoCamera {
             vendor_id,
             product_id,
             serial,
@@ -192,7 +210,7 @@ fn get_dyn_webcam<'a>(
             handle_boxerr!(uvcam.set_resolution(res));
             Box::new(uvcam)
         }
-        PossibleDevice::V4L2 {
+        PossibleDevice::Video4Linux2 {
             location,
             res,
             fps,
@@ -208,7 +226,7 @@ fn get_dyn_webcam<'a>(
             handle_boxerr!(v4lcam.set_framerate(fps));
             Box::new(v4lcam)
         }
-        PossibleDevice::OpenCV {
+        PossibleDevice::OpenComVision {
             index: _index,
             res,
             fps,

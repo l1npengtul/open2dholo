@@ -30,6 +30,8 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::clippy::single_match_else)]
 #![allow(clippy::clippy::similar_names)]
+#![allow(clippy::never_loop)]
+#![allow(clippy::clippy::too_many_arguments)]
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
