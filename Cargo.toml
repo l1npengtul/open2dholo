@@ -20,6 +20,8 @@ regex = "1.4.5"
 image = "0.23.14"
 dirs = "3.0.1"
 k = "0.24.0"
+gltf = "0.15.2"
+json = "0.12.4"
 
 
 [dependencies.ouroboros]

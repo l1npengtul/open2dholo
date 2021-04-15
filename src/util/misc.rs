@@ -81,3 +81,34 @@ pub struct FullyCalculatedPacket {
     pub euler: EulerAngles,
     pub eye_positions: [Eye; 2],
 }
+
+
+pub struct VRMStylePermissions {
+    allowed_persons: AllowedPersons,
+    allow_violence: bool,
+    allow_sexual: bool,
+    commercial: bool,
+    additional_url: Option<String>,
+}
+
+pub struct CreatorMetadata {
+    name: Option<String>,
+    author: Option<String>,
+    contact: Option<String>,
+    reference: Option<String>,
+    version: Option<String>
+}
+
+pub enum AllowedPersons {
+    AuthorOnly,
+    PermittedOnly(Vec<String>),
+    Anyone,
+}
+
+pub struct ModelReference {
+    repr_name: String,
+    model_path: String,
+    tscn_path: String, 
+    license: Option<String>,
+    vrm_style_perms: Option<VRMStylePermissions>,
+}
