@@ -14,7 +14,13 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{show_error, wtf, globalize_path};
+use crate::{
+    globalize_path,
+    nodes::util::check_endswith_glb,
+    show_error,
+    util::misc::{MdlRefBuilder, ModelReference},
+    wtf,
+};
 use dirs::home_dir;
 use gdnative::{
     api::{MenuButton, PopupMenu, OS},
@@ -24,13 +30,14 @@ use gdnative::{
 };
 use native_dialog::FileDialog as NativeFileDialog;
 use std::{cell::RefCell, collections::HashMap};
+use walkdir::WalkDir;
 
 #[derive(NativeClass)]
 #[inherit(MenuButton)]
 #[register_with(Self::register_signals)]
 pub struct FileMenuButton {
     previous_file_path: RefCell<String>,
-    default_model_paths: RefCell<HashMap<String, String>> // Name and Path
+    default_model_paths: RefCell<HashMap<String, ModelReference>>, // Name and Path
 }
 
 // TODO: signal to connect to Viewport and change model
@@ -91,8 +98,31 @@ impl FileMenuButton {
 
         // crawl the default model directory
         let default_model_global = globalize_path!("res://default_models");
-        
-        
+        let mut file_hashmap: HashMap<String, ModelReference> = HashMap::new();
+        for file in WalkDir::new(default_model_global).min_depth(1) {
+            if let Ok(f) = file {
+                if check_endswith_glb(&f) {
+                    // get the filename without the ".glb" and raw path
+                    let filename = {
+                        let vec: Vec<&str> =
+                            f.file_name().to_str().unwrap_or("").rsplit('/').collect();
+                        let a = (*vec.last().unwrap()).to_string();
+                            a
+                            .strip_suffix(".glb")
+                            .unwrap()
+                            .to_string()
+                    };
+                    let tscn_path = f.file_name().to_str().unwrap().to_string().strip_suffix("glb").unwrap().to_owned() + "tscn";
+                    let mut mdl = MdlRefBuilder::from_vrm_meta_json(f.file_name().to_str().unwrap().to_string())
+                        .with_model_path(f.file_name().to_str().unwrap().to_string()).with_tscn_path(tscn_path);
+                    if mdl.check_empty_displayname() {
+                        mdl = mdl.with_display_name(filename.to_string());
+                    }
+                    let model_ref = mdl.build();
+                    file_hashmap.insert(filename, model_ref);
+                }
+            }
+        }
 
         default_popupmenu.add_item("ModelNameModelName", 0, -1);
         wtf!(default_popupmenu.connect(
@@ -105,6 +135,8 @@ impl FileMenuButton {
 
         popupmenu.add_separator("");
         popupmenu.add_item("Open Settigs", 2, -1);
+
+        *self.default_model_paths.borrow_mut() = file_hashmap;
     }
 
     #[export]
@@ -137,7 +169,7 @@ impl FileMenuButton {
                                 }
                             }
                             // TODO: Loader emit signal
-                        } else {    
+                        } else {
                             show_error!("Failed to open file", "File path doesn't exist!");
                         }
                     }

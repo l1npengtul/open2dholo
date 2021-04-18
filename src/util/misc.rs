@@ -14,14 +14,14 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution};
 use facial_processing::utils::{
     eyes::Eye,
     face::FaceLandmark,
     misc::{BackendProviders, EulerAngles},
 };
-use license::License;
 use serde::{Deserialize, Serialize};
-use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution};
+use std::fs::File;
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
@@ -83,12 +83,25 @@ pub struct FullyCalculatedPacket {
     pub eye_positions: [Eye; 2],
 }
 
-
 // TODO: Add serde serialize/deserialize to RON or equivalent
+
+fn make_allow_bool(s: String) -> bool {
+    matches!(s.as_str(), "Allow")
+}
+
+fn make_option_str(s: String) -> Option<String> {
+    let made_opt = s.as_str();
+    if made_opt.is_empty() {
+        None
+    } else {
+        Some(made_opt.to_string())
+    }
+}
 
 // VRoid JSON decoder
 #[derive(Serialize, Debug, Deserialize)]
-struct VrmPermBuilder {
+#[allow(non_snake_case)]
+pub struct VrmPermBuilder {
     pub version: String,
     pub author: String,
     pub contactInformation: String,
@@ -101,14 +114,94 @@ struct VrmPermBuilder {
     pub commercialUssageName: String,
     pub otherPermissionUrl: String,
     pub licenseName: String,
-    pub otherLicenseUrl: String
+    pub otherLicenseUrl: String,
 }
 impl VrmPermBuilder {
+    pub fn new(vrm_path: String) -> Self {
+        let vrm_file = File::open(vrm_path).unwrap();
+        let vrm = gltf::Glb::from_reader(vrm_file).unwrap();
+        let json = vrm.json;
+        let s = match std::str::from_utf8(json.as_ref()) {
+            Ok(v) => v,
+            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+        };
+        let json_parsed = json::parse(s).unwrap();
+        let json_iter = json_parsed.entries();
+        let mut extensions_vec: Vec<String> = vec![];
+        let mut json_string: String = String::new();
+        for (tag, value) in json_iter {
+            if tag == "extensionsUsed" {
+                for mem in value.members() {
+                    extensions_vec.push(String::from(mem.as_str().unwrap()))
+                }
+            }
+            if tag == "extensions" {
+                for (k, v) in value.entries() {
+                    if extensions_vec.contains(&String::from(k)) {
+                        for (a, b) in v.entries() {
+                            if a == "meta" {
+                                json_string = b.to_string();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        serde_json::from_str(&json_string).unwrap()
+    }
+
     pub fn split(self) -> (VRMStylePermissions, CreatorMetadata) {
-        // TODO
+        let violence = make_allow_bool(self.violentUssageName);
+        let sexual = make_allow_bool(self.sexualUssageName);
+        let commer = make_allow_bool(self.commercialUssageName);
+        let permurl = make_option_str(self.otherPermissionUrl);
+        let license = {
+            match (self.licenseName.as_str(), self.otherLicenseUrl.as_str()) {
+                ("", y) if !y.is_empty() => y.to_string(),
+                (x, "") if !x.is_empty() => x.to_string(),
+                (x, y) if !x.is_empty() && y.is_empty() => {
+                    format!("{} / {}", x, y)
+                }
+                (_, _) => "All Rights Reserved".to_string(),
+            }
+        };
+        let vrmstyle = VRMStylePermissions::new(
+            AllowedPersons::from(self.allowedUserName),
+            violence,
+            sexual,
+            commer,
+            permurl,
+            license,
+        );
+
+        let name = make_option_str(self.title);
+        let author = make_option_str(self.author);
+        let contact = make_option_str(self.contactInformation);
+        let reference = make_option_str(self.reference);
+        let version = make_option_str(self.version);
+        let creatormeta = CreatorMetadata::new(name, author, contact, reference, version);
+
+        (vrmstyle, creatormeta)
     }
 }
-/// These are permissions taken from `VRoid` 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AllowedPersons {
+    Everyone,
+    ExplicitlyLicensedPerson,
+    OnlyAuthor,
+}
+impl From<String> for AllowedPersons {
+    fn from(f: String) -> Self {
+        match f.as_ref() {
+            "ExplicitlyLicensedPerson" => AllowedPersons::ExplicitlyLicensedPerson,
+            "OnlyAuthor" => AllowedPersons::OnlyAuthor,
+            _ => AllowedPersons::Everyone,
+        }
+    }
+}
+/// These are permissions taken from `VRoid`
 /// You can check for futher details on Pixiv's VROID FAQ
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VRMStylePermissions {
@@ -117,11 +210,30 @@ pub struct VRMStylePermissions {
     allow_sexual: bool,
     commercial: bool,
     additional_url: Option<String>,
+    license: String,
 }
 impl VRMStylePermissions {
+    pub fn new(
+        allowed_persons: AllowedPersons,
+        allow_violence: bool,
+        allow_sexual: bool,
+        commercial: bool,
+        additional_url: Option<String>,
+        license: String,
+    ) -> Self {
+        VRMStylePermissions {
+            allowed_persons,
+            allow_violence,
+            allow_sexual,
+            commercial,
+            additional_url,
+            license,
+        }
+    }
+
     /// check the VRM model's allowed persons.
-    pub fn allowed_persons(&self) -> &AllowedPersons {
-        &self.allowed_persons
+    pub fn allowed_persons(&self) -> AllowedPersons {
+        self.allowed_persons
     }
 
     /// Check if the VRM model allows violence.
@@ -143,16 +255,21 @@ impl VRMStylePermissions {
     pub fn additional_url(&self) -> &Option<String> {
         &self.additional_url
     }
+
+    /// Get a reference to the v r m style permissions's license.
+    pub fn license(&self) -> &String {
+        &self.license
+    }
 }
 impl Default for VRMStylePermissions {
     fn default() -> Self {
         VRMStylePermissions {
-            allowed_persons: AllowedPersons::AuthorOnly,
+            allowed_persons: AllowedPersons::OnlyAuthor,
             allow_violence: false,
             allow_sexual: false,
             commercial: false,
             additional_url: None,
-
+            license: "All Rights Reserved".to_string(),
         }
     }
 }
@@ -163,10 +280,24 @@ pub struct CreatorMetadata {
     author: Option<String>,
     contact: Option<String>,
     reference: Option<String>,
-    version: Option<String>
+    version: Option<String>,
 }
 impl CreatorMetadata {
-
+    pub fn new(
+        name: Option<String>,
+        author: Option<String>,
+        contact: Option<String>,
+        reference: Option<String>,
+        version: Option<String>,
+    ) -> Self {
+        CreatorMetadata {
+            name,
+            author,
+            contact,
+            reference,
+            version,
+        }
+    }
 
     /// Get a reference to the creator's name.
     pub fn name(&self) -> &Option<String> {
@@ -194,18 +325,10 @@ impl CreatorMetadata {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AllowedPersons {
-    AuthorOnly,
-    PermittedOnly(String),
-    Anyone,
-}
-
 pub struct MdlRefBuilder {
     display_name: String,
     model_path: String,
     tscn_path: String, // TODO: Deprecate in 4.0
-    license: Option<String>,
     creator_meta: Option<CreatorMetadata>,
     vrm_style_perms: Option<VRMStylePermissions>,
 }
@@ -219,6 +342,13 @@ impl MdlRefBuilder {
         self
     }
 
+    pub fn check_empty_displayname(&self) -> bool {
+        if self.display_name == *"" {
+            return true;
+        }
+        false
+    }
+
     pub fn with_model_path(mut self, path: String) -> MdlRefBuilder {
         self.model_path = path;
         self
@@ -229,45 +359,36 @@ impl MdlRefBuilder {
         self
     }
 
-    pub fn with_license_by_name(mut self, license: String) -> MdlRefBuilder {
-        self.license = Some(license);
-        self
+    // pub fn with_license_by_name(mut self, license: String) -> MdlRefBuilder {
+    //     self.license = Some(license);
+    //     self
+    // }
+
+    // pub fn with_spdx_license(mut self, license: &dyn License) -> MdlRefBuilder {
+    //     self.license = Some(license.name().to_string());
+    //     self
+    // }
+
+    pub fn from_vrm_meta_json(path: String) -> MdlRefBuilder {
+        let vrm: VrmPermBuilder = VrmPermBuilder::new(path);
+        let (vrmstyle, creatormeta) = vrm.split();
+        let mdlref = MdlRefBuilder {
+            display_name: creatormeta.name().clone().unwrap_or_else(|| "".to_string()),
+            creator_meta: Some(creatormeta),
+            vrm_style_perms: Some(vrmstyle),
+            ..MdlRefBuilder::default()
+        };
+        mdlref
     }
 
-    pub fn with_spdx_license(mut self, license: &dyn License) -> MdlRefBuilder {
-        self.license = Some(license.name().to_string());
-        self
-    }
-
-    pub fn with_vrm_meta_json(mut self, json: String) -> MdlRefBuilder {
-        let json_parsed = json::parse(json).unwrap();
-        let json_iter = json_parsed.entries();
-        let mut extensions_vec: Vec<String> = vec![];
-        let mut json_string: String = String::new();
-        for (tag, value) in json_iter {
-            if tag == "extensionsUsed" {
-                for mem in value.members() {
-                    extensions_vec.push(String::from(mem.as_str().unwrap()))
-                }
-            }
-            if tag == "extensions" {
-                for (k,v) in value.entries() {
-                    if extensions_vec.contains(&String::from(k)) {
-                        for (a,b) in v.entries() {
-                            if a == "meta" {
-                                println!("{}",b);
-                                json_string = b.to_string();
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+    pub fn build(self) -> ModelReference {
+        ModelReference {
+            display_name: self.display_name,
+            model_path: self.model_path,
+            tscn_path: self.tscn_path,
+            creator_meta: self.creator_meta,
+            vrm_style_perms: self.vrm_style_perms,
         }
-    
-        let vrm_perm: VrmPermBuilder = serde_json::from_str(&json_string).unwrap();
-
-
     }
 }
 
@@ -277,7 +398,6 @@ impl Default for MdlRefBuilder {
             display_name: "".to_string(),
             model_path: "".to_string(),
             tscn_path: "".to_string(),
-            license: None,
             creator_meta: None,
             vrm_style_perms: None,
         }
@@ -289,7 +409,6 @@ pub struct ModelReference {
     display_name: String,
     model_path: String,
     tscn_path: String, // TODO: Deprecate in 4.0
-    license: Option<String>,
     creator_meta: Option<CreatorMetadata>,
     vrm_style_perms: Option<VRMStylePermissions>,
 }
@@ -319,11 +438,6 @@ impl ModelReference {
         globalize_path!(self.tscn_path())
     }
 
-    /// get the model reference's license.
-    pub fn license(&self) -> &Option<String> {
-        &self.license
-    }
-
     /// Get a reference to the model reference's creator meta.
     pub fn creator_meta(&self) -> &Option<CreatorMetadata> {
         &self.creator_meta
@@ -333,6 +447,4 @@ impl ModelReference {
     pub fn vrm_style_perms(&self) -> &Option<VRMStylePermissions> {
         &self.vrm_style_perms
     }
-
-    
 }

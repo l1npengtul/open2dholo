@@ -27,7 +27,7 @@ window/stretch/aspect="keep"
 
 [editor_plugins]
 
-enabled=PoolStringArray( "zylann.editor_debugger" )
+enabled=PoolStringArray(  )
 
 [memory]
 

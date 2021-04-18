@@ -51,3 +51,14 @@ pub fn get_immidiate_treeitems(_owner: TRef<Tree>, _root: TRef<TreeItem>) -> Vec
     // while let Some(i) = item { }
     children
 }
+
+pub fn check_endswith(entry: &walkdir::DirEntry, end: &'_ str) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map_or(false, |s| s.ends_with(end))
+}
+
+pub fn check_endswith_glb(entry: &walkdir::DirEntry) -> bool {
+    check_endswith(entry, ".glb")
+}
