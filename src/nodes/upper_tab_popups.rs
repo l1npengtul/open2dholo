@@ -29,7 +29,7 @@ use gdnative::{
     NativeClass,
 };
 use native_dialog::FileDialog as NativeFileDialog;
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, convert::TryInto};
 use walkdir::WalkDir;
 
 #[derive(NativeClass)]
@@ -55,9 +55,14 @@ impl FileMenuButton {
         });
 
         builder.add_signal(Signal {
-            name: "settings_open",
-            args: &[],
-        })
+            name: "new_tscn_model_load",
+            args: &[SignalArgument {
+                name: "model_path",
+                default: Variant::from_str(""),
+                export_info: ExportInfo::new(VariantType::GodotString),
+                usage: PropertyUsage::DEFAULT,
+            }],
+        });
     }
     fn new(_owner: &MenuButton) -> Self {
         let home_dir = home_dir().map_or_else(
@@ -103,18 +108,18 @@ impl FileMenuButton {
             if let Ok(f) = file {
                 if check_endswith_glb(&f) {
                     // get the filename without the ".glb" and raw path
-                    let filename = {
-                        let vec: Vec<&str> =
-                            f.file_name().to_str().unwrap_or("").rsplit('/').collect();
-                        let a = (*vec.last().unwrap()).to_string();
-                            a
-                            .strip_suffix(".glb")
-                            .unwrap()
-                            .to_string()
-                    };
-                    let tscn_path = f.file_name().to_str().unwrap().to_string().strip_suffix("glb").unwrap().to_owned() + "tscn";
-                    let mut mdl = MdlRefBuilder::from_vrm_meta_json(f.file_name().to_str().unwrap().to_string())
-                        .with_model_path(f.file_name().to_str().unwrap().to_string()).with_tscn_path(tscn_path);
+                    let filename = f
+                        .file_name()
+                        .to_str()
+                        .unwrap_or("")
+                        .strip_suffix(".glb")
+                        .unwrap_or("")
+                        .to_string();
+                    let full_path = f.path().as_os_str().to_str().unwrap_or("").to_string();
+                    let tscn_path = full_path.strip_suffix(".glb").unwrap().to_string() + ".tscn";
+                    let mut mdl = MdlRefBuilder::from_vrm_meta_json(full_path.clone())
+                        .with_model_path(full_path)
+                        .with_tscn_path(tscn_path);
                     if mdl.check_empty_displayname() {
                         mdl = mdl.with_display_name(filename.to_string());
                     }
@@ -124,7 +129,16 @@ impl FileMenuButton {
             }
         }
 
-        default_popupmenu.add_item("ModelNameModelName", 0, -1);
+        let mut names: Vec<&String> = file_hashmap
+            .values()
+            .into_iter()
+            .map(ModelReference::display_name)
+            .collect();
+        names.sort();
+        for (idx, name) in names.into_iter().enumerate() {
+            default_popupmenu.add_item(name, idx.try_into().unwrap(), -1);
+        }
+
         wtf!(default_popupmenu.connect(
             "id_pressed",
             owner,
@@ -187,17 +201,36 @@ impl FileMenuButton {
     }
 
     #[export]
-    pub fn on_default_model_popupmenu_button_clicked(&self, _owner: TRef<MenuButton>, id: i32) {
-        godot_print!("{}", id);
+    pub fn on_default_model_popupmenu_button_clicked(&self, owner: TRef<MenuButton>, id: i32) {
+        let default_popupmenu = unsafe {
+            &*owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File/Default").unwrap().assume_safe().cast::<PopupMenu>().unwrap()
+        };
+        let model_path = match self
+            .default_model_paths
+            .borrow()
+            .get(&(default_popupmenu.get_item_text(i64::from(id)).to_string()))
+        {
+            Some(mdlref) => mdlref.tscn_path().clone(),
+            None => return,
+        };
+        godot_print!("{}", model_path);
+        owner.emit_signal("new_tscn_model_load", &[Variant::from_str(model_path)]);
     }
 }
 
 #[derive(NativeClass)]
 #[inherit(MenuButton)]
+#[register_with(Self::register_signals)]
 pub struct EditMenuButton;
 
 #[methods]
 impl EditMenuButton {
+    fn register_signals(builder: &ClassBuilder<Self>) {
+        builder.add_signal(Signal {
+            name: "settings_open",
+            args: &[],
+        })
+    }
     fn new(_owner: &MenuButton) -> Self {
         EditMenuButton
     }

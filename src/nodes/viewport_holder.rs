@@ -16,7 +16,7 @@
 
 use crate::{
     processing::input_processor::InputProcesser,
-    show_error,
+    show_error, localize_path,
     util::{
         camera::device_utils::{DeviceFormat, PossibleDevice, Resolution},
         misc::{Backend, BackendConfig},
@@ -30,6 +30,7 @@ use std::cell::RefCell;
 #[inherit(VSplitContainer)]
 pub struct ViewportHolder {
     input_processer: RefCell<Option<InputProcesser>>,
+    
 }
 
 #[methods]
@@ -49,35 +50,37 @@ impl ViewportHolder {
             &mut owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File").unwrap().assume_safe()
         };
 
-        if let Err(why) = emitter_tree.connect(
+        wtf!(emitter_tree.connect(
             "new_input_processer",
             owner,
             "on_new_input_processer",
             VariantArray::new_shared(),
             0,
-        ) {
-            panic!("Failed to connect signals: {}!", why.to_string())
-        }
+        ));
 
-        if let Err(why) = emitter_tree.connect(
+        wtf!(emitter_tree.connect(
             "kill_input_process",
             owner,
             "on_kill_signal",
             VariantArray::new_shared(),
             0,
-        ) {
-            panic!("Failed to connect signals: {}!", why.to_string())
-        }
+        ));
 
-        if let Err(why) = emitter_loader.connect(
+        wtf!(emitter_loader.connect(
             "new_model_load",
             owner,
             "on_new_model_load",
             VariantArray::new_shared(),
             0,
-        ) {
-            panic!("Failed to connect signals: {}!", why.to_string())
-        }
+        ));
+
+        wtf!(emitter_loader.connect(
+            "new_tscn_model_load",
+            owner,
+            "on_new_tscn_mdl_load",
+            VariantArray::new_shared(),
+            0,
+        ));
     }
 
     #[export]
@@ -168,5 +171,18 @@ impl ViewportHolder {
                 return;
             }
         };
+    }
+
+    #[export]
+    pub fn on_new_tscn_mdl_load(&self, _owner: TRef<VSplitContainer>, model_path: Variant) {
+        let _string_path = match GodotString::from_variant(&model_path) {
+            Ok(gdstr) => localize_path!(gdstr),
+            Err(why) => {
+                show_error!("Could not load model", why.to_string());
+                return;
+            }
+        };
+
+
     }
 }

@@ -104,3 +104,12 @@ macro_rules! globalize_path {
         format!("{}", proj.globalize_path($path))
     }};
 }
+
+#[macro_export]
+macro_rules! localize_path {
+    ($path:expr) => {{
+        let proj: &'static gdnative::api::ProjectSettings =
+            gdnative::api::ProjectSettings::godot_singleton();
+        format!("{}", proj.localize_path($path))
+    }};
+}
