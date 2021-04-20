@@ -28,13 +28,33 @@ use std::cell::RefCell;
 
 #[derive(NativeClass)]
 #[inherit(VSplitContainer)]
+#[register_with(Self::register_signals)]
 pub struct ViewportHolder {
     input_processer: RefCell<Option<InputProcesser>>,
-    
 }
 
 #[methods]
 impl ViewportHolder {
+    fn register_signals(builder: &ClassBuilder<Self>) {
+        let mut default_68pt_vec = Vec::new();
+        let vector2 = Vector2::new(0_f32,0_f32);
+        for _ in 0..68 {
+            default_68pt_vec.push(vector2);
+        }
+
+        builder.add_signal(Signal {
+            name: "new_processed_frame_68pt",
+            args: &[
+                SignalArgument { 
+                    name: "point_array_68", 
+                    default: Variant::from_vector2_array(&TypedArray::from_vec(default_68pt_vec)), 
+                    export_info: ExportInfo::new(VariantType::Vector2Array), 
+                    usage: PropertyUsage::DEFAULT,
+                }
+            ],
+        });
+    }
+
     fn new(_owner: &VSplitContainer) -> Self {
         ViewportHolder {
             input_processer: RefCell::new(None),
@@ -182,6 +202,7 @@ impl ViewportHolder {
                 return;
             }
         };
+
 
 
     }

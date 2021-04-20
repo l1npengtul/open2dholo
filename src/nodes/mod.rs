@@ -24,3 +24,5 @@ pub mod upper_tab_popups;
 mod util;
 pub mod viewport_holder;
 pub mod webcam_input_edit;
+pub mod camera_input_preview;
+pub mod preview_viewport;

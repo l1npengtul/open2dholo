@@ -1,8 +1,6 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=2 format=2]
 
 [ext_resource path="res://GDNative/ViewportHolder.gdns" type="Script" id=1]
-
-[sub_resource type="CubeMesh" id=1]
 
 [node name="VSplitContainer2" type="VSplitContainer"]
 margin_right = 462.0
@@ -16,7 +14,7 @@ __meta__ = {
 
 [node name="VBoxContainer" type="VBoxContainer" parent="."]
 margin_right = 462.0
-margin_bottom = 31.0
+margin_bottom = 28.0
 size_flags_vertical = 3
 alignment = 1
 __meta__ = {
@@ -41,30 +39,17 @@ margin_right = 462.0
 margin_bottom = 24.0
 text = "Disable"
 
-[node name="ViewportContainer" type="ViewportContainer" parent="VBoxContainer"]
+[node name="Control" type="Control" parent="VBoxContainer"]
 margin_top = 28.0
 margin_right = 462.0
-margin_bottom = 31.0
+margin_bottom = 28.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-stretch = true
-
-[node name="Viewport" type="Viewport" parent="VBoxContainer/ViewportContainer"]
-size = Vector2( 462, 3 )
-handle_input_locally = false
-render_target_update_mode = 3
-
-[node name="Camera" type="Camera" parent="VBoxContainer/ViewportContainer/Viewport"]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 2.36898, 0, 0 )
-
-[node name="MeshInstance" type="MeshInstance" parent="VBoxContainer/ViewportContainer/Viewport"]
-mesh = SubResource( 1 )
-material/0 = null
 
 [node name="VBoxContainer2" type="VBoxContainer" parent="."]
-margin_top = 43.0
+margin_top = 40.0
 margin_right = 462.0
-margin_bottom = 75.0
+margin_bottom = 68.0
 size_flags_horizontal = 11
 size_flags_vertical = 11
 alignment = 2
@@ -93,13 +78,13 @@ text = "Disable"
 [node name="ViewportContainer" type="ViewportContainer" parent="VBoxContainer2"]
 margin_top = 28.0
 margin_right = 462.0
-margin_bottom = 32.0
+margin_bottom = 28.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 stretch = true
 
 [node name="Viewport" type="Viewport" parent="VBoxContainer2/ViewportContainer"]
-size = Vector2( 462, 4 )
+size = Vector2( 462, 0 )
 handle_input_locally = false
 render_target_update_mode = 3
 
