@@ -15,14 +15,14 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod about_dialog;
+pub mod camera_input_preview;
 pub mod error_alert_dialog;
 pub mod error_quitter;
 pub mod model_tree_edit;
 pub mod open2dholoctrl;
+pub mod preview_viewport;
 pub mod settings_dialog;
 pub mod upper_tab_popups;
 mod util;
 pub mod viewport_holder;
 pub mod webcam_input_edit;
-pub mod camera_input_preview;
-pub mod preview_viewport;

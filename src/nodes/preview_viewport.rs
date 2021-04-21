@@ -13,7 +13,5 @@ impl PreviewViewport {
     }
 
     #[export]
-    fn _ready(&self, _owner: &Viewport) {
-
-    }
+    fn _ready(&self, _owner: &Viewport) {}
 }

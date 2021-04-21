@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=2]
+[gd_scene load_steps=3 format=2]
 
 [ext_resource path="res://GDNative/ViewportHolder.gdns" type="Script" id=1]
+[ext_resource path="res://GDNative/CameraInputPreview.gdns" type="Script" id=2]
 
 [node name="VSplitContainer2" type="VSplitContainer"]
 margin_right = 462.0
@@ -45,6 +46,7 @@ margin_right = 462.0
 margin_bottom = 28.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
+script = ExtResource( 2 )
 
 [node name="VBoxContainer2" type="VBoxContainer" parent="."]
 margin_top = 40.0

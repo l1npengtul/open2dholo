@@ -68,6 +68,8 @@ fn init(handle: InitHandle) {
     handle.add_class::<nodes::settings_dialog::SettingsDialog>();
     handle.add_class::<nodes::about_dialog::AboutDialog>();
     handle.add_class::<nodes::error_quitter::ErrorQuitter>();
+    handle.add_class::<nodes::camera_input_preview::CameraInputPreview>();
+    handle.add_class::<nodes::preview_viewport::PreviewViewport>();
 }
 
 godot_init!(init);
