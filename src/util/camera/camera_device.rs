@@ -28,6 +28,7 @@ use crate::{
     },
 };
 use flume::{Receiver, Sender, TryRecvError};
+use gdnative::godot_print;
 use opencv::{
     core::{Mat, MatTrait, MatTraitManual, Vec3b},
     videoio::{
@@ -40,7 +41,6 @@ use ouroboros::self_referencing;
 use std::{
     cell::{Cell, RefCell},
     error::Error,
-    mem::size_of,
     mem::MaybeUninit,
     sync::{atomic::AtomicUsize, Arc},
 };
@@ -57,7 +57,6 @@ use v4l::{
     video::{capture::Parameters, traits::Capture},
     FourCC,
 };
-use gdnative::godot_print;
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice<'a> {
@@ -675,8 +674,8 @@ impl OpenCvCameraDevice {
     pub fn new(
         name: String,
         idx: u32,
-        frame: u32,
-        resolution: Resolution,
+        fps: u32,
+        res: Resolution,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let video_capture = {
             // generate video capture with auto detect backend
@@ -685,13 +684,7 @@ impl OpenCvCameraDevice {
                 Err(why) => ret_boxerr!(why),
             };
 
-            if let Err(why) = set_property_res(&mut v_cap, resolution) {
-                return Err(why);
-            }
-            if let Err(why) = set_property_fps(&mut v_cap, frame) {
-                return Err(why);
-            }
-            if let Err(why) = set_property_fourcc(&mut v_cap) {
+            if let Err(why) = set_properties(&mut v_cap, res, fps) {
                 return Err(why);
             }
 
@@ -700,8 +693,8 @@ impl OpenCvCameraDevice {
 
         Ok(OpenCvCameraDevice {
             name: RefCell::new(name),
-            res: Cell::new(resolution),
-            fps: Cell::new(frame),
+            res: Cell::new(res),
+            fps: Cell::new(fps),
             index: Cell::new(idx),
             video_capture,
         })
@@ -727,13 +720,7 @@ impl OpenCvCameraDevice {
                 Err(why) => ret_boxerr!(why),
             };
 
-            if let Err(why) = set_property_res(&mut v_cap, res.get()) {
-                return Err(why);
-            }
-            if let Err(why) = set_property_fps(&mut v_cap, fps.get()) {
-                return Err(why);
-            }
-            if let Err(why) = set_property_fourcc(&mut v_cap) {
+            if let Err(why) = set_properties(&mut v_cap, res.get(), fps.get()) {
                 return Err(why);
             }
 
@@ -978,6 +965,17 @@ impl<'a> Webcam<'a> for OpenCvCameraDevice {
     fn get_frame(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         self.get_next_frame()
     }
+}
+
+fn set_properties(
+    vc: &mut VideoCapture,
+    res: Resolution,
+    fps: u32,
+) -> Result<(), Box<dyn std::error::Error>> {
+    set_property_fourcc(vc)?;
+    set_property_res(vc, res)?;
+    set_property_fps(vc, fps)?;
+    Ok(())
 }
 
 fn set_property_res(

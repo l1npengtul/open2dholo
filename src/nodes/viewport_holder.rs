@@ -19,7 +19,7 @@ use crate::{
     processing::input_processor::InputProcesser,
     show_error,
     util::{
-        camera::device_utils::{DeviceFormat, PossibleDevice, Resolution},
+        camera::device_utils::{DeviceConfig, DeviceFormat, PossibleDevice, Resolution},
         misc::{Backend, BackendConfig},
     },
     wtf,
@@ -154,18 +154,19 @@ impl ViewportHolder {
             let device_exists = { self.input_processer.borrow().is_some() };
 
             if device_exists {
-                let possible = PossibleDevice::from_device_contact(
+                let dev_cfg: DeviceConfig = PossibleDevice::from_device_contact(
                     device_contact,
                     device_res,
                     device_fps as u32,
                     DeviceFormat::MJpeg,
-                );
+                )
+                .into();
                 wtf!(self
                     .input_processer
                     .borrow()
                     .as_ref()
                     .unwrap()
-                    .change_device(possible));
+                    .set_device_cfg(dev_cfg));
             } else {
                 let input_processer = match InputProcesser::from_device_contact(
                     device_contact,

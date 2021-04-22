@@ -460,6 +460,48 @@ impl<'a> PossibleDevice {
     pub fn fmt(&self) -> DeviceFormat {
         DeviceFormat::MJpeg
     }
+
+    pub fn change_config(self, dev_cfg: DeviceConfig) -> Self {
+        match self {
+            PossibleDevice::UniversalVideoCamera {
+                vendor_id,
+                product_id,
+                serial,
+                res: _,
+                fps: _,
+                fmt,
+            } => PossibleDevice::UniversalVideoCamera {
+                vendor_id,
+                product_id,
+                serial,
+                res: dev_cfg.res,
+                fps: dev_cfg.fps,
+                fmt,
+            },
+            PossibleDevice::Video4Linux2 {
+                location,
+                res: _,
+                fps: _,
+                fmt,
+            } => PossibleDevice::Video4Linux2 {
+                location,
+                res: dev_cfg.res,
+                fps: dev_cfg.fps,
+                fmt,
+            },
+            PossibleDevice::OpenComVision {
+                index,
+                res: _,
+                fps: _,
+                fmt,
+            } => PossibleDevice::OpenComVision {
+                index,
+                res: dev_cfg.res,
+                fps: dev_cfg.fps,
+                fmt,
+            },
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -605,7 +647,14 @@ pub struct DeviceConfig {
     pub res: Resolution,
     pub fps: u32,
 }
-
+impl From<PossibleDevice> for DeviceConfig {
+    fn from(val: PossibleDevice) -> Self {
+        DeviceConfig {
+            res: val.res(),
+            fps: val.fps(),
+        }
+    }
+}
 pub fn enumerate_cache_device() -> Option<HashMap<String, CachedDeviceList>> {
     let mut known_devices: HashMap<String, CachedDeviceList> = HashMap::new();
     // get device list from v4l2

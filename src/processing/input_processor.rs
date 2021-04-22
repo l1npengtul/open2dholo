@@ -4,17 +4,16 @@ use crate::{
     util::{
         camera::{
             camera_device::OpenCvCameraDevice,
-            device_utils::{DeviceContact, DeviceFormat, PossibleDevice, Resolution},
+            device_utils::{DeviceConfig, DeviceContact, DeviceFormat, PossibleDevice, Resolution},
             webcam::Webcam,
         },
         misc::{BackendConfig, FullyCalculatedPacket, MessageType},
     },
-    wtf,
 };
 use facial_processing::face_processor::FaceProcessorBuilder;
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
-use image::{ImageBuffer, Rgb};
+use image::ImageBuffer;
 use std::{
     cell::{Cell, RefCell},
     line,
@@ -86,6 +85,19 @@ impl InputProcesser {
         Ok(())
     }
 
+    pub fn set_device_cfg(&self, dev_cfg: DeviceConfig) -> Result<(), Box<dyn std::error::Error>> {
+        let current_possible = self.device.borrow().clone().change_config(dev_cfg);
+        self.device.replace(current_possible);
+        if self
+            .sender_tothread
+            .send(MessageType::ChangeDevice(dev_cfg))
+            .is_err()
+        {
+            return Err(Box::new(ThreadSendMessageError::CannotSend));
+        }
+        Ok(())
+    }
+
     pub fn query_gotten_results(&self) -> Vec<FullyCalculatedPacket> {
         let mut point_vec = Vec::new();
         for point in self.receiver_fromthread.drain() {
@@ -121,7 +133,7 @@ fn process_input(
     let init_fps = device.fps();
     let mut device = match OpenCvCameraDevice::from_possible_device("".to_string(), device) {
         Ok(d) => d,
-        Err(why) => return 255,
+        Err(_why) => return 255,
     };
 
     loop {
@@ -135,7 +147,10 @@ fn process_input(
                     name,
                     device: new_dev,
                 } => {
-                    device = match OpenCvCameraDevice::from_possible_device(name.unwrap_or("".to_string()), new_dev) {
+                    device = match OpenCvCameraDevice::from_possible_device(
+                        name.unwrap_or_else(|| "".to_string()),
+                        new_dev,
+                    ) {
                         Ok(webcam) => webcam,
                         Err(why) => {
                             godot_print!("died {}, {}", line!(), why.to_string());
@@ -178,12 +193,13 @@ fn process_input(
         let res = device.get_resolution().unwrap();
         let fps = device.get_framerate().unwrap();
         godot_print!("fps: {}", fps);
-        (&mut frame).reserve((res.x * res.y) as usize);
+        (&mut frame).reserve((res.x * res.y * 3) as usize);
 
         godot_print!("res: {}", res);
         let image = match ImageBuffer::from_raw(res.x, res.y, frame) {
             Some(v) => v,
             None => {
+                godot_print!("alloc_fail!");
                 continue;
             }
         };
@@ -213,27 +229,27 @@ fn process_input(
     }
 }
 
-fn get_dyn_webcam<'a>(
-    name: Option<String>,
-    device: PossibleDevice,
-) -> Result<Box<dyn Webcam<'a> + 'a>, Box<dyn std::error::Error>> {
-    let device_held: Box<dyn Webcam<'a>> = {
-        let ocvcam = match OpenCvCameraDevice::from_possible_device(
-            name.unwrap_or_else(|| "OpenCV Camera".to_string()),
-            device.clone(),
-        ) {
-            Ok(device) => device,
-            Err(why) => {
-                return Err(why);
-            }
-        };
-        handle_boxerr!(ocvcam.set_resolution(device.res()));
-        handle_boxerr!(ocvcam.set_framerate(device.fps()));
-        Box::new(ocvcam)
-    };
+// fn get_dyn_webcam<'a>(
+//     name: Option<String>,
+//     device: PossibleDevice,
+// ) -> Result<Box<dyn Webcam<'a> + 'a>, Box<dyn std::error::Error>> {
+//     let device_held: Box<dyn Webcam<'a>> = {
+//         let ocvcam = match OpenCvCameraDevice::from_possible_device(
+//             name.unwrap_or_else(|| "OpenCV Camera".to_string()),
+//             device.clone(),
+//         ) {
+//             Ok(device) => device,
+//             Err(why) => {
+//                 return Err(why);
+//             }
+//         };
+//         handle_boxerr!(ocvcam.set_resolution(device.res()));
+//         handle_boxerr!(ocvcam.set_framerate(device.fps()));
+//         Box::new(ocvcam)
+//     };
 
-    Ok(device_held)
-}
+//     Ok(device_held)
+// }
 
 // hack us election
 // make trump president
