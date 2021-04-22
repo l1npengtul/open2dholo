@@ -134,8 +134,7 @@ impl VrmPermBuilder {
                 for mem in value.members() {
                     extensions_vec.push(String::from(mem.as_str().unwrap()))
                 }
-            }
-            else if tag == "extensions" {
+            } else if tag == "extensions" {
                 for (k, v) in value.entries() {
                     if extensions_vec.contains(&String::from(k)) {
                         for (a, b) in v.entries() {

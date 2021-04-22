@@ -3,18 +3,21 @@ use crate::{
     handle_boxerr,
     util::{
         camera::{
-            camera_device::{OpenCvCameraDevice, UVCameraDevice, V4LinuxDevice},
+            camera_device::OpenCvCameraDevice,
             device_utils::{DeviceContact, DeviceFormat, PossibleDevice, Resolution},
             webcam::Webcam,
         },
         misc::{BackendConfig, FullyCalculatedPacket, MessageType},
     },
+    wtf,
 };
 use facial_processing::face_processor::FaceProcessorBuilder;
 use flume::{Receiver, Sender};
+use gdnative::godot_print;
 use image::{ImageBuffer, Rgb};
 use std::{
     cell::{Cell, RefCell},
+    line,
     thread::{Builder, JoinHandle},
 };
 
@@ -116,12 +119,13 @@ fn process_input(
         .unwrap();
     let init_res = device.res();
     let init_fps = device.fps();
-    let mut device = match get_dyn_webcam(None, device) {
-        Ok(webcam) => webcam,
-        Err(_) => return 255,
+    let mut device = match OpenCvCameraDevice::from_possible_device("".to_string(), device) {
+        Ok(d) => d,
+        Err(why) => return 255,
     };
 
     loop {
+        godot_print!("a");
         if let Ok(msg_recv) = message.try_recv() {
             match msg_recv {
                 MessageType::Die(code) => {
@@ -131,10 +135,20 @@ fn process_input(
                     name,
                     device: new_dev,
                 } => {
-                    device = match get_dyn_webcam(name, new_dev) {
+                    device = match OpenCvCameraDevice::from_possible_device(name.unwrap_or("".to_string()), new_dev) {
                         Ok(webcam) => webcam,
-                        Err(_) => return 255,
+                        Err(why) => {
+                            godot_print!("died {}, {}", line!(), why.to_string());
+                            return 255;
+                        }
                     };
+
+                    match device.open_stream() {
+                        Ok(_) => {}
+                        Err(why) => {
+                            godot_print!("died {}, {}", line!(), why.to_string());
+                        }
+                    }
                 }
                 MessageType::ChangeDevice(new_cfg) => {
                     let new_res = new_cfg.res;
@@ -150,15 +164,29 @@ fn process_input(
         }
 
         // get frame
-        let frame = match device.get_frame() {
-            Ok(f) => f,
-            Err(_) => {
+        let mut frame = match device.get_frame() {
+            Ok(f) => {
+                godot_print!("framelen: {}", f.len());
+                f
+            }
+            Err(why) => {
+                godot_print!("died {}, {}", line!(), why.to_string());
                 return 255;
             }
         };
+
         let res = device.get_resolution().unwrap();
-        let image: ImageBuffer<Rgb<u8>, Vec<u8>> =
-            ImageBuffer::from_raw(res.x, res.y, frame).unwrap();
+        let fps = device.get_framerate().unwrap();
+        godot_print!("fps: {}", fps);
+        (&mut frame).reserve((res.x * res.y) as usize);
+
+        godot_print!("res: {}", res);
+        let image = match ImageBuffer::from_raw(res.x, res.y, frame) {
+            Some(v) => v,
+            None => {
+                continue;
+            }
+        };
 
         // detections
         let bbox = processor.calculate_face_bboxes(&image);
@@ -178,8 +206,10 @@ fn process_input(
             })
             .is_err()
         {
+            godot_print!("died {}", line!());
             return 254;
         }
+        godot_print!("b");
     }
 }
 
@@ -187,64 +217,19 @@ fn get_dyn_webcam<'a>(
     name: Option<String>,
     device: PossibleDevice,
 ) -> Result<Box<dyn Webcam<'a> + 'a>, Box<dyn std::error::Error>> {
-    let device_held: Box<dyn Webcam<'a>> = match device {
-        PossibleDevice::UniversalVideoCamera {
-            vendor_id,
-            product_id,
-            serial,
-            res,
-            fps,
-            fmt: _fmt,
-        } => {
-            let uvcam: UVCameraDevice<'a> = match UVCameraDevice::new_camera(
-                vendor_id.map(i32::from),
-                product_id.map(i32::from),
-                serial,
-            ) {
-                Ok(camera) => camera,
-                Err(why) => {
-                    return Err(why);
-                }
-            };
-            handle_boxerr!(uvcam.set_framerate(fps));
-            handle_boxerr!(uvcam.set_resolution(res));
-            Box::new(uvcam)
-        }
-        PossibleDevice::Video4Linux2 {
-            location,
-            res,
-            fps,
-            fmt: _fmt,
-        } => {
-            let v4lcam = match V4LinuxDevice::new_location(location) {
-                Ok(device) => device,
-                Err(why) => {
-                    return Err(why);
-                }
-            };
-            handle_boxerr!(v4lcam.set_resolution(res));
-            handle_boxerr!(v4lcam.set_framerate(fps));
-            Box::new(v4lcam)
-        }
-        PossibleDevice::OpenComVision {
-            index: _index,
-            res,
-            fps,
-            fmt: _fmt,
-        } => {
-            let ocvcam = match OpenCvCameraDevice::from_possible_device(
-                name.unwrap_or_else(|| "OpenCV Camera".to_string()),
-                device,
-            ) {
-                Ok(device) => device,
-                Err(why) => {
-                    return Err(why);
-                }
-            };
-            handle_boxerr!(ocvcam.set_resolution(res));
-            handle_boxerr!(ocvcam.set_framerate(fps));
-            Box::new(ocvcam)
-        }
+    let device_held: Box<dyn Webcam<'a>> = {
+        let ocvcam = match OpenCvCameraDevice::from_possible_device(
+            name.unwrap_or_else(|| "OpenCV Camera".to_string()),
+            device.clone(),
+        ) {
+            Ok(device) => device,
+            Err(why) => {
+                return Err(why);
+            }
+        };
+        handle_boxerr!(ocvcam.set_resolution(device.res()));
+        handle_boxerr!(ocvcam.set_framerate(device.fps()));
+        Box::new(ocvcam)
     };
 
     Ok(device_held)

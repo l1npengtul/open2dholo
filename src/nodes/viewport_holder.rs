@@ -118,9 +118,9 @@ impl ViewportHolder {
 
     #[export]
     pub fn on_kill_signal(&self, _owner: TRef<VSplitContainer>) {
-        //     if let Some(mut input) = self.input_processer.replace(None) {
-        //         input.kill();
-        //     }
+        //if let Some(mut input) = self.input_processer.replace(None) {
+        //    input.kill();
+        //}
     }
 
     #[export]

@@ -57,6 +57,7 @@ use v4l::{
     video::{capture::Parameters, traits::Capture},
     FourCC,
 };
+use gdnative::godot_print;
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice<'a> {
@@ -852,28 +853,50 @@ impl OpenCvCameraDevice {
                 Err(why) => {
                     ret_boxerr!(why);
                 }
-            }
+            };
 
             if frame.size().unwrap().width > 0 {
                 if frame.is_continuous().unwrap() {
+                    godot_print!("cont");
                     // use a memcpy - we about to get f u n k y
                     let mut ret_vec: Vec<u8> = Vec::new();
-                    ret_vec.reserve_exact(
+                    ret_vec.reserve(
                         (frame.rows() * frame.cols() * frame.channels().unwrap_or(3)) as usize,
                     );
                     // make a scope so the vec outlives the pointer 100%
-                    {
-                        let vec_ptr = ret_vec.as_mut_ptr().cast(); // this looks, feels, and is probably a sin.
-                        let mat_ptr = frame.as_raw_Mat();
-                        unsafe {
-                            mat_ptr.copy_to_nonoverlapping(
-                                vec_ptr,
-                                (size_of::<u8>() as i32
-                                    * frame.rows()
-                                    * frame.cols()
-                                    * frame.channels().unwrap_or(3))
-                                    as usize,
-                            );
+                    // {
+                    //     let vec_ptr = ret_vec.as_mut_ptr().cast(); // this looks, feels, and is probably a sin.
+                    //     let mat_ptr = frame.as_raw_Mat();
+                    //     unsafe {
+                    //         mat_ptr.copy_to_nonoverlapping(
+                    //             vec_ptr,
+                    //             (size_of::<u8>() as i32
+                    //                 * frame.rows()
+                    //                 * frame.cols()
+                    //                 * frame.channels().unwrap_or(3))
+                    //                 as usize,
+                    //         );
+                    //     }
+                    // }
+                    for row in 0..(frame.rows() - 1) {
+                        let mat_rw = match frame.row(row) {
+                            Ok(m) => m,
+                            Err(why) => {
+                                dbg!("{}", why.to_string());
+                                ret_boxerr!(why);
+                            }
+                        };
+                        let slice = match mat_rw.data_typed::<Vec3b>() {
+                            Ok(sl) => sl,
+                            Err(why) => {
+                                dbg!("{}", why.to_string());
+                                ret_boxerr!(why);
+                            }
+                        };
+                        for px in slice {
+                            ret_vec.push(px.0[0]);
+                            ret_vec.push(px.0[1]);
+                            ret_vec.push(px.0[2]);
                         }
                     }
                     return Ok(ret_vec);
@@ -881,9 +904,11 @@ impl OpenCvCameraDevice {
                 // non continuous mat
                 // TODO: Fix
                 let mut ret_vec: Vec<u8> = Vec::new();
-                ret_vec.reserve_exact(
+                ret_vec.reserve(
                     (frame.rows() * frame.cols() * frame.channels().unwrap_or(3)) as usize,
                 );
+                godot_print!("!cont");
+
                 for row in 0..(frame.rows() - 1) {
                     let mat_rw = match frame.row(row) {
                         Ok(m) => m,

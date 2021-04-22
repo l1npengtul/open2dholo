@@ -94,6 +94,28 @@ macro_rules! wtf {
             }
         }
     }};
+    ($result:expr, $reason:expr) => {{
+        match $result {
+            Ok(a) => a,
+            Err(why) => {
+                let file: &'static str = std::file!();
+                let line: u32 = std::line!();
+                let cols: u32 = std::column!();
+                let why_str = format!("{}", $reason);
+                let os: &'static gdnative::api::OS = gdnative::api::OS::godot_singleton();
+                os.alert(
+                    format!(
+                        "Fatal Error at file {}, {}:{}. \nResult message: {}",
+                        file, line, cols, why_str
+                    ),
+                    format!("Open2DHolo Fatal Error"),
+                );
+                // get scene tree
+                // os.emit_signal("error_critical", &[Variant::from_i64(1)]);
+                std::process::exit(1);
+            }
+        }
+    }};
 }
 
 #[macro_export]
