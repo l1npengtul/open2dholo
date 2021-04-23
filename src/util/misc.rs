@@ -21,7 +21,7 @@ use facial_processing::utils::{
     misc::{BackendProviders, EulerAngles},
 };
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::{fs::File, io::Read};
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
@@ -445,5 +445,51 @@ impl ModelReference {
     /// Get a reference to the model reference's vrm style perms.
     pub fn vrm_style_perms(&self) -> &Option<VRMStylePermissions> {
         &self.vrm_style_perms
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct ArbitaryVecRead {
+    held_data: Vec<u8>,
+}
+
+impl ArbitaryVecRead {
+    pub fn new(data: Vec<u8>) -> Self {
+        ArbitaryVecRead {
+            held_data: data
+        }
+    }
+
+    pub fn replace(&mut self, new_data: Vec<u8>) -> Vec<u8> {
+        std::mem::replace(&mut self.held_data, new_data)
+    }
+}
+
+#[allow(clippy::needless_range_loop)]
+impl Read for ArbitaryVecRead {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut iter = self.held_data.iter();
+        for i in 0..buf.len() {
+            if let Some(byte) = iter.next() {
+                buf[i] = *(byte as &u8);
+            }
+            else {
+                return Ok(i);
+            }
+        }
+        Ok(buf.len())
+    }
+
+    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
+        let mut iter = self.held_data.iter();
+        for i in 0..buf.len() {
+            if let Some(byte) = iter.next() {
+                buf.push(*(byte as &u8));
+            }
+            else {
+                return Ok(i);
+            }
+        }
+        Ok(buf.len())
     }
 }

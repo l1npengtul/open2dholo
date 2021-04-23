@@ -149,7 +149,7 @@ fn process_input(
                 } => {
                     device = match OpenCvCameraDevice::from_possible_device(
                         name.unwrap_or_else(|| "".to_string()),
-                        new_dev,
+                        new_dev.clone(),
                     ) {
                         Ok(webcam) => webcam,
                         Err(why) => {
@@ -179,7 +179,7 @@ fn process_input(
         }
 
         // get frame
-        let mut frame = match device.get_frame() {
+        let mut frame_data = match device.get_frame() {
             Ok(f) => {
                 godot_print!("framelen: {}", f.len());
                 f
@@ -189,30 +189,29 @@ fn process_input(
                 return 255;
             }
         };
-
         let res = device.get_resolution().unwrap();
-        let fps = device.get_framerate().unwrap();
-        godot_print!("fps: {}", fps);
-        (&mut frame).reserve((res.x * res.y * 3) as usize);
+        frame_data.resize((res.x*res.y*3) as usize, 0_u8);
 
-        godot_print!("res: {}", res);
-        let image = match ImageBuffer::from_raw(res.x, res.y, frame) {
-            Some(v) => v,
+        let framebuf = match ImageBuffer::from_raw(res.y, res.x, frame_data) {
+            Some(v) => {
+                v
+            }
             None => {
-                godot_print!("alloc_fail!");
+                godot_print!("no frame");
                 continue;
             }
         };
 
         // detections
-        let bbox = processor.calculate_face_bboxes(&image);
+        let bbox = processor.calculate_face_bboxes(&framebuf);
         if bbox.is_empty() {
+            godot_print!("no face");
             continue;
         }
-        let face_landmarks = processor.calculate_landmark(&image, *bbox.get(0).unwrap());
-        let eyes = processor.calculate_eyes(face_landmarks.clone(), &image);
+        let face_landmarks = processor.calculate_landmark(&framebuf, *bbox.get(0).unwrap());
+        let eyes = processor.calculate_eyes(face_landmarks.clone(), &framebuf);
         let pnp = processor
-            .calculate_pnp(&image, face_landmarks.clone())
+            .calculate_pnp(&framebuf, face_landmarks.clone())
             .unwrap();
         if sender
             .send(FullyCalculatedPacket {
@@ -228,6 +227,7 @@ fn process_input(
         godot_print!("b");
     }
 }
+
 
 // fn get_dyn_webcam<'a>(
 //     name: Option<String>,
