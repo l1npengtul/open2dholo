@@ -21,7 +21,8 @@ use facial_processing::utils::{
     misc::{BackendProviders, EulerAngles},
 };
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::{fs::File, io::Read};
+use std::ops::Deref;
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
@@ -445,5 +446,51 @@ impl ModelReference {
     /// Get a reference to the model reference's vrm style perms.
     pub fn vrm_style_perms(&self) -> &Option<VRMStylePermissions> {
         &self.vrm_style_perms
+    }
+}
+
+
+pub struct ArbitaryVecRead<T> {
+    held_data: Vec<T>,
+}
+
+impl<T> ArbitaryVecRead<T> {
+    pub fn new(data: Vec<T>) -> Self {
+        ArbitaryVecRead {
+            held_data: data
+        }
+    }
+
+    pub fn replace(&mut self, new_data: Vec<T>) -> Vec<T> {
+        std::mem::replace(&mut self.held_data, new_data)
+    }
+}
+
+impl<T> Deref for ArbitaryVecRead<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.held_data
+    }
+}
+
+impl<T: Clone> Clone for ArbitaryVecRead<T> {
+    fn clone(&self) -> Self {
+        let new_data = self.held_data.clone();
+        ArbitaryVecRead {
+            held_data: new_data
+        }
+    }
+}
+
+impl<T> Read for ArbitaryVecRead<T> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let length = self.held_data.len();
+        let data_as_buf = unsafe {self.held_data.as_slice().as_mut_ptr().cast::<u8>() };
+        let new_mut_slice = unsafe {
+            std::slice::from_raw_parts_mut(data_as_buf, length)
+        };
+        *buf = new_mut_slice;
+        Ok(length)
     }
 }

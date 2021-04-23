@@ -13,7 +13,7 @@ use crate::{
 use facial_processing::face_processor::FaceProcessorBuilder;
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
-use image::ImageBuffer;
+use image::{ImageBuffer, Rgb};
 use std::{
     cell::{Cell, RefCell},
     line,
@@ -135,6 +135,7 @@ fn process_input(
         Ok(d) => d,
         Err(_why) => return 255,
     };
+    let mut save = false;
 
     loop {
         godot_print!("a");
@@ -149,7 +150,7 @@ fn process_input(
                 } => {
                     device = match OpenCvCameraDevice::from_possible_device(
                         name.unwrap_or_else(|| "".to_string()),
-                        new_dev,
+                        new_dev.clone(),
                     ) {
                         Ok(webcam) => webcam,
                         Err(why) => {
@@ -179,7 +180,7 @@ fn process_input(
         }
 
         // get frame
-        let mut frame = match device.get_frame() {
+        let frame_data = match device.get_frame() {
             Ok(f) => {
                 godot_print!("framelen: {}", f.len());
                 f
@@ -189,30 +190,29 @@ fn process_input(
                 return 255;
             }
         };
-
         let res = device.get_resolution().unwrap();
-        let fps = device.get_framerate().unwrap();
-        godot_print!("fps: {}", fps);
-        (&mut frame).reserve((res.x * res.y * 3) as usize);
+        let framebuf = ImageBuffer::from_fn(res.y, res.x, |x,y| {
+            let base_idx = ((x*y)+y)*3;
+            let r: u8 = *frame_data.get(base_idx as usize).unwrap_or(&0);
+            let g: u8 = *frame_data.get((base_idx+1) as usize).unwrap_or(&0);
+            let b: u8 = *frame_data.get((base_idx+2) as usize).unwrap_or(&0);
+            Rgb([r,g,b])
+        });
 
-        godot_print!("res: {}", res);
-        let image = match ImageBuffer::from_raw(res.x, res.y, frame) {
-            Some(v) => v,
-            None => {
-                godot_print!("alloc_fail!");
-                continue;
-            }
-        };
-
+        if !save {
+            framebuf.save("/home/linpengtulewis/IdeaProjects/open2dholo/pog.png").unwrap();
+            save = true;
+        }
         // detections
-        let bbox = processor.calculate_face_bboxes(&image);
+        let bbox = processor.calculate_face_bboxes(&framebuf);
         if bbox.is_empty() {
+            godot_print!("no face");
             continue;
         }
-        let face_landmarks = processor.calculate_landmark(&image, *bbox.get(0).unwrap());
-        let eyes = processor.calculate_eyes(face_landmarks.clone(), &image);
+        let face_landmarks = processor.calculate_landmark(&framebuf, *bbox.get(0).unwrap());
+        let eyes = processor.calculate_eyes(face_landmarks.clone(), &framebuf);
         let pnp = processor
-            .calculate_pnp(&image, face_landmarks.clone())
+            .calculate_pnp(&framebuf, face_landmarks.clone())
             .unwrap();
         if sender
             .send(FullyCalculatedPacket {
@@ -228,6 +228,7 @@ fn process_input(
         godot_print!("b");
     }
 }
+
 
 // fn get_dyn_webcam<'a>(
 //     name: Option<String>,
