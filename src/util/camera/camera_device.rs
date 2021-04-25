@@ -41,7 +41,7 @@ use ouroboros::self_referencing;
 use std::{
     cell::{Cell, RefCell},
     error::Error,
-    mem::MaybeUninit,
+    mem::{MaybeUninit, size_of},
     sync::{atomic::AtomicUsize, Arc},
 };
 use usb_enumeration::enumerate;
@@ -57,6 +57,9 @@ use v4l::{
     video::{capture::Parameters, traits::Capture},
     FourCC,
 };
+
+// TODO: Split me out into a different crate!
+// Let the people have a cross-platform native Webcam library!
 
 // USE set_format for v4l2 device
 pub struct V4LinuxDevice<'a> {

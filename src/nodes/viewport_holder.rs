@@ -110,8 +110,8 @@ impl ViewportHolder {
     pub fn _process(&self, _owner: TRef<VSplitContainer>, _delta: f32) {
         if let Some(input) = &*self.input_processer.borrow() {
             let results = input.query_gotten_results();
-            for _pkt in results {
-                godot_print!("a")
+            for pkt in results {
+                
             } // TODO: Remove
         }
     }
