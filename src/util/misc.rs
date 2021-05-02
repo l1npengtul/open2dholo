@@ -16,9 +16,7 @@
 
 use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution};
 use facial_processing::utils::{
-    eyes::Eye,
-    face::FaceLandmark,
-    misc::{BackendProviders, EulerAngles},
+    misc::{BackendProviders, EulerAngles, Point2D},
 };
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read};
@@ -78,9 +76,10 @@ impl BackendConfig {
 
 #[derive(Clone)]
 pub struct FullyCalculatedPacket {
-    pub landmarks: FaceLandmark,
+    // pub landmarks: FaceLandmark,
+    pub landmarks: Vec<Point2D>,
     pub euler: EulerAngles,
-    pub eye_positions: [Eye; 2],
+    // pub eye_positions: [Eye; 2],
 }
 
 // TODO: Add serde serialize/deserialize to RON or equivalent
@@ -455,9 +454,7 @@ pub struct ArbitaryVecRead {
 
 impl ArbitaryVecRead {
     pub fn new(data: Vec<u8>) -> Self {
-        ArbitaryVecRead {
-            held_data: data
-        }
+        ArbitaryVecRead { held_data: data }
     }
 
     pub fn replace(&mut self, new_data: Vec<u8>) -> Vec<u8> {
@@ -472,8 +469,7 @@ impl Read for ArbitaryVecRead {
         for i in 0..buf.len() {
             if let Some(byte) = iter.next() {
                 buf[i] = *(byte as &u8);
-            }
-            else {
+            } else {
                 return Ok(i);
             }
         }
@@ -485,8 +481,7 @@ impl Read for ArbitaryVecRead {
         for i in 0..buf.len() {
             if let Some(byte) = iter.next() {
                 buf.push(*(byte as &u8));
-            }
-            else {
+            } else {
                 return Ok(i);
             }
         }

@@ -28,10 +28,10 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::missing_panics_doc)]
-#![allow(clippy::clippy::single_match_else)]
-#![allow(clippy::clippy::similar_names)]
+#![allow(clippy::single_match_else)]
+#![allow(clippy::similar_names)]
 #![allow(clippy::never_loop)]
-#![allow(clippy::clippy::too_many_arguments)]
+#![allow(clippy::too_many_arguments)]
 #![allow(clippy::upper_case_acronyms)]
 use crate::util::camera::device_utils::DeviceContact;
 use gdnative::prelude::*;
@@ -57,7 +57,14 @@ thread_local! {
     pub(crate) static CURRENT_DEVICE: Rc<RefCell<Option<DeviceContact>>> = Rc::new(RefCell::new(None));
 }
 
+#[cfg(unix)]
+fn global_load_gthread() {}
+
+#[cfg(windows)]
+fn global_load_gthread() {}
+
 fn init(handle: InitHandle) {
+    global_load_gthread();
     handle.add_class::<nodes::open2dholoctrl::Open2DHoloCtrl>();
     handle.add_class::<nodes::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<nodes::webcam_input_edit::WebcamInputEditor>();

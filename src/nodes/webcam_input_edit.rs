@@ -186,7 +186,7 @@ impl WebcamInputEditor {
 
         face_detection_settings.set_disable_folding(false);
         face_detection_settings.set_collapsed(true);
-        face_detection_settings.set_text(0, "Face Detection Input Settigns");
+        face_detection_settings.set_text(0, "Face Detection Input Settings");
         face_detection_settings.set_text_align(0, TreeItem::ALIGN_CENTER);
         face_detection_settings.set_selectable(1, false);
 
@@ -314,6 +314,7 @@ impl WebcamInputEditor {
                                 res_vec_sorted.push(*res)
                             }
                             res_vec_sorted.sort();
+                            res_vec_sorted.reverse();
                             for (id_cnt, res) in res_vec_sorted.into_iter().enumerate() {
                                 resolution_popup.add_item(format!("{}", res), id_cnt as i64, -1);
                             }

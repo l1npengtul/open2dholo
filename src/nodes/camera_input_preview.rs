@@ -39,12 +39,15 @@ impl CameraInputPreview {
 
     // Draw points here
     #[export]
-    fn _draw(&self, owner: &Control) {
+    fn _draw(&self, owner: TRef<Control>) {
         let current_size = owner.size();
         let ratio = (self.x_max.get() / current_size.x).min(self.y_max.get() / current_size.y);
         for v2 in self.processed_68pt_normalized.borrow().iter() {
             owner.draw_circle(
-                Vector2::new(v2.x / ratio, v2.y / ratio),
+                Vector2::new(
+                    (v2.x / ratio) - current_size.x / 2_f32,
+                    (v2.y / ratio) - current_size.y / 2_f32,
+                ),
                 1.0_f64,
                 Color::rgb(255_f32, 255_f32, 255_f32),
             )
@@ -52,9 +55,9 @@ impl CameraInputPreview {
     }
 
     #[export]
-    pub fn on_new_processed_frame_68pt(&self, _owner: TRef<Control>, pointarray: Variant) {
+    pub fn on_new_processed_frame_68pt(&self, owner: TRef<Control>, pointarray: Variant) {
         let vec2_arr = pointarray.to_vector2_array();
-        if vec2_arr.len() == 68 {
+        if !vec2_arr.is_empty() {
             let mut x_mx = 0_f32;
             let mut y_mx = 0_f32;
             let mut vec = vec![];
@@ -72,5 +75,6 @@ impl CameraInputPreview {
             self.x_max.set(x_mx);
             self.y_max.set(y_mx);
         }
+        CanvasItem::update(&owner)
     }
 }

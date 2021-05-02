@@ -22,13 +22,15 @@ use crate::{
     ret_boxerr,
     util::camera::{
         device_utils::{
-            get_os_webcam_index, DeviceContact, DeviceFormat, PathIndex, PossibleDevice, Resolution,
+            get_os_webcam_index, DeviceContact, DeviceFormat, PathIndex, PossibleDevice,
+            Resolution,
         },
         webcam::{QueryCamera, Webcam, WebcamType},
     },
 };
 use flume::{Receiver, Sender, TryRecvError};
 use gdnative::godot_print;
+use mozjpeg::Decompress;
 use opencv::{
     core::{Mat, MatTrait, MatTraitManual, Vec3b},
     videoio::{
@@ -40,8 +42,11 @@ use opencv::{
 use ouroboros::self_referencing;
 use std::{
     cell::{Cell, RefCell},
+    convert::TryInto,
     error::Error,
-    mem::{MaybeUninit, size_of},
+    mem::MaybeUninit,
+    ops::Deref,
+    slice::from_raw_parts,
     sync::{atomic::AtomicUsize, Arc},
 };
 use usb_enumeration::enumerate;
@@ -135,7 +140,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
     }
 
     fn set_resolution(&self, res: Resolution) -> Result<(), Box<dyn std::error::Error>> {
-        let mut v4l2_format = FourCC::new(b"YUYV");
+        let mut v4l2_format = FourCC::new(b"MJPG");
         match self.device_format.get() {
             DeviceFormat::Yuyv => {}
             DeviceFormat::MJpeg => {
@@ -186,7 +191,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
 
     fn open_stream(&self) -> Result<(), Box<dyn std::error::Error>> {
         if !self.opened.get() {
-            return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 4) {
+            return match Stream::with_buffers(&*self.inner.borrow_mut(), Type::VideoCapture, 60) {
                 Ok(stream) => {
                     *self.device_stream.borrow_mut() = Some(RefCell::new(stream));
                     self.opened.set(true);
@@ -204,7 +209,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
                 Some(stream) => {
                     let a = &mut *stream.borrow_mut();
                     match a.next() {
-                        Ok(fr) => Ok(fr.0.to_vec()),
+                        Ok(fr) => Ok(convert_mjpeg_rgb24(fr.0)),
                         Err(why) => {
                             ret_boxerr!(why)
                         }
@@ -225,7 +230,7 @@ impl<'a> Webcam<'a> for V4LinuxDevice<'a> {
 
 impl<'a> QueryCamera<'a> for V4LinuxDevice<'a> {
     fn get_supported_resolutions(&self) -> Result<Vec<Resolution>, Box<dyn std::error::Error>> {
-        let mut v4l2_format = FourCC::new(b"YUYV");
+        let mut v4l2_format = FourCC::new(b"MJPG");
         match self.device_format.get() {
             DeviceFormat::Yuyv => {}
             DeviceFormat::MJpeg => {
@@ -260,7 +265,7 @@ impl<'a> QueryCamera<'a> for V4LinuxDevice<'a> {
         &self,
         res: Resolution,
     ) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
-        let mut v4l2_format = FourCC::new(b"YUYV");
+        let mut v4l2_format = FourCC::new(b"MJPG");
         match self.device_format.get() {
             DeviceFormat::Yuyv => {}
             DeviceFormat::MJpeg => {
@@ -580,7 +585,7 @@ impl<'a> Webcam<'a> for UVCameraDevice<'a> {
                 Err(why) => Err(why),
             });
         match frame {
-            Ok(v) => Ok(v),
+            Ok(v) => Ok(convert_mjpeg_rgb24(v)),
             Err(why) => {
                 ret_boxerr!(why)
             }
@@ -787,7 +792,7 @@ impl OpenCvCameraDevice {
             .borrow()
             .get(CAP_PROP_FRAME_WIDTH)
             .unwrap();
-        Resolution::new(a as u32, b as u32)
+        Resolution::new(b as u32, a as u32)
     }
 
     fn fps(&self) -> u32 {
@@ -828,8 +833,16 @@ impl OpenCvCameraDevice {
     }
 
     fn open_stream_inner(&self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.video_capture.borrow().is_opened().unwrap_or(false) {
-            ret_boxerr!(CannotOpenStream("Cannot Open OPENCV stream!".to_string()))
+        {
+            match self.video_capture.borrow_mut().open_1(
+                self.index.get().try_into().unwrap(),
+                get_api_pref_int() as i32,
+            ) {
+                Ok(_) => {}
+                Err(why) => {
+                    ret_boxerr!(why);
+                }
+            }
         }
         Ok(())
     }
@@ -884,9 +897,9 @@ impl OpenCvCameraDevice {
                             }
                         };
                         for px in slice {
-                            ret_vec.push(px.0[0]);
-                            ret_vec.push(px.0[1]);
                             ret_vec.push(px.0[2]);
+                            ret_vec.push(px.0[1]);
+                            ret_vec.push(px.0[0]);
                         }
                     }
                     return Ok(ret_vec);
@@ -915,9 +928,9 @@ impl OpenCvCameraDevice {
                         }
                     };
                     for px in slice {
-                        ret_vec.push(px.0[0]);
-                        ret_vec.push(px.0[1]);
                         ret_vec.push(px.0[2]);
+                        ret_vec.push(px.0[1]);
+                        ret_vec.push(px.0[0]);
                     }
                 }
                 dbg!("aaa");
@@ -1051,4 +1064,14 @@ fn get_api_pref_int() -> u32 {
         "windows" => CAP_MSMF as u32,
         &_ => CAP_ANY as u32,
     }
+}
+
+#[inline]
+fn convert_mjpeg_rgb24<S: Deref<Target = [u8]>>(data: S) -> Vec<u8> {
+    let mut decompressor = Decompress::new_mem(data.as_ref()).unwrap().rgb().unwrap();
+    let decomp = decompressor.read_scanlines::<[u8; 3]>().unwrap();
+    unsafe {
+        &*(from_raw_parts(decomp.as_ptr(), data.len() * 3) as *const [[u8; 3]] as *const [u8])
+    }
+    .to_vec()
 }

@@ -1,21 +1,48 @@
-use crate::{error::thread_send_message_error::ThreadSendMessageError, globalize_path, handle_boxerr, util::{
+use crate::{
+    error::thread_send_message_error::ThreadSendMessageError,
+    globalize_path, handle_boxerr, mat_init,
+    util::{
         camera::{
             camera_device::{OpenCvCameraDevice, UVCameraDevice, V4LinuxDevice},
             device_utils::{DeviceConfig, DeviceContact, DeviceFormat, PossibleDevice, Resolution},
             webcam::Webcam,
         },
         misc::{BackendConfig, FullyCalculatedPacket, MessageType},
-    }};
-use facial_processing::{face_processor::FaceProcessorBuilder, utils::misc::BackendProviders};
+    },
+    vector,
+};
+use cv_convert::TryFromCv;
+use dlib_face_recognition::{
+    FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
+};
+use facial_processing::{
+    error::FacialProcessingError,
+    utils::{
+        face::FaceLandmark,
+        misc::{BoundingBox, EulerAngles, PnPArguments, Point2D},
+    },
+};
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
-use image::ImageBuffer;
-use openvtuber_rs::FaceDetectionBuilder;
+use image::{ImageBuffer, Rgb};
+use nalgebra::Matrix3;
+use opencv::{
+    calib3d::{
+        rodrigues, rq_decomp3x3, solve_pnp, solve_pnp_ransac, SOLVEPNP_AP3P, SOLVEPNP_DLS,
+        SOLVEPNP_EPNP, SOLVEPNP_IPPE, SOLVEPNP_IPPE_SQUARE, SOLVEPNP_ITERATIVE, SOLVEPNP_MAX_COUNT,
+         SOLVEPNP_UPNP,
+    },
+    core::{
+        Mat, MatExprTrait, Point2d, Point3d, ToInputArray, ToOutputArray, Vector,
+         CV_64F,
+    },
+};
 use std::{
     cell::{Cell, RefCell},
     line,
     thread::{Builder, JoinHandle},
 };
+
 
 pub struct InputProcesser {
     device: RefCell<PossibleDevice>,
@@ -116,28 +143,31 @@ impl InputProcesser {
 }
 
 fn process_input(
-    cfg: BackendConfig,
+    _cfg: BackendConfig,
     device: PossibleDevice,
     sender: Sender<FullyCalculatedPacket>,
     message: Receiver<MessageType>,
 ) -> u8 {
-    let processor = FaceDetectionBuilder::new("");
     let init_res = device.res();
     let init_fps = device.fps();
-    let mut device =  match get_dyn_webcam(None, device) {
+    let face_detector = FaceDetector::new();
+    let mut device = match get_dyn_webcam(Some("".to_string()), device) {
         Ok(webcam) => webcam,
         Err(_) => return 255,
     };
+    let ld_detector = LandmarkPredictor::new(globalize_path!(
+        "res://models/facial-processing-rs-models/shape_predictor_68_face_landmarks.dat"
+    ))
+    .unwrap();
 
     match device.open_stream() {
         Ok(_) => {}
         Err(why) => {
             godot_print!("died {}, {}", line!(), why.to_string());
         }
-    }
+    };
 
     loop {
-        godot_print!("a");
         if let Ok(msg_recv) = message.try_recv() {
             match msg_recv {
                 MessageType::Die(code) => {
@@ -187,11 +217,12 @@ fn process_input(
             }
         };
         let res = device.get_resolution().unwrap();
-        frame_data.resize((res.x*res.y*3) as usize, 0_u8);
+        frame_data.resize((res.x * res.y * 3) as usize, 0_u8);
 
-        let framebuf = match ImageBuffer::from_raw(res.y, res.x, frame_data) {
+        let framebuf = match ImageBuffer::from_raw(res.x, res.y, frame_data) {
             Some(v) => {
-                v
+                let img_buf: ImageBuffer<Rgb<u8>, Vec<u8>> = v;
+                ImageMatrix::from_image(&img_buf)
             }
             None => {
                 godot_print!("no frame");
@@ -199,33 +230,42 @@ fn process_input(
             }
         };
 
-        // detections
-        let bbox = processor.calculate_face_bboxes(&framebuf);
-        if bbox.is_empty() {
-            godot_print!("no face");
-            continue;
+        for rect in face_detector.face_locations(&framebuf).iter() {
+            let landmarks = ld_detector.face_landmarks(&framebuf, rect);
+
+            let mut pt_vec = vec![];
+            let mut point_vec = vec![];
+            for lm_point in landmarks.iter() {
+                pt_vec.push(Point2D {
+                    x: lm_point.x() as f64,
+                    y: lm_point.y() as f64,
+                });
+                point_vec.push(*lm_point)
+            }
+
+            let facelandmark = FaceLandmark::from_dlib(BoundingBox::from(*rect), point_vec);
+
+            let pnp = EulerAngles {
+                x: 0_f64,
+                y: 0_f64,
+                z: 0_f64,
+            };
+
+
+
+            if sender
+                .send(FullyCalculatedPacket {
+                    landmarks: pt_vec,
+                    euler: pnp,
+                })
+                .is_err()
+            {
+                godot_print!("died {}", line!());
+                return 254;
+            }
         }
-        let face_landmarks = processor.calculate_landmark(&framebuf, *bbox.get(0).unwrap());
-        let eyes = processor.calculate_eyes(face_landmarks.clone(), &framebuf);
-        let pnp = processor
-            .calculate_pnp(&framebuf, face_landmarks.clone())
-            .unwrap();
-        if sender
-            .send(FullyCalculatedPacket {
-                landmarks: face_landmarks,
-                euler: pnp,
-                eye_positions: eyes,
-            })
-            .is_err()
-        {
-            godot_print!("died {}", line!());
-            return 254;
-        }
-        godot_print!("b");
     }
 }
-
-
 
 fn get_dyn_webcam<'a>(
     name: Option<String>,
@@ -294,6 +334,216 @@ fn get_dyn_webcam<'a>(
     Ok(device_held)
 }
 
+pub struct PnPSolver {
+    face_3d: Vector<Point3d>,
+    camera_res: Point2D,
+    camera_distortion: Mat,
+    camera_matrix: Mat,
+    pnp_mode: i32,
+    pnp_extrinsic: bool,
+    pnp_args: PnPArguments,
+}
+impl PnPSolver {
+    pub fn new(
+        camera_res: Point2D,
+        calc_mode: Option<i32>,
+        pnp_args: PnPArguments,
+    ) -> Result<Self, FacialProcessingError> {
+        // Fake 3D Model definition
+        let face_3d: Vector<Point3d> = vector![
+            Point3d::new(0.0, 0.0, 0.0),          // Nose Tip
+            Point3d::new(0.0, -330.0, -65.0),     // Chin
+            Point3d::new(-225.0, 170.0, -135.0),  // Left corner left eye
+            Point3d::new(225.0, 170.0, -135.0),   // Right corner right eye
+            Point3d::new(-150.0, -150.0, -125.0), // Mouth Corner left
+            Point3d::new(150.0, -150.0, -125.0)   // Mouth Corner right
+        ];
+
+        let focal_len = camera_res.x;
+        let center = Point2D::new(camera_res.x / 2_f64, camera_res.y / 2_f64);
+        let camera_matrix_na: Matrix3<f64> = Matrix3::from_row_slice(&[
+            focal_len, 0.0, center.x, 0.0, focal_len, center.y, 0.0, 0.0, 1.0,
+        ]);
+        let camera_matrix = match Mat::try_from_cv(camera_matrix_na) {
+            Ok(m) => m,
+            Err(why) => {
+                return Err(FacialProcessingError::InitializeError(why.to_string()));
+            }
+        };
+
+        let camera_distortion = match Mat::zeros(4, 1, CV_64F) {
+            Ok(mut m) => m.a(),
+            Err(why) => {
+                return Err(FacialProcessingError::InitializeError(why.to_string()));
+            }
+        };
+
+        let pnp_mode = match calc_mode {
+            Some(mode) => match mode {
+                SOLVEPNP_AP3P | SOLVEPNP_DLS | SOLVEPNP_ITERATIVE | SOLVEPNP_IPPE
+                | SOLVEPNP_IPPE_SQUARE | SOLVEPNP_MAX_COUNT | SOLVEPNP_EPNP | SOLVEPNP_UPNP => mode,
+                _ => {
+                    return Err(FacialProcessingError::InitializeError(format!(
+                        "{} is not a valid PNP setting!",
+                        mode
+                    )))
+                }
+            },
+            None => SOLVEPNP_EPNP,
+        };
+
+        Ok(PnPSolver {
+            face_3d,
+            camera_res,
+            camera_distortion,
+            camera_matrix,
+            pnp_mode,
+            pnp_extrinsic: false,
+            pnp_args,
+        })
+    }
+
+    pub fn raw_forward(
+        &self,
+        data: FaceLandmark,
+    ) -> Result<(Vector<f64>, Vector<f64>), FacialProcessingError> {
+        match &self.pnp_args {
+            PnPArguments::NoRandsc => {
+                let mut rvec = Vector::new();
+                let mut tvec = Vector::new();
+                godot_print!("3");
+
+                let mut fp: Vector<Point2d> = Vector::new();
+                for pt in data.pnp_landmarks().to_vec() {
+                    fp.push(Point2D::into(pt))
+                }
+                godot_print!("3");
+
+                godot_print!(
+                    "{}: {:#?}",
+                    &self.face_3d.as_slice().len(),
+                    &self.face_3d.as_slice()
+                );
+                godot_print!("{}: {:#?}", &fp.as_slice().len(), &fp.as_slice());
+                godot_print!("{:#?}", &self.camera_matrix);
+                godot_print!("{:#?}", &self.camera_distortion);
+
+                match solve_pnp(
+                    &self.face_3d.input_array().unwrap(),
+                    &fp.input_array().unwrap(),
+                    &self.camera_matrix.input_array().unwrap(),
+                    &self.camera_distortion.input_array().unwrap(),
+                    &mut rvec.output_array().unwrap(),
+                    &mut tvec.output_array().unwrap(),
+                    self.pnp_extrinsic,
+                    self.pnp_mode,
+                ) {
+                    Ok(b) => {
+                        godot_print!("3");
+
+                        if b {
+                            return Ok((rvec, tvec));
+                        }
+                        Err(FacialProcessingError::InternalError(
+                            "PnP Calculation failed".to_string(),
+                        ))
+                    }
+                    Err(why) => Err(FacialProcessingError::InternalError(why.to_string())),
+                }
+            }
+            PnPArguments::Randsc {
+                iter,
+                reproj,
+                conf,
+                inliner: _inliner,
+            } => {
+                let mut rvec = Vector::new();
+                let mut tvec = Vector::new();
+                let mut fp: Vector<Point2d> = Vector::new();
+                for pt in data.pnp_landmarks().to_vec() {
+                    fp.push(Point2D::into(pt))
+                }
+                let mut il = opencv::core::no_array().unwrap();
+                match solve_pnp_ransac(
+                    &self.face_3d.input_array().unwrap(),
+                    &fp.input_array().unwrap(),
+                    &self.camera_matrix.input_array().unwrap(),
+                    &self.camera_distortion.input_array().unwrap(),
+                    &mut rvec.output_array().unwrap(),
+                    &mut tvec.output_array().unwrap(),
+                    self.pnp_extrinsic,
+                    *iter,
+                    *reproj,
+                    *conf,
+                    &mut il.output_array().unwrap(),
+                    SOLVEPNP_EPNP,
+                ) {
+                    Ok(b) => {
+                        if b {
+                            return Ok((rvec, tvec));
+                        }
+                        Err(FacialProcessingError::InternalError(
+                            "PnP Calculation failed".to_string(),
+                        ))
+                    }
+                    Err(why) => Err(FacialProcessingError::InternalError(why.to_string())),
+                }
+            }
+        }
+    }
+
+    pub fn forward(&self, data: FaceLandmark) -> Result<EulerAngles, FacialProcessingError> {
+        godot_print!("2");
+        match self.raw_forward(data) {
+            Ok((rvec, _tvec)) => {
+                godot_print!("2");
+                let mut dest = mat_init!();
+                let mut jackobin = mat_init!();
+                godot_print!("2");
+                if let Err(why) = rodrigues(
+                    &rvec.input_array().unwrap(),
+                    &mut dest.output_array().unwrap(),
+                    &mut jackobin.output_array().unwrap(),
+                ) {
+                    return Err(FacialProcessingError::InternalError(format!(
+                        "Failed to calculate rodrigues: {}",
+                        why.to_string()
+                    )));
+                }
+                godot_print!("2");
+
+                let mut mtx_r = mat_init!();
+                let mut mtx_q = mat_init!();
+                let mut qx = mat_init!();
+                let mut qy = mat_init!();
+                let mut qz = mat_init!();
+                godot_print!("2");
+                match rq_decomp3x3(
+                    &dest.input_array().unwrap(),
+                    &mut mtx_r.output_array().unwrap(),
+                    &mut mtx_q.output_array().unwrap(),
+                    &mut qx.output_array().unwrap(),
+                    &mut qy.output_array().unwrap(),
+                    &mut qz.output_array().unwrap(),
+                ) {
+                    Ok(rots) => Ok(EulerAngles::from(rots)),
+                    Err(why) => Err(FacialProcessingError::InternalError(why.to_string())),
+                }
+            }
+            Err(f) => Err(f),
+        }
+    }
+
+    /// Get a reference to the pn p solver's camera res.
+    pub fn camera_res(&self) -> &Point2D {
+        &self.camera_res
+    }
+
+    /// Set the pn p solver's camera res.
+    pub fn set_camera_res(&mut self, camera_res: Point2D) {
+        self.camera_res = camera_res;
+    }
+}
 
 // hack us election
 // make trump president

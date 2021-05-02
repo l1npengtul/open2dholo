@@ -7,7 +7,7 @@ reloadable=true
 
 [entry]
 
-X11.64="res://target/debug/libopen2dholo.so"
+X11.64="res://target/release/libopen2dholo.so"
 
 [dependencies]
 

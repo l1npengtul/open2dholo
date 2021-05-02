@@ -135,3 +135,22 @@ macro_rules! localize_path {
         format!("{}", proj.localize_path($path))
     }};
 }
+
+#[macro_export]
+macro_rules! mat_init {
+    () => {{
+        opencv::core::Mat::default()
+    }};
+}
+#[macro_export]
+macro_rules! vector {
+    ( $( $elem:expr ),* ) => {
+        {
+            let mut vector = opencv::core::Vector::new();
+            $(
+                vector.push($elem);
+            )*
+            vector
+        }
+    };
+}

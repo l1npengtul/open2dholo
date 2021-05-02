@@ -107,12 +107,20 @@ impl ViewportHolder {
 
     // poll the channel to get the data
     #[export]
-    pub fn _process(&self, _owner: TRef<VSplitContainer>, _delta: f32) {
+    pub fn _process(&self, owner: TRef<VSplitContainer>, _delta: f32) {
         if let Some(input) = &*self.input_processer.borrow() {
             let results = input.query_gotten_results();
             for pkt in results {
-                
-            } // TODO: Remove
+                let mut variant_arr: Vector2Array = Vector2Array::new();
+                for pt in pkt.landmarks {
+                    variant_arr.push(Vector2::new(pt.x() as f32, pt.y() as f32))
+                }
+                godot_print!("aaa");
+                owner.emit_signal(
+                    "new_processed_frame_68pt",
+                    &[Variant::from_vector2_array(&variant_arr)],
+                );
+            }
         }
     }
 

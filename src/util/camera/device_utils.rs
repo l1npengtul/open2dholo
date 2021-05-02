@@ -206,15 +206,9 @@ impl Ord for Resolution {
     // The user would expect a descending list of resolutions (aka highest -> lowest)
     fn cmp(&self, other: &Self) -> Ordering {
         match self.x.cmp(&other.x) {
-            Ordering::Less => {
-                Ordering::Less
-            }
-            Ordering::Equal => {
-                self.y.cmp(&other.y)
-            }
-            Ordering::Greater => {
-                Ordering::Greater
-            }
+            Ordering::Less => Ordering::Less,
+            Ordering::Equal => self.y.cmp(&other.y),
+            Ordering::Greater => Ordering::Greater,
         }
     }
 }
