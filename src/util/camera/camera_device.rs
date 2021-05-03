@@ -22,14 +22,12 @@ use crate::{
     ret_boxerr,
     util::camera::{
         device_utils::{
-            get_os_webcam_index, DeviceContact, DeviceFormat, PathIndex, PossibleDevice,
-            Resolution,
+            get_os_webcam_index, DeviceContact, DeviceFormat, PathIndex, PossibleDevice, Resolution,
         },
         webcam::{QueryCamera, Webcam, WebcamType},
     },
 };
 use flume::{Receiver, Sender, TryRecvError};
-use gdnative::godot_print;
 use mozjpeg::Decompress;
 use opencv::{
     core::{Mat, MatTrait, MatTraitManual, Vec3b},
@@ -860,7 +858,6 @@ impl OpenCvCameraDevice {
 
             if frame.size().unwrap().width > 0 {
                 if frame.is_continuous().unwrap() {
-                    godot_print!("cont");
                     // use a memcpy - we about to get f u n k y
                     let mut ret_vec: Vec<u8> = Vec::new();
                     ret_vec.reserve(
@@ -910,7 +907,6 @@ impl OpenCvCameraDevice {
                 ret_vec.reserve(
                     (frame.rows() * frame.cols() * frame.channels().unwrap_or(3)) as usize,
                 );
-                godot_print!("!cont");
 
                 for row in 0..(frame.rows() - 1) {
                     let mat_rw = match frame.row(row) {

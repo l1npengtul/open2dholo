@@ -15,9 +15,7 @@
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution};
-use facial_processing::utils::{
-    misc::{BackendProviders, EulerAngles, Point2D},
-};
+use facial_processing::utils::misc::{BackendProviders, EulerAngles, Point2D};
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read};
 

@@ -115,7 +115,6 @@ impl ViewportHolder {
                 for pt in pkt.landmarks {
                     variant_arr.push(Vector2::new(pt.x() as f32, pt.y() as f32))
                 }
-                godot_print!("aaa");
                 owner.emit_signal(
                     "new_processed_frame_68pt",
                     &[Variant::from_vector2_array(&variant_arr)],
@@ -157,7 +156,6 @@ impl ViewportHolder {
             let backend = BackendConfig::new(device_res, Backend::Dlib);
 
             let device_contact = crate::CURRENT_DEVICE.with(|dev| dev.borrow().clone().unwrap());
-            godot_print!("input_proc");
 
             let device_exists = { self.input_processer.borrow().is_some() };
 

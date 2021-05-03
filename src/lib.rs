@@ -56,15 +56,7 @@ lazy_static! {
 thread_local! {
     pub(crate) static CURRENT_DEVICE: Rc<RefCell<Option<DeviceContact>>> = Rc::new(RefCell::new(None));
 }
-
-#[cfg(unix)]
-fn global_load_gthread() {}
-
-#[cfg(windows)]
-fn global_load_gthread() {}
-
 fn init(handle: InitHandle) {
-    global_load_gthread();
     handle.add_class::<nodes::open2dholoctrl::Open2DHoloCtrl>();
     handle.add_class::<nodes::model_tree_edit::ModelTreeEditor>();
     handle.add_class::<nodes::webcam_input_edit::WebcamInputEditor>();
