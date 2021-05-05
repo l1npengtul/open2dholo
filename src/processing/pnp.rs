@@ -1,7 +1,7 @@
 use arrsac::Arrsac;
 use cv_core::{
     nalgebra::{IsometryMatrix3, Point2, Point3},
-    FeatureWorldMatch, Pose, Projective, WorldPoint,
+    FeatureWorldMatch, Projective, WorldPoint,
 };
 use cv_pinhole::NormalizedKeyPoint;
 use facial_processing::utils::{face::FaceLandmark, misc::EulerAngles};
@@ -65,7 +65,7 @@ impl FacePnP {
         {
             Some(angles) => {
                 let (euler_x, euler_y, euler_z) = {
-                    let cam_to_world: IsometryMatrix3<f64> = angles.inverse().into();
+                    let cam_to_world: IsometryMatrix3<f64> = angles.into();
                     cam_to_world.rotation.euler_angles()
                 };
                 Some(EulerAngles {

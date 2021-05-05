@@ -52,6 +52,16 @@ impl ViewportHolder {
                 usage: PropertyUsage::DEFAULT,
             }],
         });
+
+        builder.add_signal(Signal {
+            name: "model_load_start",
+            args: &[SignalArgument {
+                name: "path",
+                default: Variant::from_str("res://"),
+                export_info: ExportInfo::new(VariantType::GodotString),
+                usage: PropertyUsage::DEFAULT,
+            }],
+        });
     }
 
     fn new(_owner: &VSplitContainer) -> Self {
@@ -189,24 +199,31 @@ impl ViewportHolder {
     }
 
     #[export]
-    pub fn on_new_model_load(&self, _owner: TRef<VSplitContainer>, model_path: Variant) {
-        let _string_path = match GodotString::from_variant(&model_path) {
+    pub fn on_new_model_load(&self, owner: TRef<VSplitContainer>, model_path: Variant) {
+        let string_path = match GodotString::from_variant(&model_path) {
             Ok(gdstr) => gdstr.to_string(),
             Err(why) => {
                 show_error!("Could not load model", why.to_string());
                 return;
             }
         };
+        self.emit_loaded(owner, string_path);
     }
 
     #[export]
-    pub fn on_new_tscn_mdl_load(&self, _owner: TRef<VSplitContainer>, model_path: Variant) {
-        let _string_path = match GodotString::from_variant(&model_path) {
+    pub fn on_new_tscn_mdl_load(&self, owner: TRef<VSplitContainer>, model_path: Variant) {
+        let string_path = match GodotString::from_variant(&model_path) {
             Ok(gdstr) => localize_path!(gdstr),
             Err(why) => {
                 show_error!("Could not load model", why.to_string());
                 return;
             }
         };
+        self.emit_loaded(owner, string_path);
+    }
+
+    #[export]
+    fn emit_loaded(&self, owner: TRef<VSplitContainer>, mdl_path: String) {
+        owner.emit_signal("model_load_start", &[Variant::from_str(mdl_path)]);
     }
 }

@@ -124,7 +124,7 @@ impl FileMenuButton {
                         mdl = mdl.with_display_name(filename.to_string());
                     }
                     let model_ref = mdl.build();
-                    file_hashmap.insert(filename, model_ref);
+                    file_hashmap.insert(model_ref.display_name().clone(), model_ref);
                 }
             }
         }
@@ -202,19 +202,18 @@ impl FileMenuButton {
 
     #[export]
     pub fn on_default_model_popupmenu_button_clicked(&self, owner: TRef<MenuButton>, id: i32) {
+        godot_print!("?");
         let default_popupmenu = unsafe {
             &*owner.get_node("/root/Open2DHolo/Open2DHoloMainUINode/Panel/VBoxContainer/HBoxContainer/HBoxContainer/File/Default").unwrap().assume_safe().cast::<PopupMenu>().unwrap()
         };
-        let model_path = match self
-            .default_model_paths
-            .borrow()
-            .get(&(default_popupmenu.get_item_text(i64::from(id)).to_string()))
-        {
-            Some(mdlref) => mdlref.tscn_path().clone(),
-            None => return,
-        };
-        godot_print!("{}", model_path);
-        owner.emit_signal("new_tscn_model_load", &[Variant::from_str(model_path)]);
+        let selected_text = default_popupmenu.get_item_text(i64::from(id)).to_string();
+
+        if let Some(mdl_ref) = self.default_model_paths.borrow().get(&selected_text) {
+            owner.emit_signal(
+                "new_tscn_model_load",
+                &[Variant::from_str(mdl_ref.globalized_tscn_path())],
+            );
+        }
     }
 }
 

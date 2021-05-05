@@ -1,6 +1,6 @@
 use crate::{
     error::thread_send_message_error::ThreadSendMessageError,
-    globalize_path, handle_boxerr, 
+    globalize_path, handle_boxerr,
     processing::pnp::FacePnP,
     util::{
         camera::{
@@ -14,11 +14,9 @@ use crate::{
 use dlib_face_recognition::{
     FaceDetector, FaceDetectorTrait, ImageMatrix, LandmarkPredictor, LandmarkPredictorTrait,
 };
-use facial_processing::{
-    utils::{
-        face::FaceLandmark,
-        misc::{BoundingBox, EulerAngles, Point2D},
-    },
+use facial_processing::utils::{
+    face::FaceLandmark,
+    misc::{BoundingBox, EulerAngles, Point2D},
 };
 use flume::{Receiver, Sender};
 use gdnative::godot_print;
@@ -199,9 +197,7 @@ fn process_input(
 
         // get frame
         let mut frame_data = match device.get_frame() {
-            Ok(f) => {
-                f
-            }
+            Ok(f) => f,
             Err(why) => {
                 godot_print!("died {}, {}", line!(), why.to_string());
                 return 255;

@@ -486,3 +486,5 @@ impl Read for ArbitaryVecRead {
         Ok(buf.len())
     }
 }
+
+pub struct ModelIK {}

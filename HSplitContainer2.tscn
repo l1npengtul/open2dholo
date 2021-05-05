@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=4 format=2]
 
 [ext_resource path="res://GDNative/ViewportHolder.gdns" type="Script" id=1]
 [ext_resource path="res://GDNative/CameraInputPreview.gdns" type="Script" id=2]
+[ext_resource path="res://GDNative/PreviewViewport.gdns" type="Script" id=3]
 
 [node name="VSplitContainer2" type="VSplitContainer"]
 margin_right = 462.0
@@ -89,6 +90,8 @@ stretch = true
 size = Vector2( 462, 0 )
 handle_input_locally = false
 render_target_update_mode = 3
+script = ExtResource( 3 )
 
 [node name="Camera" type="Camera" parent="VBoxContainer2/ViewportContainer/Viewport"]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2.98869 )
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15985, 1.38506 )
+fov = 100.0

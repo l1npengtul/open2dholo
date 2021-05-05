@@ -414,14 +414,11 @@ script = ExtResource( 4 )
 [node name="CameraPopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
 margin_right = 20.0
 margin_bottom = 20.0
-popup_exclusive = true
 allow_search = true
 
 [node name="FrameratePopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
 margin_right = 20.0
 margin_bottom = 20.0
-popup_exclusive = true
-hide_on_state_item_selection = true
 
 [node name="StartButton" type="Button" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
 margin_left = 598.0
@@ -436,14 +433,10 @@ text = "Open Webcam..."
 [node name="FormatPopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
 margin_right = 20.0
 margin_bottom = 20.0
-popup_exclusive = true
-hide_on_state_item_selection = true
 
 [node name="ResolutionPopup" type="PopupMenu" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer/VBoxContainer"]
 margin_right = 20.0
 margin_bottom = 20.0
-popup_exclusive = true
-hide_on_state_item_selection = true
 
 [node name="VScrollBar" type="VScrollBar" parent="Open2DHoloMainUINode/Panel/VBoxContainer/HSplitContainer/TabContainer/Input/GridContainer"]
 margin_left = 721.0
