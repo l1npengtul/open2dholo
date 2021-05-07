@@ -306,7 +306,7 @@ impl WebcamInputEditor {
                             let position = rect.origin.to_vector();
 
                             let selected_cache_dev = match self.device_list.borrow().get(camera) {
-                                Some(dev) => dev.to_owned(),
+                                Some(dev) => dev.clone(),
                                 None => panic!("The device no longer exists!"),
                             };
                             let mut res_vec_sorted: Vec<Resolution> = Vec::new();
@@ -481,7 +481,7 @@ impl WebcamInputEditor {
                 .as_ref()
                 .unwrap_or(&"".to_string()),
         ) {
-            Some(dev) => dev.to_owned(),
+            Some(dev) => dev.clone(),
             None => return, // TODO: Global Error handler
         };
 

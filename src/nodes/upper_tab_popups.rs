@@ -104,29 +104,28 @@ impl FileMenuButton {
         // crawl the default model directory
         let default_model_global = globalize_path!("res://default_models");
         let mut file_hashmap: HashMap<String, ModelReference> = HashMap::new();
-        for file in WalkDir::new(default_model_global).min_depth(1) {
-            if let Ok(f) = file {
-                if check_endswith_glb(&f) {
-                    // get the filename without the ".glb" and raw path
-                    let filename = f
-                        .file_name()
-                        .to_str()
-                        .unwrap_or("")
-                        .strip_suffix(".glb")
-                        .unwrap_or("")
-                        .to_string();
-                    let full_path = f.path().as_os_str().to_str().unwrap_or("").to_string();
-                    let tscn_path = full_path.strip_suffix(".glb").unwrap().to_string() + ".tscn";
-                    let mut mdl = MdlRefBuilder::from_vrm_meta_json(full_path.clone())
-                        .with_model_path(full_path)
-                        .with_tscn_path(tscn_path);
-                    if mdl.check_empty_displayname() {
-                        mdl = mdl.with_display_name(filename.to_string());
-                    }
-                    let model_ref = mdl.build();
-                    file_hashmap.insert(model_ref.display_name().clone(), model_ref);
+        for file in WalkDir::new(default_model_global).min_depth(1).into_iter().flatten() {
+            if check_endswith_glb(&file) {
+                // get the filename without the ".glb" and raw path
+                let filename = file
+                    .file_name()
+                    .to_str()
+                    .unwrap_or("")
+                    .strip_suffix(".glb")
+                    .unwrap_or("")
+                    .to_string();
+                let full_path = file.path().as_os_str().to_str().unwrap_or("").to_string();
+                let tscn_path = full_path.strip_suffix(".glb").unwrap().to_string() + ".tscn";
+                let mut mdl = MdlRefBuilder::from_vrm_meta_json(full_path.clone())
+                    .with_model_path(full_path)
+                    .with_tscn_path(tscn_path);
+                if mdl.check_empty_displayname() {
+                    mdl = mdl.with_display_name(filename.to_string());
                 }
+                let model_ref = mdl.build();
+                file_hashmap.insert(model_ref.display_name().clone(), model_ref);
             }
+        
         }
 
         let mut names: Vec<&String> = file_hashmap

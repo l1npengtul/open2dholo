@@ -296,8 +296,8 @@ impl<'a> PossibleDevice {
                 };
 
                 PossibleDevice::UniversalVideoCamera {
-                    vendor_id: vendor_id.to_owned(),
-                    product_id: product_id.to_owned(),
+                    vendor_id: *vendor_id,
+                    product_id: *product_id,
                     serial: serial.clone(),
                     res,
                     fps,
@@ -347,8 +347,8 @@ impl<'a> PossibleDevice {
                 };
 
                 PossibleDevice::UniversalVideoCamera {
-                    vendor_id: vendor_id.to_owned(),
-                    product_id: product_id.to_owned(),
+                    vendor_id,
+                    product_id,
                     serial,
                     res,
                     fps,

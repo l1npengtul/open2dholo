@@ -14,10 +14,13 @@
 //     You should have received a copy of the GNU General Public License
 //     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution};
+use crate::{error::model_error::{self, ModelError}, util::camera::device_utils::{DeviceConfig, PossibleDevice, Resolution}};
 use facial_processing::utils::misc::{BackendProviders, EulerAngles, Point2D};
+use gdnative::{TRef, api::Skeleton, core_types::Transform};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Read};
+use std::{collections::HashMap, fs::File, io::Read, ops::Deref};
+use k::{Isometry3, Node, NodeBuilder, Translation3, UnitQuaternion};
+use nalgebra::{Quaternion, Translation, Vector4};
 
 // TODO: Change to acutal data format
 #[derive(Clone)]
@@ -487,4 +490,48 @@ impl Read for ArbitaryVecRead {
     }
 }
 
-pub struct ModelIK {}
+// FIXME: WARNING! DO TEST IF X,Y,Z in Godot matches up to k X,Y,Z ?
+pub struct IkChain {
+    skelly_id_map: HashMap<i64, usize>,
+}
+
+impl IkChain {
+    pub fn new(skeleton: TRef<Skeleton>) -> Result<Self, ModelError> {
+        if skeleton.get_bone_count() >= 1 {
+            return Err(
+                ModelError::InvalidBoneNumberError(skeleton.get_bone_count(), "".to_string())
+            );
+        }
+        skeleton.localize_rests();
+        let node_map_string = HashMap::new();
+
+        for bone_id in 0..skeleton.get_bone_count() {
+            let bone_name = skeleton.get_bone_name(bone_id).to_string();
+            let bone_rest = transform_into_isometry3(skeleton.get_bone_rest(bone_id));
+
+            let mut node = NodeBuilder::new()
+            .name(bone_name.as_str())
+            .origin(bone_rest)
+            .joint_type()
+        }
+
+        Err(ModelError::InvalidBoneNumberError(0, "".to_string()))
+    }
+}
+
+// FIXME: WARNING! DO TEST IF X,Y,Z in Godot matches up to k X,Y,Z ? 
+#[inline]
+fn transform_into_isometry3(transform: Transform) -> Isometry3<f32> {
+    let position = transform.origin; // X, Y, Z
+    let rotation = transform.basis.to_quat().normalize(); // X, Y, Z
+
+    let position_translation: Translation3<f32> = Translation3::new(position.x, position.y, position.z);
+    let rotation_angle = UnitQuaternion::from_quaternion(Quaternion::new(rotation.i, rotation.j, rotation.k, rotation.r));
+    Isometry3::from_parts(position_translation, rotation_angle)
+}
+
+// Converts Z-Axis up centric to Y Axis up centric coordinates. 
+// TODO
+fn convert_xyz_y_up(iso: Isometry3<f32>) /*-> Isometry3<f32> */ {
+
+}
