@@ -17,6 +17,6 @@
 pub mod config_error;
 pub mod conversion_error;
 pub mod invalid_device_error;
+pub mod model_error;
 pub mod processing_error;
 pub mod thread_send_message_error;
-pub mod model_error;

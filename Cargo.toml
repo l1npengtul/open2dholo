@@ -32,6 +32,7 @@ lambda-twist = "0.7.0"
 cv-core = "0.15.0"
 cv-pinhole = "0.6.0"
 sample-consensus = "1.0.1"
+euclid = "0.22.3"
 
 [dependencies.rand]
 version = "0.8.3"

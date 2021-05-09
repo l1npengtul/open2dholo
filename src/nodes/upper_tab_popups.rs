@@ -104,7 +104,11 @@ impl FileMenuButton {
         // crawl the default model directory
         let default_model_global = globalize_path!("res://default_models");
         let mut file_hashmap: HashMap<String, ModelReference> = HashMap::new();
-        for file in WalkDir::new(default_model_global).min_depth(1).into_iter().flatten() {
+        for file in WalkDir::new(default_model_global)
+            .min_depth(1)
+            .into_iter()
+            .flatten()
+        {
             if check_endswith_glb(&file) {
                 // get the filename without the ".glb" and raw path
                 let filename = file
@@ -125,7 +129,6 @@ impl FileMenuButton {
                 let model_ref = mdl.build();
                 file_hashmap.insert(model_ref.display_name().clone(), model_ref);
             }
-        
         }
 
         let mut names: Vec<&String> = file_hashmap

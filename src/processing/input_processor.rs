@@ -22,6 +22,7 @@ use flume::{Receiver, Sender};
 use gdnative::godot_print;
 use image::{ImageBuffer, Rgb};
 
+use euclid::{Box2D, Point2D as EPoint2D};
 use std::{
     cell::{Cell, RefCell},
     line,
@@ -241,8 +242,14 @@ fn process_input(
                 None => prev_euler,
             };
 
+            let facebox_2d = Box2D::new(
+                EPoint2D::new(rect.left as i32, rect.bottom as i32),
+                EPoint2D::new(rect.right as i32, rect.top as i32),
+            );
+
             if sender
                 .send(FullyCalculatedPacket {
+                    face_location: facebox_2d,
                     landmarks: pt_vec,
                     euler: pnp,
                 })

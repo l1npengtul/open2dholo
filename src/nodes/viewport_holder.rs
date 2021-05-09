@@ -47,7 +47,9 @@ impl ViewportHolder {
             name: "new_processed_frame_68pt",
             args: &[SignalArgument {
                 name: "point_array_68",
-                default: Variant::from_vector2_array(&TypedArray::from_vec(default_68pt_vec)),
+                default: Variant::from_vector2_array(&TypedArray::from_vec(
+                    default_68pt_vec.clone(),
+                )),
                 export_info: ExportInfo::new(VariantType::Vector2Array),
                 usage: PropertyUsage::DEFAULT,
             }],
@@ -62,6 +64,30 @@ impl ViewportHolder {
                 usage: PropertyUsage::DEFAULT,
             }],
         });
+
+        builder.add_signal(Signal {
+            name: "frame_processed",
+            args: &[
+                SignalArgument {
+                    name: "point_array_68",
+                    default: Variant::from_vector2_array(&TypedArray::from_vec(default_68pt_vec)),
+                    export_info: ExportInfo::new(VariantType::Vector2Array),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                SignalArgument {
+                    name: "face_box",
+                    default: Variant::from_rect2(&Rect2::default()),
+                    export_info: ExportInfo::new(VariantType::Rect2),
+                    usage: PropertyUsage::DEFAULT,
+                },
+                SignalArgument {
+                    name: "facing_direction",
+                    default: Variant::from_vector3(&Vector3::default()),
+                    export_info: ExportInfo::new(VariantType::Vector3),
+                    usage: PropertyUsage::DEFAULT,
+                },
+            ],
+        })
     }
 
     fn new(_owner: &VSplitContainer) -> Self {
