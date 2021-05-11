@@ -50,6 +50,7 @@ impl InputProcesser {
         let cfg2 = backend_cfg.get();
         let dev2 = device.clone();
 
+        // Create a seperate thread to run the process_input pipeline in to avoid choking the main UI thread.
         let thread = Builder::new()
             .name("input_processor".to_string())
             .stack_size(33_554_432) // 32 MiB
@@ -158,6 +159,7 @@ fn process_input(
         }
     };
 
+    // pipeline
     loop {
         if let Ok(msg_recv) = message.try_recv() {
             match msg_recv {

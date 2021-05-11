@@ -141,7 +141,7 @@ impl ViewportHolder {
     #[export]
     fn set_world_same(&self, _owner: TRef<VSplitContainer>) {}
 
-    // poll the channel to get the data
+    // poll the channel to get the data from the input process thread
     #[export]
     pub fn _process(&self, owner: TRef<VSplitContainer>, _delta: f32) {
         if let Some(input) = &*self.input_processer.borrow() {
@@ -210,6 +210,7 @@ impl ViewportHolder {
                     .unwrap()
                     .set_device_cfg(dev_cfg));
             } else {
+                // create new InputProcesser to run pipeline
                 let input_processer = match InputProcesser::from_device_contact(
                     device_contact,
                     device_res,

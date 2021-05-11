@@ -170,6 +170,14 @@ impl PreviewViewport {
             };
             model_skeleton.set_bone_custom_pose(self.neck_bone_id.get().into(), new_neck_tranform);
             let (left_eye, right_eye) = calc_ear(&landmarks_vec);
+            let mouth_open = single_ear(
+                *landmarks_vec.get(49).unwrap(),
+                *landmarks_vec.get(51).unwrap(),
+                *landmarks_vec.get(53).unwrap(),
+                *landmarks_vec.get(55).unwrap(),
+                *landmarks_vec.get(57).unwrap(),
+                *landmarks_vec.get(59).unwrap(),
+            );
             // TODO: get face transforms here
             let visual_server = unsafe { VisualServer::godot_singleton() };
             for variant in model_mesh.surface_get_blend_shape_arrays(0).iter() {
@@ -211,7 +219,8 @@ fn single_ear(
     p5: Vector2D<f32, UnknownUnit>,
     p6: Vector2D<f32, UnknownUnit>,
 ) -> f32 {
-    (euclid_distance(p2, p6) + euclid_distance(p3, p5)) / (2_f32 * euclid_distance(p1, p4))
+    (euclid_distance(p2, p6) + euclid_distance(p3, p5))
+        / (2_f32 * euclid_distance(p1, p4)).clamp(0_f32, 1_f32)
 }
 
 #[inline]
