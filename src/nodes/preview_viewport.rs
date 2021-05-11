@@ -5,13 +5,14 @@ use gdnative::{
     prelude::*,
     NativeClass,
 };
-use std::cell::{Cell, RefCell};
+use std::{borrow::BorrowMut, cell::{Cell, RefCell}};
 // TODO: gen gdns file and add to inithandle
 
 #[derive(NativeClass)]
 #[inherit(Viewport)]
 pub struct PreviewViewport {
     loaded_model: RefCell<Option<Ref<Resource>>>,
+    name: RefCell<String>,
     neck_bone_id: Cell<i32>,
 }
 
@@ -21,6 +22,7 @@ impl PreviewViewport {
         PreviewViewport {
             loaded_model: RefCell::new(None),
             neck_bone_id: Cell::new(-1),
+            name: RefCell::new(String::new()),
         }
     }
 
@@ -77,16 +79,18 @@ impl PreviewViewport {
                         .unwrap()
                         .assume_safe()
                 };
+                let name = node.name().to_string();
                 owner.add_child(node, true);
                 for child_id in 0..owner.get_child_count() {
                     let node_name =
                         unsafe { owner.get_child(child_id).unwrap().assume_safe() }.name();
                     godot_print!("{}", node_name);
                 }
+                *self.name.borrow_mut() = name.clone();
                 // FIXME: replace with acutal node!
                 let model_skeleton = unsafe {
                     owner
-                        .get_node("Spatial/Skeleton")
+                        .get_node(format!("{}/Skeleton", name))
                         .unwrap()
                         .assume_safe()
                         .cast::<Skeleton>()
@@ -115,11 +119,13 @@ impl PreviewViewport {
         landmarks: Variant,
         angle: Variant,
     ) {
+        godot_print!("process");
         if self.loaded_model.borrow().is_some() {
+            let node_name = self.name.borrow().clone();
             // FIXME: replace with acutal node!
             let model = unsafe {
                 owner
-                    .get_node("Spatial")
+                    .get_node(node_name.clone())
                     .unwrap()
                     .assume_safe()
                     .cast::<Spatial>()
@@ -128,7 +134,7 @@ impl PreviewViewport {
 
             let model_skeleton = unsafe {
                 owner
-                    .get_node("Spatial/Skeleton")
+                    .get_node(format!("{}/Skeleton", node_name))
                     .unwrap()
                     .assume_safe()
                     .cast::<Skeleton>()
@@ -138,7 +144,7 @@ impl PreviewViewport {
             // why
             let model_mesh_inst = unsafe {
                 owner
-                    .get_node("Spatial/Skeleton/Face")
+                    .get_node(format!("{}/Skeleton/Face", node_name))
                     .unwrap()
                     .assume_safe()
                     .cast::<MeshInstance>()
