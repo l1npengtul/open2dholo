@@ -93,5 +93,5 @@ render_target_update_mode = 3
 script = ExtResource( 3 )
 
 [node name="Camera" type="Camera" parent="VBoxContainer2/ViewportContainer/Viewport"]
-transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15985, 1.38506 )
+transform = Transform( -1, 0, -3.25841e-07, 0, 1, 0, 3.25841e-07, 0, -1, 0, 1.50973, -0.470337 )
 fov = 100.0

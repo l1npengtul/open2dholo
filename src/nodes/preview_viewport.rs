@@ -171,24 +171,22 @@ impl PreviewViewport {
             let current_neck_transform =
                 model_skeleton.get_bone_custom_pose(self.neck_bone_id.get().into());
             let new_neck_tranform = Transform {
-                basis: Basis::from_euler(angle_vec3),
+                basis: Basis::from_euler(Vector3::new(angle_vec3.z, angle_vec3.y, angle_vec3.x)),
                 origin: current_neck_transform.origin,
             };
+            // this currently makes the model require an exorcism. Change to OpenCV and see if it keeps segfaulting, and if so throw computer out of window.
             model_skeleton.set_bone_custom_pose(self.neck_bone_id.get().into(), new_neck_tranform);
-            let (left_eye, right_eye) = calc_ear(&landmarks_vec);
-            let mouth_open = single_ear(
-                *landmarks_vec.get(49).unwrap(),
-                *landmarks_vec.get(51).unwrap(),
-                *landmarks_vec.get(53).unwrap(),
-                *landmarks_vec.get(55).unwrap(),
-                *landmarks_vec.get(57).unwrap(),
-                *landmarks_vec.get(59).unwrap(),
-            );
-            // TODO: get face transforms here
-            let visual_server = unsafe { VisualServer::godot_singleton() };
-            for variant in model_mesh.surface_get_blend_shape_arrays(0).iter() {
-                godot_print!("{:?}", variant);
-            }
+            // let (left_eye, right_eye) = calc_ear(&landmarks_vec);
+            // let mouth_open = single_ear(
+            //     *landmarks_vec.get(49).unwrap(),
+            //     *landmarks_vec.get(51).unwrap(),
+            //     *landmarks_vec.get(53).unwrap(),
+            //     *landmarks_vec.get(55).unwrap(),
+            //     *landmarks_vec.get(57).unwrap(),
+            //     *landmarks_vec.get(59).unwrap(),
+            // );
+            // // TODO: get face transforms here
+            // let visual_server = unsafe { VisualServer::godot_singleton() };
         }
     }
 }

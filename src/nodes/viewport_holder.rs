@@ -151,10 +151,17 @@ impl ViewportHolder {
                 for pt in pkt.landmarks {
                     variant_arr.push(Vector2::new(pt.x() as f32, pt.y() as f32))
                 }
+                let vector3_angles = Variant::from_vector3(&Vector3::new(pkt.euler.x() as f32, pkt.euler.y() as f32, pkt.euler.z()  as f32));
+                let facebox_rect = Variant::from_rect2(&pkt.face_location.to_rect().to_f32());
                 owner.emit_signal(
                     "new_processed_frame_68pt",
                     &[Variant::from_vector2_array(&variant_arr)],
                 );
+                owner.emit_signal("frame_processed", &[
+                    Variant::from_vector2_array(&variant_arr),
+                    facebox_rect,
+                    vector3_angles,
+                ]);
             }
         }
     }

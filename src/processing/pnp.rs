@@ -1,8 +1,5 @@
 use arrsac::Arrsac;
-use cv_core::{
-    nalgebra::{IsometryMatrix3, Point2, Point3},
-    FeatureWorldMatch, Projective, WorldPoint,
-};
+use cv_core::{FeatureWorldMatch, Projective, WorldPoint, nalgebra::{IsometryMatrix3, Point2, Point3}};
 use cv_pinhole::NormalizedKeyPoint;
 use facial_processing::utils::{face::FaceLandmark, misc::EulerAngles};
 use image::{ImageBuffer, Rgb};
