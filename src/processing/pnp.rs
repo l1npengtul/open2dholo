@@ -1,22 +1,24 @@
 use arrsac::Arrsac;
-use cv_core::{FeatureWorldMatch, Projective, WorldPoint, nalgebra::{IsometryMatrix3, Point2, Point3}};
-use cv_pinhole::NormalizedKeyPoint;
+use cv::{Consensus, Estimator, FeatureWorldMatch, Projective, WorldPoint, camera::pinhole::NormalizedKeyPoint, estimate::LambdaTwist, nalgebra::{Isometry, IsometryMatrix3, Point2, Point3, Rotation, U3}};
 use facial_processing::utils::{face::FaceLandmark, misc::EulerAngles};
+use gdnative::godot_print;
 use image::{ImageBuffer, Rgb};
-use lambda_twist::LambdaTwist;
-use rand::{rngs::SmallRng, SeedableRng};
-use sample_consensus::Consensus;
-use std::cell::RefCell;
+use rand::{SeedableRng, prelude::StdRng};
+use std::{cell::RefCell, time::{SystemTime, UNIX_EPOCH}};
+use arrayvec::ArrayVec;
 
 pub struct FacePnP {
-    arrsac: RefCell<Arrsac<SmallRng>>,
+    arrsac: RefCell<Arrsac<StdRng>>,
     lambda: LambdaTwist,
     face_points: [Point3<f64>; 6],
 }
 
 impl FacePnP {
     pub fn new() -> Self {
-        let arrsac = RefCell::new(Arrsac::new(0.01, SmallRng::from_seed([0; 32])));
+        let time = {
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+        };
+        let arrsac = RefCell::new(Arrsac::new(0.5_f64, StdRng::seed_from_u64(time)));
         let lambda = LambdaTwist::new();
         let face_points = [
             Point3::new(0.0, 0.0, 0.0),          // Nose Tip
@@ -34,6 +36,7 @@ impl FacePnP {
         }
     }
 
+    // FIXME: precalculate facial points
     pub fn calculate(
         &self,
         image: &ImageBuffer<Rgb<u8>, Vec<u8>>,
@@ -54,25 +57,26 @@ impl FacePnP {
             .map(|(nrm_img_pt, world_face_pt)| {
                 FeatureWorldMatch(*nrm_img_pt, WorldPoint::from_point(*world_face_pt))
             });
+        
 
-        match self
-            .arrsac
-            .borrow_mut()
-            .model(&self.lambda, face_points_with_nrm_img_points.clone())
-        {
-            Some(angles) => {
-                let (euler_x, euler_y, euler_z) = {
-                    let cam_to_world: IsometryMatrix3<f64> = angles.into();
-                    cam_to_world.rotation.euler_angles()
-                };
-                Some(EulerAngles {
-                    x: euler_x,
-                    y: euler_y,
-                    z: euler_z,
-                })
-            }
-            None => None,
+        let a = Estimator::estimate(&self.lambda, face_points_with_nrm_img_points.clone());
+        for pt in a {
+            let isometry: &Isometry<f64, U3, Rotation<f64, U3>> = pt.as_ref();
+            let (x,y,z) = isometry.rotation.euler_angles();
+            godot_print!("a: {} {} {}", x,y,z);
         }
+        // TODO: check out second rotation
+        for pose in Estimator::estimate(&self.lambda, face_points_with_nrm_img_points) {
+            let isometry: &Isometry<f64, U3, Rotation<f64, U3>> = pose.as_ref();
+            let (x,y,z) = isometry.rotation.euler_angles();
+            return Some(EulerAngles {
+                x,
+                y,
+                z,
+
+            })
+        }
+        None
     }
 }
 

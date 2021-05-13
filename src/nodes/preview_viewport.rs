@@ -171,7 +171,7 @@ impl PreviewViewport {
             let current_neck_transform =
                 model_skeleton.get_bone_custom_pose(self.neck_bone_id.get().into());
             let new_neck_tranform = Transform {
-                basis: Basis::from_euler(Vector3::new(angle_vec3.z, angle_vec3.y, angle_vec3.x)),
+                basis: Basis::from_euler(Vector3::new(angle_vec3.z * -0.5_f32, angle_vec3.x + 4.7, angle_vec3.y - 0.6)),
                 origin: current_neck_transform.origin,
             };
             // this currently makes the model require an exorcism. Change to OpenCV and see if it keeps segfaulting, and if so throw computer out of window.
