@@ -5,7 +5,10 @@ use gdnative::{
     prelude::*,
     NativeClass,
 };
-use std::{borrow::BorrowMut, cell::{Cell, RefCell}};
+use std::{
+    borrow::BorrowMut,
+    cell::{Cell, RefCell},
+};
 // TODO: gen gdns file and add to inithandle
 
 #[derive(NativeClass)]
@@ -171,7 +174,11 @@ impl PreviewViewport {
             let current_neck_transform =
                 model_skeleton.get_bone_custom_pose(self.neck_bone_id.get().into());
             let new_neck_tranform = Transform {
-                basis: Basis::from_euler(Vector3::new(angle_vec3.z * -0.5_f32, angle_vec3.x + 4.7, angle_vec3.y - 0.6)),
+                basis: Basis::from_euler(Vector3::new(
+                    angle_vec3.x + 1_f32,
+                    angle_vec3.z + 3.7_f32,
+                    angle_vec3.y - 4_f32,
+                )),
                 origin: current_neck_transform.origin,
             };
             // this currently makes the model require an exorcism. Change to OpenCV and see if it keeps segfaulting, and if so throw computer out of window.
@@ -187,6 +194,7 @@ impl PreviewViewport {
             // );
             // // TODO: get face transforms here
             // let visual_server = unsafe { VisualServer::godot_singleton() };
+            godot_print!("{:?}", model_mesh_inst.get_property_list());
         }
     }
 }

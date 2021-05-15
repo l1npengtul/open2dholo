@@ -30,6 +30,8 @@ arrsac = "0.6.1"
 euclid = "0.22.3"
 cv = "0.6.0"
 arrayvec = "0.4.12"
+cam-geom = "0.8.0"
+dlt = "0.6.0"
 
 [dependencies.rand]
 version = "0.8.3"
