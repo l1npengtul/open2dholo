@@ -1,14 +1,11 @@
 use crate::wtf;
 use euclid::{UnknownUnit, Vector2D};
 use gdnative::{
-    api::{MeshInstance, Resource, Skeleton, Viewport, VisualServer},
+    api::{MeshInstance, Resource, Skeleton, Viewport},
     prelude::*,
     NativeClass,
 };
-use std::{
-    borrow::BorrowMut,
-    cell::{Cell, RefCell},
-};
+use std::cell::{Cell, RefCell};
 // TODO: gen gdns file and add to inithandle
 
 #[derive(NativeClass)]
@@ -118,23 +115,14 @@ impl PreviewViewport {
     fn on_frame_processed(
         &self,
         owner: TRef<Viewport>,
-        _facebox: Variant,
         landmarks: Variant,
+        _facebox: Variant,
         angle: Variant,
     ) {
         godot_print!("process");
         if self.loaded_model.borrow().is_some() {
             let node_name = self.name.borrow().clone();
             // FIXME: replace with acutal node!
-            let model = unsafe {
-                owner
-                    .get_node(node_name.clone())
-                    .unwrap()
-                    .assume_safe()
-                    .cast::<Spatial>()
-                    .unwrap()
-            };
-
             let model_skeleton = unsafe {
                 owner
                     .get_node(format!("{}/Skeleton", node_name))
@@ -154,12 +142,6 @@ impl PreviewViewport {
                     .unwrap()
             };
 
-            let mm = { model_mesh_inst.mesh().unwrap() };
-
-            let model_mesh = unsafe { mm.assume_safe() };
-
-            let model_mesh_rid = model_mesh.get_rid();
-
             let angle_vec3 = angle.to_vector3();
             let landmarks_vec = {
                 let ld = landmarks.to_vector2_array();
@@ -175,26 +157,32 @@ impl PreviewViewport {
                 model_skeleton.get_bone_custom_pose(self.neck_bone_id.get().into());
             let new_neck_tranform = Transform {
                 basis: Basis::from_euler(Vector3::new(
-                    angle_vec3.x + 1_f32,
-                    angle_vec3.z + 3.7_f32,
+                    angle_vec3.x + 0.8_f32,
+                    angle_vec3.z + 3.4_f32,
                     angle_vec3.y - 4_f32,
                 )),
                 origin: current_neck_transform.origin,
             };
             // this currently makes the model require an exorcism. Change to OpenCV and see if it keeps segfaulting, and if so throw computer out of window.
             model_skeleton.set_bone_custom_pose(self.neck_bone_id.get().into(), new_neck_tranform);
-            // let (left_eye, right_eye) = calc_ear(&landmarks_vec);
-            // let mouth_open = single_ear(
-            //     *landmarks_vec.get(49).unwrap(),
-            //     *landmarks_vec.get(51).unwrap(),
-            //     *landmarks_vec.get(53).unwrap(),
-            //     *landmarks_vec.get(55).unwrap(),
-            //     *landmarks_vec.get(57).unwrap(),
-            //     *landmarks_vec.get(59).unwrap(),
-            // );
-            // // TODO: get face transforms here
-            // let visual_server = unsafe { VisualServer::godot_singleton() };
-            godot_print!("{:?}", model_mesh_inst.get_property_list());
+            let (left_eye, right_eye) = calc_ear(&landmarks_vec);
+            let mouth_open = single_ear(
+                *landmarks_vec.get(48).unwrap(),
+                *landmarks_vec.get(50).unwrap(),
+                *landmarks_vec.get(52).unwrap(),
+                *landmarks_vec.get(54).unwrap(),
+                *landmarks_vec.get(56).unwrap(),
+                *landmarks_vec.get(58).unwrap(),
+            );
+
+            // Face transformations for vroid style 3D model
+            // 13 => blink right, 14 => blink left
+            // 29 => mouth
+            // all lies from a scale of 0.0~1.0. Never negative
+            godot_print!("{} {} {}", left_eye, right_eye, mouth_open);
+            model_mesh_inst.set("blend_shapes/morph_13", f64::from(left_eye));
+            model_mesh_inst.set("blend_shapes/morph_14", f64::from(right_eye));
+            model_mesh_inst.set("blend_shapes/morph_29", f64::from(mouth_open));
         }
     }
 }
@@ -204,20 +192,20 @@ impl PreviewViewport {
 fn calc_ear(landmarks: &[Vector2D<f32, UnknownUnit>]) -> (f32, f32) {
     // eye left
     let left = single_ear(
+        *landmarks.get(36).unwrap(),
         *landmarks.get(37).unwrap(),
         *landmarks.get(38).unwrap(),
         *landmarks.get(39).unwrap(),
         *landmarks.get(40).unwrap(),
         *landmarks.get(41).unwrap(),
-        *landmarks.get(42).unwrap(),
     );
     let right = single_ear(
+        *landmarks.get(42).unwrap(),
         *landmarks.get(43).unwrap(),
         *landmarks.get(44).unwrap(),
         *landmarks.get(45).unwrap(),
         *landmarks.get(46).unwrap(),
         *landmarks.get(47).unwrap(),
-        *landmarks.get(48).unwrap(),
     );
     (left, right)
 }
@@ -231,8 +219,7 @@ fn single_ear(
     p5: Vector2D<f32, UnknownUnit>,
     p6: Vector2D<f32, UnknownUnit>,
 ) -> f32 {
-    (euclid_distance(p2, p6) + euclid_distance(p3, p5))
-        / (2_f32 * euclid_distance(p1, p4)).clamp(0_f32, 1_f32)
+    (euclid_distance(p2, p6) + euclid_distance(p3, p5)) / (2_f32 * euclid_distance(p1, p4))
 }
 
 #[inline]

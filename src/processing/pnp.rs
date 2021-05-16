@@ -1,35 +1,18 @@
-use arrayvec::ArrayVec;
-use arrsac::Arrsac;
 use cv::{
     camera::pinhole::NormalizedKeyPoint,
     estimate::LambdaTwist,
-    nalgebra::{Isometry, IsometryMatrix3, Point2, Point3, Rotation, U3},
-    Consensus, Estimator, FeatureWorldMatch, Projective, WorldPoint,
+    nalgebra::{Isometry, Point2, Point3, Rotation, U3},
+    Estimator, FeatureWorldMatch, Projective, WorldPoint,
 };
 use facial_processing::utils::{face::FaceLandmark, misc::EulerAngles};
-use gdnative::godot_print;
 use image::{ImageBuffer, Rgb};
-use rand::{prelude::StdRng, SeedableRng};
-use std::{
-    cell::RefCell,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
 pub struct FacePnP {
-    arrsac: RefCell<Arrsac<StdRng>>,
     lambda: LambdaTwist,
     face_points: [Point3<f64>; 6],
 }
 
 impl FacePnP {
     pub fn new() -> Self {
-        let time = {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        };
-        let arrsac = RefCell::new(Arrsac::new(0.5_f64, StdRng::seed_from_u64(time)));
         let lambda = LambdaTwist::new();
         let face_points = [
             Point3::new(0.0, 0.0, 0.0),          // Nose Tip
@@ -41,7 +24,6 @@ impl FacePnP {
         ];
 
         FacePnP {
-            arrsac,
             lambda,
             face_points,
         }
@@ -69,11 +51,6 @@ impl FacePnP {
                 FeatureWorldMatch(*nrm_img_pt, WorldPoint::from_point(*world_face_pt))
             });
 
-        let a = Estimator::estimate(&self.lambda, face_points_with_nrm_img_points.clone());
-        for pt in a {
-            let isometry: &Isometry<f64, U3, Rotation<f64, U3>> = pt.as_ref();
-            let (x, y, z) = isometry.rotation.euler_angles();
-        }
         // TODO: check out second rotation
         for pose in Estimator::estimate(&self.lambda, face_points_with_nrm_img_points) {
             let isometry: &Isometry<f64, U3, Rotation<f64, U3>> = pose.as_ref();
