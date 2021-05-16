@@ -116,10 +116,16 @@ impl PreviewViewport {
         &self,
         owner: TRef<Viewport>,
         landmarks: Variant,
-        _facebox: Variant,
+        facebox: Variant,
         angle: Variant,
     ) {
         godot_print!("process");
+        godot_print!(
+            "landmark: {:?} \nfacebox: {:?} \nangle:{:?}",
+            landmarks,
+            facebox,
+            angle
+        );
         if self.loaded_model.borrow().is_some() {
             let node_name = self.name.borrow().clone();
             // FIXME: replace with acutal node!
